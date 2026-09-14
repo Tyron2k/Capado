@@ -64,13 +64,30 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Python health check — the image no longer ships curl (removed to shrink the runtime
+    # attack surface), and the interpreter is always present. Mirrors the Dockerfile HEALTHCHECK.
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3001/api/health || exit 1"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:3001/api/health', timeout=4).status==200 else 1)"
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 30s
     restart: unless-stopped
+    # Runtime hardening. The image already runs as a non-root user (uid 10001); these close the
+    # rest: read_only makes the root filesystem immutable so a compromised process cannot persist
+    # a change, tmpfs gives the few paths that must be writable, no-new-privileges blocks setuid
+    # escalation, and dropping ALL capabilities removes kernel privileges the app never uses.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
   frontend:
     image: ${CAPADO_IMAGE_PREFIX:-ghcr.io/tyron2k/capado}/frontend:${CAPADO_VERSION:-latest}
@@ -85,12 +102,27 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      # 127.0.0.1, not localhost: localhost also resolves to ::1, and nginx here listens on IPv4
+      # only (the image's ipv6-by-default step is skipped because the rendered config lives in
+      # /tmp, outside the path it patches). wget would try ::1 first and fail against a healthy
+      # server. An explicit IPv4 address sidesteps the ambiguity.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 20s
     restart: unless-stopped
+    # Runtime hardening, matching the backend. The image already runs as the unprivileged nginx
+    # user (uid 101); read_only freezes the root filesystem, tmpfs supplies the paths nginx must
+    # write (its rendered config, pid and temp files all live under /tmp), no-new-privileges
+    # blocks escalation, and cap_drop removes kernel privileges the static file server never uses.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
   capado_data:
