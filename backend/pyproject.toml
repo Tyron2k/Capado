@@ -23,6 +23,12 @@ dependencies = [
     "python-multipart==0.0.32",  # Required by FastAPI for UploadFile/Form parsing
     "httpx==0.28.1",  # HTTP client for OIDC token exchange and userinfo requests
     "pydantic-settings==2.15.0",  # BaseSettings for centralized app.config.settings
+    # Not imported by the app — pinned only to lift the version the base image ships. The
+    # python:3.12-slim layer carried setuptools 70.3.0, which Trivy flags for CVE-2025-47273
+    # (path traversal, fixed in 78.1.1). Declaring it here puts it in uv.lock so the venv gets
+    # the patched version, and lets Dependabot advance it like any other dependency. Range, not
+    # a pin, because it is a build tool nothing in the app calls — there is no API to break.
+    "setuptools>=78.1.1",
 ]
 
 # Development/test dependencies are declared once under [dependency-groups]
