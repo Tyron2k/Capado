@@ -96,7 +96,16 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    # The base image's SYSTEM python ships setuptools 70.3.0, which Trivy flags for
+    # CVE-2025-47273 (path traversal, fixed in 78.1.1). This is separate from the venv, which
+    # the app actually runs from and where uv.lock already pins a patched setuptools — Trivy
+    # scans both, so the unused system copy fails the gate on its own. The app never imports
+    # this one (PATH points at /app/.venv/bin), but upgrading it is simpler and safer than
+    # removing it from an externally-managed python. --break-system-packages is required
+    # because the base image marks the system python EXTERNALLY-MANAGED (PEP 668); it is
+    # correct here precisely because nothing depends on this copy.
+    && python3 -m pip install --no-cache-dir --break-system-packages --upgrade "setuptools>=78.1.1"
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY --from=builder /app/.venv /app/.venv
