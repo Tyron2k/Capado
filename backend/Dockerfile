@@ -50,7 +50,7 @@
 # final image: only /app/.venv is copied out, and the compilers that made it stay
 # behind. Upgrading here would add a minute to every build and change nothing that
 # ships.
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -65,7 +65,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # --- Development (default target for docker compose) -----------------------
-FROM python:3.12-slim AS dev
+FROM python:3.14-slim AS dev
 
 WORKDIR /app
 
@@ -88,7 +88,7 @@ EXPOSE 3001
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3001", "--reload"]
 
 # --- Production: minimal runtime image ------------------------------------
-FROM python:3.12-slim AS production
+FROM python:3.14-slim AS production
 
 WORKDIR /app
 
