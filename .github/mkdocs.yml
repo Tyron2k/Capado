@@ -1,0 +1,126 @@
+# Project site for Capado — https://<org>.github.io/Capado/
+#
+# WHY MKDOCS AND NOT PLAIN GITHUB PAGES: docs/ already holds 29 files in a Diátaxis layout, and the one
+# thing that structure needs to be usable is navigation and search. Plain Pages would render the same
+# markdown with no way to move between the four sections.
+#
+# The docs stay ENGLISH, as they were written. Only the landing page is bilingual, mirroring the
+# README.md / README.en.md pattern already in the repo — translating 4700 lines of reference material
+# would double the maintenance for a readership that reads English anyway.
+#
+# NOT INCLUDED IN nav: docs/compliance/. That document is written for a works council and lists the
+# personal data an installation processes; it belongs to a DEPLOYMENT, not to the software's public
+# documentation. It stays reachable from the README for anyone who needs it.
+
+site_name: Capado
+site_description: Capacity planning for people and machines, with skill matching. Self-hosted.
+site_url: https://example.github.io/Capado/
+repo_url: https://github.com/Tyron2k/Capado
+repo_name: Capado
+edit_uri: edit/main/docs/
+
+# Everything the site renders lives in docs/. The two READMEs stay at the repo root, where GitHub
+# shows them, and the landing page below carries their content in shortened form.
+#
+# This config lives in .github/, not the repo root, so both paths are relative to that: the
+# docs tree and the build output sit at the repo root, one level up. Every mkdocs invocation
+# must therefore pass -f .github/mkdocs.yml (there is no root config for it to find by default).
+docs_dir: ../docs
+site_dir: ../site
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    # Renders the "Edit this page" pencil, which is how a docs bug gets fixed by whoever spots it.
+    - content.action.edit
+  palette:
+    # Follow the reader's system setting first, with a manual override — the app itself has a dark
+    # mode, so a docs site that only does light would look like a different product.
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Follow system
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+plugins:
+  - search
+
+# Explicit nav rather than automatic: the automatic order is alphabetical, which would put the API
+# reference before the getting-started guide and bury the ADRs' own README under ADR-009.
+nav:
+  - Home: index.md
+  - Startseite (Deutsch): index.de.md
+  - Getting started:
+      - Local setup: how-to/local-setup.md
+      - Upgrading: how-to/upgrading.md
+      - Publishing a release: how-to/publishing-a-release.md
+      - Adding a feature: how-to/adding-a-feature.md
+  - Understanding it:
+      - Architecture: explanation/architecture.md
+      - Capacity model: explanation/capacity-model.md
+      - Conflict detection: explanation/conflict-detection.md
+  - Reference:
+      - API: reference/api.md
+      - Data model: reference/data-model.md
+      - Import and export: reference/import-export.md
+      - Date handling: reference/date-handling.md
+      - Layout components: reference/layout-components.md
+      - CI: reference/ci.md
+      - Known limitations: reference/known-limitations.md
+      - Glossary: reference/glossary.md
+  - For works councils:
+      - Zweck und Grenzen (Deutsch): compliance/zweck-und-grenzen-de.md
+  - Decisions:
+      - Why ADRs, and where they stop: decisions/README.md
+      - ADR-001 Config and auth hardening: decisions/001-config-and-auth-hardening.md
+      - ADR-002 Refresh token cookie: decisions/002-refresh-token-cookie.md
+      - ADR-003 Single tenant and sites: decisions/003-single-tenant-and-sites.md
+      - ADR-004 Hours as capacity base: decisions/004-hours-as-capacity-base.md
+      - ADR-005 Infrastructure availability windows: decisions/005-infrastructure-availability-windows.md
+      - ADR-006 Audit trail: decisions/006-audit-trail.md
+      - ADR-007 Plan baselines: decisions/007-plan-baselines.md
+      - ADR-008 Project hierarchy: decisions/008-project-hierarchy.md
+      - ADR-009 No actual time recording: decisions/009-no-actual-time-recording.md
+
+# docs/README.md is the map for someone reading the repo, not a page of the site — the nav above IS
+# that map here, so rendering both would state the structure twice and let them drift apart.
+#
+# The leading slash is load-bearing: these are gitignore-style patterns, so a bare `README.md` also
+# matches `decisions/README.md` and would silently drop the ADR index that two pages link to. MkDocs
+# reports that as INFO, not a warning, so `--strict` does NOT catch it — the build stays green with a
+# missing page. Anchored to docs_dir it hits exactly the one file intended.
+exclude_docs: |
+  /README.md

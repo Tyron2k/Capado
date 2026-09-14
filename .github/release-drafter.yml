@@ -1,0 +1,63 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+categories:
+  - title: "🚀 Features"
+    labels:
+      - "feature"
+  - title: "🐛 Bug Fixes"
+    labels:
+      - "fix"
+  - title: "🧹 Maintenance"
+    labels:
+      - "dependencies"
+      - "ci"
+      - "refactor"
+  - title: "📖 Documentation"
+    labels:
+      - "documentation"
+
+# Auto-label PRs based on Conventional Commit prefix in the title
+autolabeler:
+  - label: "feature"
+    title:
+      - '/^feat(\(.+\))?:/'
+  - label: "fix"
+    title:
+      - '/^fix(\(.+\))?:/'
+  - label: "refactor"
+    title:
+      - '/^refactor(\(.+\))?:/'
+  - label: "documentation"
+    title:
+      - '/^docs(\(.+\))?:/'
+  - label: "ci"
+    title:
+      - '/^ci(\(.+\))?:/'
+  - label: "dependencies"
+    title:
+      - '/^chore\(deps\)/'
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - "breaking"
+  minor:
+    labels:
+      - "feature"
+  patch:
+    labels:
+      - "fix"
+      - "refactor"
+      - "dependencies"
+  default: patch
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

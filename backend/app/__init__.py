@@ -1,0 +1,1 @@
+"""Capado backend application package."""

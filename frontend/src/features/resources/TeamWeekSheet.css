@@ -1,0 +1,98 @@
+/*
+ * The printable team week.
+ *
+ * Written for paper first. The screen version is the same table, which is deliberate: a sheet that
+ * looks different on paper than it did on screen is a sheet somebody prints twice.
+ *
+ * Landscape, because seven day columns plus a name column do not fit portrait at a legible size —
+ * and a sheet nobody can read at arm's length on a workshop wall has failed at its only job.
+ */
+
+.team-week-sheet {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.team-week-sheet th,
+.team-week-sheet td {
+  border: 1px solid var(--mantine-color-gray-4);
+  padding: 4px 6px;
+  vertical-align: top;
+  text-align: left;
+}
+
+.team-week-sheet th {
+  background: var(--mantine-color-gray-1);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.team-week-name {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.team-week-cell {
+  /* Seven equal columns; the name column takes what is left. */
+  width: 12%;
+  min-width: 80px;
+}
+
+.team-week-closed {
+  /* Distinguishable in colour AND by the em-dash the component renders, so the meaning
+     survives a black-and-white printer. */
+  background: var(--mantine-color-gray-2);
+}
+
+@media print {
+  /* Hide everything except the sheet. Printing the app shell wastes the first page on
+     navigation nobody can click on paper. */
+  body * {
+    visibility: hidden;
+  }
+
+  .team-week-sheet,
+  .team-week-sheet * {
+    visibility: visible;
+  }
+
+  .team-week-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    font-size: 9pt;
+  }
+
+  /* The week navigation and the print button itself are meaningless on paper. */
+  .team-week-controls {
+    display: none;
+  }
+
+  .team-week-sheet th {
+    /* Repeated on every page by the browser when thead is used, which is why the component
+       emits a real thead rather than a styled first row. */
+    background: #eee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .team-week-closed {
+    background: #eee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .team-week-sheet tr {
+    /* A person's week must not be split across a page break — half a row on the next sheet
+       is how somebody reads the wrong days. */
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: landscape;
+    margin: 10mm;
+  }
+}

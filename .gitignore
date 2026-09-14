@@ -1,0 +1,116 @@
+# ===========================================================================
+# Root .gitignore — covers backend/, frontend/, and repo-wide files
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# OS / Editor
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ---------------------------------------------------------------------------
+# Environment & secrets
+# ---------------------------------------------------------------------------
+.env
+certs/*.crt
+certs/*.key
+certs/*.pem
+
+# ---------------------------------------------------------------------------
+# Docker
+# ---------------------------------------------------------------------------
+docker-compose.override.yml
+postgres_data/
+
+# ---------------------------------------------------------------------------
+# Backups
+# ---------------------------------------------------------------------------
+backups/
+
+# ---------------------------------------------------------------------------
+# Seed data — operator-specific, never part of the codebase
+# ---------------------------------------------------------------------------
+# Seeding is external to the application (see docs/explanation/architecture.md). A seeds/
+# directory holds one operator's real personnel, projects and assignments, so this is a guard
+# rather than a convenience: the rule used to live only in prose, and prose does not stop
+# `git add -A`.
+seeds/
+
+# ---------------------------------------------------------------------------
+# Kiro / IDE config (optional — remove if you want these tracked)
+# ---------------------------------------------------------------------------
+.kiro
+.vscode
+
+# ---------------------------------------------------------------------------
+# Python (backend/)
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.hypothesis/
+*.db
+test.db
+.coverage
+coverage/
+
+# Ruff
+.ruff_cache/
+
+# ---------------------------------------------------------------------------
+# Node.js / TypeScript (frontend/)
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Incremental build state. This project type-checks with `tsc -b`, which writes a .tsbuildinfo per
+# referenced project. Committing one poisons every other clone: the build trusts it and can report
+# clean while the code does not compile.
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# code2prompt output. Regenerable, so it is never committed — but the reason it is listed here is
+# sharper than tidiness: an output file left in the tree gets swallowed by the NEXT run. A dump of
+# this repository measured 1.82 million tokens, and 911K of that — half — was a previous repo.md
+# reading itself. The ignore rule is what stops that from compounding.
+#
+# .context/ holds the chunked dumps produced by scripts/context_chunks.py, regenerated on a schedule.
+# The script excludes the directory from its own input for the same reason.
+.context/
+repo.md
+repo-structure.md
+code2prompt-*.md
+*.c2p.md
+
+# MkDocs build output. Not ignored until now, which made a local `mkdocs build --strict` leave an
+# untracked directory that `git add -A` would happily commit — several hundred generated files.
+# CI builds and publishes it; nobody needs it in the tree.
+/site/

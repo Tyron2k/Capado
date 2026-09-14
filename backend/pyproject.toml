@@ -1,0 +1,154 @@
+# Backend Python project configuration.
+#
+# Managed with uv. Install deps: `uv sync`
+# Run tests: `uv run pytest`
+
+[project]
+name = "capado-backend"
+version = "0.1.0"
+description = "Capado backend service"
+license = "GPL-3.0-only"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.52.4",  # CLI entry point: uv run uvicorn app.main:app
+    "sqlmodel==0.0.42",
+    "asyncpg==0.31.0",  # Engine driver loaded via postgresql+asyncpg:// URI
+    "sqlalchemy[asyncio]==2.0.52",
+    "alembic==1.19.1",
+    "pydantic==2.13.5",
+    "bcrypt==5.0.0",
+    "PyJWT==2.13.0",  # Imported as 'jwt' in app/services/auth_service.py
+    "openpyxl==3.1.5",
+    "python-multipart==0.0.32",  # Required by FastAPI for UploadFile/Form parsing
+    "httpx==0.28.1",  # HTTP client for OIDC token exchange and userinfo requests
+    "pydantic-settings==2.15.0",  # BaseSettings for centralized app.config.settings
+]
+
+# Development/test dependencies are declared once under [dependency-groups]
+# (the uv-native location) — see the bottom of this file.
+
+[tool.pytest.ini_options]
+# Single source of pytest configuration. A `pytest.ini` next to this file would
+# silently take precedence and disable everything configured here.
+asyncio_mode = "auto"
+# pytest-asyncio >= 1.0 requires an explicit fixture loop scope; without it every
+# run emits a deprecation warning.
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-n auto --dist worksteal -q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+extend-exclude = [
+    ".venv",
+    ".hypothesis",
+    ".pytest_cache",
+    "alembic/versions",
+    "fix_docstrings.py",
+]
+
+[tool.ruff.lint]
+# A pragmatic default set. Tighten over time; do not explode the diff now.
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort (import order)
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "D",    # pydocstyle (Google convention)
+]
+ignore = [
+    "E501",  # line too long — ruff format owns wrapping
+    "B008",  # FastAPI Depends(...) in defaults is idiomatic
+    "D105",  # magic methods don't need docstrings
+    "D107",  # __init__ docstrings are optional (class docstring suffices)
+    "UP046", # Pydantic BaseModel + Generic[T] pattern not yet compatible with PEP 695
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests may reuse names, star-import fixtures, etc.
+"tests/**/*.py" = ["F401", "F403", "F811", "D"]
+# Alembic templates
+"alembic/env.py" = ["E402"]
+# Scripts are invoked externally
+"app/scripts/**/*.py" = ["D"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+# ---------------------------------------------------------------------------
+# Type checking
+# ---------------------------------------------------------------------------
+# Scoped to `app`. Tests are excluded on purpose: they construct services with
+# `session=None` and hand-built doubles, which is the project's testing style
+# (see tests/test_work_package_service.py) and cannot be expressed to a checker
+# without littering the tests with ignores.
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+
+# These five codes are switched off because SQLModel annotates a column as its
+# PYTHON type rather than as an InstrumentedAttribute. `Assignment.start_date`
+# is therefore `date | None` to a checker, so every query expression built from
+# it looks invalid:
+#
+#     Assignment.resource_id.in_(ids)      -> "UUID" has no attribute "in_"
+#     Assignment.start_date <= end         -> unsupported operand date/None
+#     Field(..., sa_column=Column(...))    -> no matching overload
+#
+# This is a consequence of the modelling style, not a gap in the tool: pyright
+# and ty report the same, because the annotation genuinely says `date | None`.
+# The only real fix is migrating the models to SQLAlchemy 2.0 `Mapped[...]` /
+# `mapped_column(...)`, which means giving up SQLModel's field syntax across 24
+# models — a deliberate decision, not a side effect of adding a linter.
+#
+# Measured cost of switching them off: 246 findings drop to 35, and of those 35
+# roughly a third were genuine (a WorkPackage | None assigned to a WorkPackage,
+# an Ellipsis sentinel with no matching annotation, several variables reused for
+# two different resource types). Everything the codes below still catch —
+# call-arg, assignment, var-annotated, return-value, name-defined, unreachable —
+# fires on real code rather than on the ORM.
+disable_error_code = [
+    "attr-defined",
+    "arg-type",
+    "call-overload",
+    "union-attr",
+    "operator",
+]
+
+[[tool.mypy.overrides]]
+# Alembic migrations are excluded from ruff too (see .pre-commit-config.yaml);
+# they are generated-then-edited scripts, not application code.
+module = "alembic.*"
+ignore_errors = true
+
+# Single source of truth for development/test dependencies.
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.20.0",  # In-memory async database for integration tests. Viable because
+    # UUIDArray already falls back to JSON off PostgreSQL (app/utils/pg_types.py) — the
+    # portability was built and never used.
+    "httpx>=0.28.1",  # AsyncClient (ASGI transport) in tests
+    "hypothesis>=6.165.7",  # Property-based testing
+    "pytest>=9.1.1",  # CLI entry point: uv run pytest
+    "pytest-asyncio>=1.4.0",  # Async test support (asyncio_mode config)
+    "pytest-cov>=7.1.0",  # Coverage reporting
+    # pytest-md-report was dropped: it silently stops producing any report from
+    # pytest 8.4 on, and pytest-asyncio >= 1.0 requires pytest >= 8.4.
+    "pytest-xdist>=3.8.0",  # Parallel test execution (addopts -n auto)
+    "ruff==0.16.6",  # Lint + format — must equal the rev in .pre-commit-config.yaml
+    "mypy==2.3.1",  # Type check — runs as its own CI job, see .github/workflows/ci.yml
+    "types-openpyxl>=3.1.5",  # Stubs for the import/export workbook writers
+]

@@ -1,0 +1,23 @@
+/*
+ * Row highlight for the resource Gantt.
+ *
+ * This is the answer to "can the bars have colours". The reported need was not telling work packages
+ * apart — it was not losing your row while reading sideways across a wide chart. Zebra striping plus
+ * a hover highlight solves that and costs no colour, which matters because colour here already means
+ * something: a red bar is a conflict. Per-work-package hues would overwrite the one signal that says
+ * where it hurts.
+ *
+ * Why a wrapper with `display: contents` rather than :hover on each cell: the label cell and the bar
+ * area are SIBLING grid items, not parent and child, so :hover on one cannot reach the other and only
+ * half the row would light up. A wrapper still receives :hover from its children while generating no
+ * box of its own, so its children stay direct grid items and keep the 200px / 1fr layout.
+ *
+ * Doing this in CSS rather than React state is also what keeps a chart with hundreds of rows from
+ * re-rendering on every mousemove.
+ */
+
+.gantt-row:hover > .gantt-row-cell {
+  /* Deliberately stronger than the zebra stripe, so hover wins on both odd and even rows —
+     otherwise every second row would appear not to respond. */
+  background-color: light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-5)) !important;
+}

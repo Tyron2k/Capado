@@ -1,0 +1,10 @@
+# Dependencies for the project site only — deliberately NOT in backend/pyproject.toml.
+#
+# The docs site is repo-root tooling and has nothing to do with the application's runtime or test
+# dependencies. Putting it in the backend's dev group would install a web theme into the venv that runs
+# the test suite, and would make `uv sync` slower for everyone who never builds the site.
+#
+# Pinned exactly, for the same reason ruff and mypy are: a theme that changes its rendering between
+# builds turns "the docs look different" into a question nobody can answer from the diff.
+mkdocs==1.6.1
+mkdocs-material==9.7.7

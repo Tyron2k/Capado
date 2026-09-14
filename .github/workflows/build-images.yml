@@ -1,0 +1,177 @@
+name: Build images
+
+# TRIGGERED BY HAND, on purpose.
+#
+# This build used to run on every push to main and cost about 9.3 minutes each time (backend
+# 216s, frontend 339s — measured, not estimated). Most of those builds were never deployed: on
+# a day with eight merges and one deploy, seven of them produced an `:edge` image nobody pulled.
+# On a metered Actions budget that is the single largest avoidable line item in this repository.
+#
+# The cost is dominated by the emulated linux/arm64 layer, which is also the layer that has hung
+# until GitHub's six hour job ceiling before now. That is why it is not worth running
+# speculatively.
+#
+# WHAT THIS TRADES AWAY: `:edge` is no longer updated automatically, so it can be older than
+# main. Check before deploying — the second tag carries the commit
+# (`edge-<sha>`), so which commit an image contains is always answerable rather than assumed.
+#
+# HOW TO RUN IT
+#
+#   gh workflow run "Build images"
+#   gh run watch
+#
+# or via the Actions tab. A published release builds its own images through release.yml and does
+# not need this.
+on:
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: "Zielplattformen"
+        required: false
+        default: "linux/amd64,linux/arm64"
+        type: choice
+        options:
+          # arm64 is what the deployment host runs (Apple Silicon). amd64-only is offered for a
+          # quick check that the Dockerfile still builds, which costs roughly half.
+          - "linux/amd64,linux/arm64"
+          - "linux/arm64"
+          - "linux/amd64"
+
+concurrency:
+  group: build-images
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            context: ./backend
+          - image: frontend
+            context: ./frontend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase repo name
+        id: repo
+        run: echo "name=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.context }}
+          target: production
+          platforms: ${{ inputs.platforms }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo.outputs.name }}/${{ matrix.image }}:edge
+            ghcr.io/${{ steps.repo.outputs.name }}/${{ matrix.image }}:edge-${{ github.sha }}
+          # Standard OCI labels, so `docker image inspect` can answer which commit an image
+          # contains. Without them the obvious check returns an empty string, which reads like a
+          # missing image rather than a missing label — that cost a wrong instruction in the
+          # upgrade guide and a few minutes of looking for the wrong problem.
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+          build-args: |
+            VITE_APP_VERSION=edge-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ---------------------------------------------------------------------------------------
+      # Scan the artefact an operator actually runs.
+      #
+      # The image is this project's distribution model — operators self-host from these
+      # containers — and until now nothing looked at them. A dependency audit of the source tree
+      # does not cover the base image, its OS packages, or anything the build pulls in.
+      #
+      # Placed AFTER the push on purpose: the digest that exists in the registry is the thing to
+      # scan, and scanning a locally built copy would leave the pushed one unexamined.
+      #
+      # BLOCKING, and only after three steps in that order: repair, measure, fix, then flip.
+      #
+      # This step was first added pinned to a tag that does not exist (`0.28.0`; the real tags carry a
+      # `v` prefix), and because this workflow is workflow_dispatch the mistake sat unexecuted until
+      # someone tried to build a release image. Once repaired it reported 7 fixable HIGH advisories,
+      # all seven in util-linux from the nginx:alpine base — fixed by the `apk upgrade` in
+      # frontend/Dockerfile, and the next build reported 0 for BOTH images.
+      #
+      # So the backlog a hard failure could block on is empty, and the only thing exit-code 1 can now
+      # stop is a NEW critical finding in a release image. That is the point of the gate.
+      #
+      # `ignore-unfixed` stays on: an advisory with no available fix would otherwise block a release
+      # for something nobody can act on. When one appears that matters, pin the base image instead of
+      # widening this.
+      - name: Scan image (Trivy)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.repo.outputs.name }}/${{ matrix.image }}:edge-${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          output: trivy-${{ matrix.image }}.txt
+
+      # STDOUT AS WELL AS THE SUMMARY, and the reason is operational rather than cosmetic. The
+      # first version wrote only to $GITHUB_STEP_SUMMARY, which is not readable through the API or
+      # `gh run view --log` — so the findings existed but could not be triaged without opening a
+      # browser, and an automated triage was impossible. A scan whose result cannot be read
+      # programmatically is only marginally better than one that does not run.
+      - name: Report scan findings
+        if: always()
+        run: |
+          report="trivy-${{ matrix.image }}.txt"
+          if [ -s "$report" ]; then
+            echo "===== Trivy findings: ${{ matrix.image }} (CRITICAL/HIGH, fixable only) ====="
+            cat "$report"
+            echo "===== end of Trivy findings ====="
+          else
+            echo "Trivy: no fixable CRITICAL or HIGH findings in ${{ matrix.image }}."
+          fi
+          {
+            echo "### Trivy — ${{ matrix.image }} (CRITICAL/HIGH, fixable only)"
+            echo '```'
+            if [ -s "$report" ]; then tail -60 "$report"; else echo "none"; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # An SBOM is what enterprise procurement asks for, independently of whether the CRA obliges it.
+      # Attached to the workflow run rather than pushed as an attestation: that keeps this change
+      # to one file and no new registry permissions.
+      - name: Generate SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ghcr.io/${{ steps.repo.outputs.name }}/${{ matrix.image }}:edge-${{ github.sha }}
+          format: cyclonedx
+          output: sbom-${{ matrix.image }}.json
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: sbom-${{ matrix.image }}
+          path: sbom-${{ matrix.image }}.json
+          retention-days: 90

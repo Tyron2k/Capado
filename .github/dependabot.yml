@@ -1,0 +1,108 @@
+version: 2
+
+updates:
+  - package-ecosystem: "uv"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "backend"
+    open-pull-requests-limit: 10
+    groups:
+      all-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "frontend"
+    open-pull-requests-limit: 10
+    groups:
+      all-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # WAIT FOR TYPESCRIPT 7.1, not for typescript-eslint. TS 7 is the Go reimplementation and ships
+      # NO JavaScript API at all; Microsoft states 7.1 will bring a new (and different) one. Until it
+      # exists there is nothing typescript-eslint can implement — its tracking issue
+      # typescript-eslint#10940 is labelled "blocked by external API" and was locked by a maintainer
+      # on 2026-07-09 with exactly that reason. Bumping the lint tooling will not unblock this.
+      #
+      # The symptom, so nobody re-diagnoses it: typescript-eslint 8.69.0 declares
+      # `typescript >=4.8.4 <6.1.0` and refuses TS 7 in code — `eslint src` exits 2 with
+      # "typescript-eslint does not support TS 7.0" before linting a single file. Checked 2026-09-05:
+      # the canary (8.69.1-alpha.0) carries the identical peer range, so no prerelease helps.
+      #
+      # OUR CODE IS READY: `tsc -b --force` compiles the whole frontend on TS 7 without one
+      # diagnostic. The blocker is purely the lint gate.
+      #
+      # Microsoft documents running TS 6 side by side for tools needing the old API. Deliberately NOT
+      # doing that: the linter would type-check against a different compiler than the build, making a
+      # disagreement between them irreproducible — the same trap as the two ruff versions in #118.
+      # (It is also reportedly not friction-free; see microsoft/typescript-go#4567.)
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci(deps)"
+    labels:
+      - "dependencies"
+      - "ci"
+    open-pull-requests-limit: 5
+
+  # Without this, a ruff bump in backend/pyproject.toml leaves the hook rev in
+  # .pre-commit-config.yaml behind, and the two lint with different versions. That drift is silent:
+  # everything keeps passing until a rule changes between the versions, and then the hook reports a
+  # finding a developer cannot reproduce with their own ruff. Watching this file is what keeps the
+  # pin honest, rather than a comment asserting that it is.
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "tooling"
+
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+      - "docker"

@@ -1,0 +1,96 @@
+# Run Capado from the published images — for evaluating it and for self-hosting.
+#
+# Nothing is built here. `docker-compose.yml` is the DEVELOPMENT setup: it builds the dev image
+# targets and bind-mounts the source for hot reload, which is the wrong thing to hand somebody who
+# just wants to see whether Capado is useful to them.
+#
+#   cp .env.example .env      # then set POSTGRES_PASSWORD and JWT_SECRET_KEY
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Two deliberate differences from the development file:
+#
+#   The database port is NOT published. Only the backend talks to Postgres, and both share this
+#   compose network, so exposing 5432 on the host would widen the attack surface for nothing.
+#
+#   The volume is managed by Compose rather than declared external, so there is no `docker volume
+#   create` step to forget. It is therefore a DIFFERENT database from the development file's —
+#   deliberately, so a stray `docker compose up` cannot write into data you are self-hosting.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: capado_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-capado_user}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"
+      POSTGRES_DB: ${POSTGRES_DB:-capado}
+    volumes:
+      - capado_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-capado_user} -d ${POSTGRES_DB:-capado}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    image: ${CAPADO_IMAGE_PREFIX:-ghcr.io/tyron2k/capado}/backend:${CAPADO_VERSION:-latest}
+    container_name: capado_backend
+    environment:
+      # Turns on the fail-fast checks. The backend refuses to start in production without a real
+      # JWT_SECRET_KEY rather than inventing a per-process one, which would silently invalidate
+      # every session on restart.
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-capado_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-capado}
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env — generate one with openssl rand -hex 32}"
+      # The browser talks to the frontend's own origin and nginx proxies /api/ onwards, so this
+      # only needs the public URL people actually open.
+      CORS_ORIGINS: ${CAPADO_PUBLIC_URL:-http://localhost:3000}
+      FRONTEND_URL: ${CAPADO_PUBLIC_URL:-http://localhost:3000}
+      # Secure by default, because the opposite mistake is invisible: a cookie sent over plain
+      # HTTP behind a TLS deployment is a regression nobody notices, whereas a Secure cookie on
+      # localhost fails loudly — you are logged out on every page load. Set COOKIE_SECURE=false
+      # in .env for a plain-HTTP trial.
+      COOKIE_SECURE: "${COOKIE_SECURE:-true}"
+      # Number of reverse proxies in front of Capado. Only raise this if you actually run one —
+      # trusting a forwarded client IP that nobody sets lets a caller spoof it past the auth
+      # rate limit.
+      TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    image: ${CAPADO_IMAGE_PREFIX:-ghcr.io/tyron2k/capado}/frontend:${CAPADO_VERSION:-latest}
+    container_name: capado_frontend
+    environment:
+      # nginx resolves this at container start and proxies /api/ to it. The default matches the
+      # backend's container_name above, so this only needs changing if you rename that service.
+      API_BACKEND_URL: ${API_BACKEND_URL:-http://capado_backend:3001}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  capado_data:

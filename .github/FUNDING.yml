@@ -1,0 +1,17 @@
+# GitHub Sponsors button for this repository.
+#
+# The button only appears once a Sponsors profile exists at github.com/sponsors — this file points
+# at it, it does not create it. Setting the profile up requires identity and payout details and can
+# only be done by the account owner.
+#
+# Deliberately donations only, and that is a legal position rather than modesty: under the EU Cyber
+# Resilience Act, free and open-source software that its author does not monetise is explicitly not
+# a commercial activity, and accepting donations without generating profit from the software keeps
+# it outside the manufacturer obligations (vulnerability handling, SBOM, five-year support, 24-hour
+# reporting to ENISA). Paid support or hosting would cross that line — on purpose or by accident —
+# so the day either starts, this file is not the only thing that needs revisiting.
+#
+# Selling licences is no longer on the table at all: contributions are inbound = outbound under the
+# GPL-3.0 with no contributor agreement, so relicensing would require every contributor's consent.
+
+github: Tyron2k

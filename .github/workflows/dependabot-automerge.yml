@@ -1,0 +1,75 @@
+name: Dependabot Auto-Merge
+
+# Triggered by the completion of the CI workflow rather than by `pull_request`,
+# for three reasons:
+#
+#   * The merge has to be gated on a green CI run. Branch protection with
+#     required status checks is unavailable here (private repository on the Free
+#     plan), so nothing outside this workflow can enforce that gate.
+#   * Calling ci.yml as a reusable workflow would run the whole pipeline a second
+#     time, including the emulated linux/arm64 image build, and its
+#     `cancel-in-progress` concurrency group is keyed on github.ref — so the two
+#     runs would cancel each other.
+#   * `workflow_run` always executes the copy of this file on the default
+#     branch, so changes to the merge logic take effect immediately instead of
+#     only after every open Dependabot pull request has been rebased.
+#
+# Only CI gates the merge; CodeQL runs independently and is not waited for.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  merge:
+    name: Merge minor/patch
+    # workflow_run fires for every CI run, including pushes to main and runs that
+    # failed. Narrow it down before spending a runner.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Merged with a plain `gh pr merge` instead of `--auto`: enabling GitHub's
+      # auto-merge needs the repository setting "Allow auto-merge", and even with
+      # it the merge would happen immediately because there are no required
+      # status checks to wait for. The workflow_run trigger above is the gate.
+      - name: Merge non-major Dependabot updates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+
+          # `// empty` keeps this quiet (and exit 0) when the branch has no
+          # matching pull request, e.g. after a manual merge.
+          pr=$(gh pr list --repo "$REPO" --head "$HEAD_BRANCH" --state open \
+                 --json number,author \
+                 --jq 'map(select(.author.login == "app/dependabot")) | .[0].number // empty')
+
+          if [ -z "$pr" ]; then
+            echo "No open Dependabot pull request for $HEAD_BRANCH; nothing to do."
+            exit 0
+          fi
+
+          # Dependabot records the semver level per dependency as a YAML trailer
+          # in its commit message. A single major bump anywhere in the set means
+          # the whole pull request is left open for a human to look at, which is
+          # what keeps grouped updates safe.
+          messages=$(gh api "repos/$REPO/pulls/$pr/commits" --jq '.[].commit.message')
+
+          if printf '%s' "$messages" | grep -q 'update-type: version-update:semver-major'; then
+            echo "PR #$pr contains a major update; leaving it for manual review."
+            exit 0
+          fi
+
+          # Branch cleanup is left to the repository's "Automatically delete head
+          # branches" setting, so an already-deleted branch cannot fail this step
+          # after the merge has already gone through.
+          gh pr merge --repo "$REPO" --squash "$pr"

@@ -1,0 +1,287 @@
+name: CI
+
+# Pull requests only. A squash-merge of a green PR produces the same tree the PR just
+# verified, so re-running every gate on main spent about four minutes per merge to learn
+# nothing. The image build moved to build-images.yml, which is triggered by hand when a
+# deploy is actually wanted — see the note there on what this trades away.
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # --- Stage 1: Lint (fast gate, always runs) ---
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    # Every job caps its runtime. Without a cap GitHub only stops a job after six
+    # hours, which is long enough to eat a fifth of the monthly Actions budget on
+    # a single hang. The limits are generous multiples of the observed durations
+    # (lint ~1min, typecheck ~30s, tests ~1min, build ~10min), so they only fire
+    # on a genuine hang rather than on a slow runner.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run prek (pre-commit hooks)
+        run: uvx prek run -a
+
+      # DEAD CODE, BY A TOOL RATHER THAN BY HAND.
+      #
+      # This exists because the manual answer was wrong twice. A grep-and-sed sweep for unreferenced
+      # files reported 20 of them — every one an artefact of BSD sed treating `\?` literally — and a
+      # grep for unused exports reported `ResourceUpdate` as dead when it has four real uses. Both
+      # failed silently and confidently, which is the worst property a check can have.
+      #
+      # BLOCKING, because the backlog is now empty. knip's first run found 4 unused exports, 35
+      # unused exported types and 1 duplicate export; all 40 are gone and it reports nothing. So the
+      # only thing a hard failure can block is a NEW dead export, which is the point.
+      #
+      # Do not restore `|| true` to make a red build green — that returns the gate to decoration,
+      # which was its previous state for a different reason.
+      #
+      # Version-pinned deliberately: knip's zero-config detection is what makes this a two-line step,
+      # and detection defaults changing under us would turn a green gate red for no code reason.
+      - name: Dead code (knip)
+        working-directory: frontend
+        run: |
+          set -o pipefail
+          npx --yes knip@5 --no-progress 2>&1 | tee knip.txt
+          {
+            echo "### Dead code (knip)"
+            echo '```'
+            tail -50 knip.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # --- Stage 2: Type check + Tests (parallel, only if lint passes) ---
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      # `tsc --noEmit` at the root checks NOTHING: tsconfig.json is a solution
+      # file with `files: []` and only references, so it resolves zero inputs.
+      # Build mode follows the references and checks all three projects.
+      - run: npx tsc -b --noEmit
+        working-directory: frontend
+
+  typecheck-python:
+    name: Python types
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    # mypy lives here rather than in prek because the lint job installs no
+    # Python dependencies: without sqlmodel, fastapi and pydantic importable,
+    # mypy resolves nothing and every annotation becomes Any. Duplicating the
+    # dependency list into a pre-commit `additional_dependencies` block would
+    # mean maintaining a second copy of uv.lock by hand.
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      # ONE mypy run, not two. The script invokes mypy with attr-defined enabled and reports
+      # every finding except the closed set of SQLAlchemy column operators, which are the only
+      # false positives that code produces under SQLModel. Running plain `mypy` alongside it
+      # would spend twice the CI minutes to learn the same thing.
+      #
+      # attr-defined is off in pyproject.toml for a good reason — ~150 findings of pure operator
+      # noise — and switching it off cost three shipped bugs in one afternoon: a typo'd dataclass
+      # field, a field read from the wrong model, and a wrong column name. All three passed a
+      # plain mypy run. See backend/scripts/check_attr_defined.py.
+      - name: mypy (incl. attr-defined)
+        run: uv run python scripts/check_attr_defined.py
+
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+
+      # Do not pass paths outside the repository (this step used to write the
+      # markdown report to "$GITHUB_STEP_SUMMARY"). pytest treats an existing
+      # out-of-tree path as a test path argument: the rootdir became
+      # /home/runner/work/_temp, no pytest configuration was found, and
+      # `asyncio_mode = auto` was lost — silently skipping all 47 async tests.
+      #
+      # COVERAGE IS A RATCHET, NOT A TARGET. The floor is set just below the measured value at the
+      # time it was last raised (58%), so ordinary churn cannot break the build while a real drop
+      # does. Raise it deliberately when a gap is closed; never lower it to make a red build green.
+      #
+      # The tooling was present and unused before this: pytest-cov has been a declared dependency
+      # while CI ran plain pytest, so nothing produced a number and nothing noticed that
+      # import_export/projects.py sits at 8% and skill_service.py at 12%.
+      - name: Run tests
+        run: >
+          uv run pytest --tb=short -q
+          --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=57
+
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      # Same ratchet as the backend: floor just below the measured 63% at introduction. The
+      # coverage-v8 provider and a `test:coverage` script were already present and never run in CI.
+      - name: Run tests with coverage
+        run: >
+          npx vitest run --coverage
+          --coverage.thresholds.lines=62
+          --coverage.thresholds.functions=53
+          --coverage.thresholds.branches=55
+
+  # ---------------------------------------------------------------------------------------------
+  # Dependency vulnerabilities.
+  #
+  # WHY THIS IS A WORKFLOW AND NOT A REPOSITORY SETTING. Dependabot's version updates and its
+  # SECURITY alerts are two separate features. The security half is a repository setting, it was off
+  # historically — enabling it surfaced 22 alerts including five `high` — and a repository setting
+  # does NOT move when the code moves to another organisation. A workflow lives in git and travels
+  # with the repository, which is the whole point.
+  #
+  # BLOCKING, because the backlog was measured and is empty. Introduced advisory on a codebase that
+  # had never been scanned; the first two runs reported "No known vulnerabilities found" from
+  # pip-audit and 0 from npm audit, so there is nothing for a hard failure to block on except a NEW
+  # finding — which is exactly what should block.
+  #
+  # If this ever goes red on an unrelated pull request, the answer is to fix or explicitly ignore the
+  # advisory, not to restore `|| true`. That reverts the gate to decoration.
+  # ---------------------------------------------------------------------------------------------
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Python dependencies (pip-audit)
+        working-directory: backend
+        run: |
+          uv sync --frozen
+          set -o pipefail
+          uv run --with pip-audit pip-audit --strict --desc 2>&1 | tee audit-python.txt
+
+      - name: Report Python audit
+        if: always()
+        working-directory: backend
+        run: |
+          {
+            echo "### Python dependency audit"
+            echo '```'
+            tail -40 audit-python.txt 2>/dev/null || echo "no output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Node dependencies (npm audit)
+        working-directory: frontend
+        run: |
+          npm ci
+          set -o pipefail
+          npm audit --audit-level=high 2>&1 | tee audit-node.txt
+
+      - name: Report Node audit
+        if: always()
+        working-directory: frontend
+        run: |
+          {
+            echo "### Node dependency audit"
+            echo '```'
+            tail -40 audit-node.txt 2>/dev/null || echo "no output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

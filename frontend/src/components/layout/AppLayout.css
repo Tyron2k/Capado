@@ -1,0 +1,98 @@
+/* ---------------------------------------------------------------------------
+ * NAVIGATION STATES ARE DERIVED FROM THE SURFACE'S OWN FOREGROUND, not from the theme.
+ *
+ * The navbar is painted in the operator's brand colour, and `--nav-fg` (set inline in AppLayout.tsx)
+ * is whichever of white or near-black actually has contrast against it. Every state below is a
+ * transparency of THAT, so the same rules work whether the brand is navy or pale yellow.
+ *
+ * What they replaced, and why it could not stay: hover used `--mantine-color-default-hover`, a theme
+ * grey that is invisible on a saturated surface; active used `--mantine-primary-color-light` behind
+ * `--mantine-primary-color-filled` text, which is the brand colour on the brand colour. That is the
+ * defect the reference dashboard shipped — its active entry was the least legible element on the
+ * screen — and it would have arrived here the moment the navbar stopped being white.
+ *
+ * `color-mix` rather than an opacity on the row: opacity would fade the icon and the label too, and the
+ * point is to tint the BACKGROUND while the text stays at full strength.
+ * ------------------------------------------------------------------------ */
+
+/* No `color` here: it belongs on the component as a style prop, because a plain class loses to
+ * Mantine's own NavLink rule at equal specificity. See the note at the NavLink in AppLayout.tsx. */
+.navLink {
+  border-radius: 8px;
+  margin-bottom: 4px;
+}
+
+.navLink:hover {
+  background-color: color-mix(in srgb, var(--nav-fg) 14%, transparent) !important;
+}
+
+/* Outlined in the foreground, not the brand: a brand-coloured ring on a brand-coloured surface is not
+ * a focus indicator. This is the only visible cue for keyboard users, so it does not get to be subtle. */
+.navLink:focus-visible {
+  outline: 2px solid var(--nav-fg);
+  outline-offset: 2px;
+}
+
+.navLink[data-active] {
+  background-color: color-mix(in srgb, var(--nav-fg) 22%, transparent) !important;
+  color: var(--nav-fg) !important;
+}
+
+.navLink .mantine-NavLink-label {
+  font-weight: 500;
+}
+
+.navLink[data-active] .mantine-NavLink-label {
+  font-weight: 600;
+}
+
+/* The icons inherit, so they follow the same rule as the label rather than needing their own. */
+.navLink .mantine-NavLink-section {
+  color: var(--nav-fg);
+}
+
+/* ---------------------------------------------------------------------------
+ * The header and navbar colours are set INLINE in AppLayout.tsx, not here.
+ *
+ * They lived in this file for one release, as part of a translucent-surface effect that measurement
+ * then showed to be invisible: Mantine's AppShell.Main sets padding-inline-start and padding-top from
+ * the navbar and header offsets, so content never passes UNDER either surface, and backdrop-filter
+ * had nothing to blur but the flat body colour. Twelve !important, an @supports block and a
+ * prefers-reduced-transparency query for no visible effect — worse than no code, because the next
+ * reader assumes it is deliberate.
+ *
+ * Removing it also removes the reason those !important existed. A class competes with Mantine's own
+ * header rule at equal specificity, so stylesheet order decides — and it decided against this file:
+ * the header fell back to Mantine's light default while every icon inside it is explicitly white, so
+ * they were invisible rather than merely wrong. An inline style has no such contest, which is why the
+ * colours went back there rather than staying here behind a specificity crutch.
+ *
+ * What survived the effect is the shared theme token set in App.tsx. That was a real find: the
+ * typography block was duplicated across both createTheme branches, so a change to it reached only
+ * half the installations.
+ * ------------------------------------------------------------------------ */
+
+/* ---------------------------------------------------------------------------
+ * COLLAPSED NAVIGATION: labels hidden, icons centred.
+ *
+ * The label is hidden with `display: none` rather than by not rendering it, because the accessible name
+ * comes from `aria-label` on the link and the visual label is then purely decorative. Removing it from
+ * the DOM would work too; hiding it keeps one JSX path instead of two, and two paths for one list is how
+ * they drift apart.
+ *
+ * `justify-content: center` on the body is what actually centres the icon: Mantine lays the section and
+ * the label out as a row, and with the label gone the row would otherwise keep its left alignment and
+ * leave the icon hugging the padding edge.
+ * ------------------------------------------------------------------------ */
+
+.navLinkCollapsed .mantine-NavLink-label {
+  display: none;
+}
+
+.navLinkCollapsed .mantine-NavLink-body {
+  justify-content: center;
+}
+
+.navLinkCollapsed .mantine-NavLink-section {
+  margin-inline-end: 0;
+}

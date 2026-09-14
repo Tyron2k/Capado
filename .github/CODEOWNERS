@@ -1,0 +1,12 @@
+# Default owner for everything
+* @Tyron2k
+
+# Backend
+/backend/ @Tyron2k
+
+# Frontend
+/frontend/ @Tyron2k
+
+# CI & Infrastructure
+/.github/ @Tyron2k
+/docker-compose.yml @Tyron2k
