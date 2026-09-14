@@ -82,8 +82,19 @@ def _prepare_password(plain_password: str) -> bytes:
     """
     password_bytes = plain_password.encode("utf-8")
     if len(password_bytes) > 72:
-        # Pre-hash with SHA-256 to fit bcrypt's 72-byte limit
-        password_bytes = hashlib.sha256(password_bytes).hexdigest().encode("utf-8")
+        # Pre-hash with SHA-256 to fit bcrypt's 72-byte limit. This is NOT the password hash:
+        # bcrypt (hash_password, above) is the computationally expensive hash that is stored.
+        # SHA-256 only condenses inputs longer than bcrypt's 72-byte cutoff so that two long
+        # passwords sharing a 72-byte prefix are not treated as equal — the practice bcrypt's
+        # own docs and OWASP recommend. CodeQL sees the isolated sha256() call and cannot follow
+        # the chain, so this is a false positive; suppressed rather than "fixed" into worse code.
+        password_bytes = (
+            hashlib.sha256(  # codeql[py/weak-sensitive-data-hashing]
+                password_bytes
+            )
+            .hexdigest()
+            .encode("utf-8")
+        )
     return password_bytes
 
 
