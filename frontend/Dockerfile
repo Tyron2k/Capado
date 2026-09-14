@@ -3,14 +3,14 @@
 # ---------------------------------------------------------------------------
 
 # --- Dependencies stage: install node_modules ------------------------------
-FROM node:24-alpine AS deps
+FROM node:26-alpine AS deps
 
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
 # --- Development (default target for docker compose) -----------------------
-FROM node:24-alpine AS dev
+FROM node:26-alpine AS dev
 
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
@@ -20,7 +20,7 @@ EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
 
 # --- Build stage: produce static assets -----------------------------------
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 
 ARG VITE_APP_VERSION=dev
 ENV VITE_APP_VERSION=$VITE_APP_VERSION
