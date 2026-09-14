@@ -1,0 +1,15 @@
+# hadolint configuration — lints the Dockerfiles in CI.
+#
+# ignored, each with a reason so the next reader does not "fix" it into a regression:
+ignored:
+  # DL3008 — "pin apt versions". Deliberately not pinned: the base is a floating tag that is
+  # rebuilt against Debian point releases, and `apt-get upgrade` takes those fixes. Pinning apt
+  # versions here would freeze exactly the packages the upgrade exists to move. The reasoning is
+  # in backend/Dockerfile's header comment.
+  - DL3008
+  # DL3066 — "non-numeric user-id may not be resolvable". A false positive here: the uid IS
+  # numeric (10001). hadolint flags the useradd line because it reads the group name; the numeric
+  # uid is exactly what makes the identity stable under a read-only root filesystem.
+  - DL3066
+
+failure-threshold: warning

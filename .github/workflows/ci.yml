@@ -285,3 +285,41 @@ jobs:
             tail -40 audit-node.txt 2>/dev/null || echo "no output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Hardening gate for the container definitions themselves — separate from the image Trivy
+  # scan in build-images.yml (which scans the built image's packages). This lints the
+  # Dockerfiles (hadolint) and scans the Dockerfiles + prod compose for misconfigurations
+  # (Trivy config), so a hardening regression — a dropped USER, a re-added shell tool, a
+  # writable mount — fails a pull request instead of shipping.
+  dockerfile-lint:
+    name: Dockerfile & config lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: hadolint (backend)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: backend/Dockerfile
+          config: .hadolint.yaml
+
+      - name: hadolint (frontend)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: frontend/Dockerfile
+          config: .hadolint.yaml
+
+      # Misconfiguration scan of the Dockerfiles and the production compose. exit-code 1 on a
+      # HIGH/CRITICAL finding turns a misconfiguration into a failed build. Both are clean today
+      # (verified locally); this keeps them that way.
+      - name: Trivy config scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          # Only the runtime container definitions; the dev compose and dev stage are not shipped.
+          trivyignores: ""
