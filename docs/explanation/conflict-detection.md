@@ -59,9 +59,10 @@ Capacity comes from `WorkingTimeService`; see
 - Same boundary-sweep approach at the day level: for each span, count how many
   bookings are active. Two or more covering the same span produce a conflict
   (100% exclusive).
-- A sweep-line helper (`_emit_infrastructure_period`) groups overlapping
+- A sweep-line helper (`_infrastructure_overlaps`) groups overlapping
   minute-precision intervals into conflict periods.
-- Consecutive conflict days are merged into a single conflict period.
+- Each timestamp span with the same active overlap set is stored as a conflict
+  period, so an unrelated booking never gets added to the conflict links.
 - Week profiles do not apply: infrastructure is exclusive rather than
   proportionally allocated.
 
@@ -122,3 +123,36 @@ were wrong.
 - Suggestions can be applied with a single click (reduce, swap) or shown as
   hints (shift).
 - Deep-links allow navigating from conflict cards to the Gantt view.
+
+## When checks run
+
+All callers use `conflict_refresh.refresh_resources` and the same `ConflictService`:
+
+- Assignment edits and absence edits check the affected resource after committing.
+- Calendar definitions (including inherited defaults), bindings and resource site/group
+  changes trigger reconciliation; resource-specific windows check their resource.
+- Assignment and resource imports check the touched resources once after the batch,
+  including duplicate-only assignment imports. The import response reports the conflict
+  count separately. A failed check does not claim that an already saved import failed.
+- The existing maintenance loop runs a **full reconciliation every 15 minutes**, independent
+  of the nightly maintenance hour. It runs on startup if there has been no successful check
+  or the previous completion is at least 15 minutes old. The scheduler enable switch controls
+  periodic checks; immediate checks on edits/imports remain active.
+
+The full check includes resources with assignments and resources with old conflicts, so
+removing the last booking clears obsolete conflicts too. Failures are recorded in the
+existing `scheduled_job_runs` table and retried in a later cycle. No schema migration is needed.
+
+Each resource is serialized by a PostgreSQL transaction advisory lock. The calculation
+finishes before stored results are replaced, and replacement commits atomically. A failed
+replacement rolls back and retains previous results. Unchanged conflicts retain their IDs.
+The scheduler's separate job lock stays on one physical database connection across commits.
+
+Planning and Gantt show the last successful **full** check, failure/overdue status and whether
+periodic checks are disabled. Visible views refresh every minute. The status endpoint is
+available to signed-in users without exposing the administrative job log.
+
+Resource Gantt bars use the assignment's actual booking dates rather than the work package's
+planned dates. Infrastructure overlap is checked with timestamp precision: a booking ending
+at 10:00 does not conflict with one starting at 10:00. A midnight end does not occupy the next
+calendar day. The chart itself still displays calendar days.

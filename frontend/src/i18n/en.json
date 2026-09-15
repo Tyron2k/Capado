@@ -113,7 +113,7 @@
     "planningFreezeDesc": "First day that may still be edited. Changes to assignments before it are refused — including moving one out of the frozen period, and deleting one. Only administrators can still change it, and that is recorded in the audit log. Leave empty for no freeze.",
     "planningFreezeNone": "no freeze",
     "schedulerEnabled": "Run maintenance jobs automatically",
-    "schedulerEnabledDesc": "Runs the audit-log and baseline pruning daily. Without it the retention periods above have no effect — nothing is deleted.",
+    "schedulerEnabledDesc": "Checks capacity conflicts every 15 minutes and cleans audit logs and baselines daily according to retention settings. Checks immediately after edits and imports always remain active.",
     "maintenanceHour": "Hour for maintenance jobs",
     "maintenanceHourDesc": "Hour in the server's timezone, normally UTC. A missed day is made up once on the next start, not once per missed day."
   },
@@ -1124,5 +1124,17 @@
   "projectFolder": {
     "customer": "Customer",
     "customerDesc": "Applies to every project in this folder and in sub-folders that name no customer of their own."
+  },
+  "conflictCheck": {
+    "lastChecked": "Last full check: {time}",
+    "never": "No full conflict check yet",
+    "unavailable": "Check status unavailable",
+    "disabled": "Periodic checks disabled",
+    "failed": "Last check failed; an automatic retry will follow",
+    "overdue": "Full check overdue",
+    "loading": "Loading check status …",
+    "running": "Check in progress",
+    "importFailed": "Import saved. The subsequent conflict check failed. The periodic reconciliation will retry if enabled.",
+    "importResult": "Conflict check completed: {count} capacity conflicts for the checked resources"
   }
 }

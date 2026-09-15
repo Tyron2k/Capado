@@ -132,6 +132,9 @@ async def update_personal_resource(
     resource.updated_at = _utcnow()
     session.add(resource)
     await session.commit()
+    from app.services.conflict_refresh import refresh_resources
+
+    await refresh_resources(session, [resource_id])
     return resource
 
 
@@ -233,14 +236,12 @@ async def erase_personal_resource(
         report.conflict_assignments = (
             await session.execute(
                 delete(ConflictAssignment).where(
-                    ConflictAssignment.conflict_id.in_(conflict_ids)  # type: ignore[attr-defined]
+                    ConflictAssignment.conflict_id.in_(conflict_ids)
                 )
             )
         ).rowcount or 0
         report.conflicts = (
-            await session.execute(
-                delete(Conflict).where(Conflict.id.in_(conflict_ids))  # type: ignore[attr-defined]
-            )
+            await session.execute(delete(Conflict).where(Conflict.id.in_(conflict_ids)))
         ).rowcount or 0
 
     assignment_ids = list(
@@ -271,14 +272,12 @@ async def erase_personal_resource(
     if assignment_ids:
         report.assignments = (
             await session.execute(
-                delete(Assignment).where(Assignment.id.in_(assignment_ids))  # type: ignore[attr-defined]
+                delete(Assignment).where(Assignment.id.in_(assignment_ids))
             )
         ).rowcount or 0
     if absence_ids:
         report.absences = (
-            await session.execute(
-                delete(Absence).where(Absence.id.in_(absence_ids))  # type: ignore[attr-defined]
-            )
+            await session.execute(delete(Absence).where(Absence.id.in_(absence_ids)))
         ).rowcount or 0
 
     # The account link is nulled by the foreign key (ON DELETE SET NULL, migration 026). Counted
@@ -303,7 +302,7 @@ async def erase_personal_resource(
     touched_ids = [resource_id, *assignment_ids, *absence_ids]
     report.audit_entries = (
         await session.execute(
-            delete(AuditLog).where(AuditLog.entity_id.in_(touched_ids))  # type: ignore[attr-defined]
+            delete(AuditLog).where(AuditLog.entity_id.in_(touched_ids))
         )
     ).rowcount or 0
 
@@ -440,6 +439,9 @@ async def update_infrastructure_resource(
     resource.updated_at = _utcnow()
     session.add(resource)
     await session.commit()
+    from app.services.conflict_refresh import refresh_resources
+
+    await refresh_resources(session, [resource_id])
     return resource
 
 

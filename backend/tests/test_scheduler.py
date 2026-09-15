@@ -16,9 +16,10 @@ No database. All data is inline and fictional.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization_settings import OrganizationSettings
@@ -55,6 +56,7 @@ def _session(settings: OrganizationSettings | None, last_success=None) -> AsyncM
     """Session double: settings query yields ``settings``, run-log query yields
     ``last_success``, advisory lock always granted."""
     session = AsyncMock(spec=AsyncSession)
+    session.bind = None
 
     def execute(statement, params=None):
         result = MagicMock()
@@ -88,7 +90,9 @@ class TestRunDueJobs:
 
     async def test_before_the_configured_hour_nothing_starts(self):
         settings = OrganizationSettings(scheduler_enabled=True, maintenance_hour=5)
-        assert await sched.run_due_jobs(_session(settings), now=NOW) == []
+        assert await sched.run_due_jobs(_session(settings), now=NOW) == [
+            sched.CONFLICT_CHECK_JOB
+        ]
 
     async def test_both_jobs_start_when_due(self):
         settings = OrganizationSettings(
@@ -98,7 +102,11 @@ class TestRunDueJobs:
             baseline_retention_months=0,
         )
         started = await sched.run_due_jobs(_session(settings), now=NOW)
-        assert set(started) == {sched.PRUNE_AUDIT, sched.PRUNE_BASELINES}
+        assert set(started) == {
+            sched.PRUNE_AUDIT,
+            sched.PRUNE_BASELINES,
+            sched.CONFLICT_CHECK_JOB,
+        }
 
     async def test_a_lock_held_elsewhere_skips_that_job(self):
         """A second instance skips the cycle rather than queueing behind the first and
@@ -144,7 +152,11 @@ class TestRunDueJobs:
         monkeypatch.setattr(sched, "_record_end", spy_record_end)
 
         started = await sched.run_due_jobs(_session(settings), now=NOW)
-        assert set(started) == {sched.PRUNE_AUDIT, sched.PRUNE_BASELINES}
+        assert set(started) == {
+            sched.PRUNE_AUDIT,
+            sched.PRUNE_BASELINES,
+            sched.CONFLICT_CHECK_JOB,
+        }
         outcomes = dict(recorded)
         assert outcomes[sched.PRUNE_AUDIT] == JobRunStatus.failed
         assert outcomes[sched.PRUNE_BASELINES] == JobRunStatus.succeeded
@@ -163,4 +175,26 @@ class TestRunDueJobs:
         """A fresh install must still prune once configured, rather than silently never
         scheduling because the settings row was created lazily."""
         started = await sched.run_due_jobs(_session(None), now=NOW)
-        assert set(started) == {sched.PRUNE_AUDIT, sched.PRUNE_BASELINES}
+        assert set(started) == {
+            sched.PRUNE_AUDIT,
+            sched.PRUNE_BASELINES,
+            sched.CONFLICT_CHECK_JOB,
+        }
+
+
+@pytest.fixture(autouse=True)
+def stub_conflict_job(monkeypatch):
+    # The calculation is exercised against a real schema in reconciliation tests.
+    monkeypatch.setitem(
+        sched.JOBS, sched.CONFLICT_CHECK_JOB, AsyncMock(return_value=(0, "checked"))
+    )
+
+
+def test_conflict_check_is_due_at_startup_and_every_fifteen_minutes():
+    def due(last):
+        return sched._job_due(sched.CONFLICT_CHECK_JOB, NOW, last, True, 23)
+
+    assert due(None)
+    assert due(NOW - timedelta(minutes=15))
+    assert not due(NOW - timedelta(minutes=14, seconds=59))
+    assert not sched._job_due(sched.CONFLICT_CHECK_JOB, NOW, None, False, 0)

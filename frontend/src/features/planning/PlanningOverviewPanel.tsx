@@ -6,6 +6,7 @@
  * `/api/assignments/planning/overview` endpoint, eliminating the previous
  * 3-4 separate requests.
  */
+import { ConflictCheckStatus } from '../conflicts/ConflictCheckStatus'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -23,6 +24,7 @@ export function PlanningOverviewPanel() {
 
   const overviewQuery = useQuery({
     queryKey: queryKeys.planning.overview(),
+    refetchInterval: 60_000,
     queryFn: ({ signal }) => getPlanningOverview(signal),
   })
   const data = overviewQuery.data ?? null
@@ -58,6 +60,7 @@ export function PlanningOverviewPanel() {
 
   return (
     <Stack gap="lg">
+      <ConflictCheckStatus />
       <UnmetRequirementsSection
         items={personalUnmet}
         title={t('planning.unmetPersonal')}

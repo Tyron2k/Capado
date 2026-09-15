@@ -1,7 +1,7 @@
 """GanttResourceService: Preparation of Gantt data from the resource perspective."""
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -163,8 +163,8 @@ class GanttResourceService:
             bar = ResourceGanttBar(
                 id=wp.id,
                 name=wp.name,
-                start_date=wp.start_date,
-                end_date=wp.end_date,
+                start_date=_assignment_dates(assignment)[0],
+                end_date=_assignment_dates(assignment)[1],
                 resource_id=assignment.resource_id,
                 resource_name=resource_name_map.get(assignment.resource_id, ""),
                 allocation_percent=_assignment_display_percent(assignment),
@@ -291,8 +291,8 @@ class GanttResourceService:
             bar = ResourceGanttBar(
                 id=wp.id,
                 name=wp.name,
-                start_date=wp.start_date,
-                end_date=wp.end_date,
+                start_date=_assignment_dates(assignment)[0],
+                end_date=_assignment_dates(assignment)[1],
                 resource_id=assignment.resource_id,
                 resource_name=resource_name_map.get(assignment.resource_id, ""),
                 allocation_percent=_assignment_display_percent(assignment),
@@ -366,3 +366,14 @@ def _assignment_display_percent(assignment: Assignment) -> float:
     if assignment.resource_type == "personal":
         return round(assignment.allocation_percent or 0.0, 2)
     return 100.0
+
+
+def _assignment_dates(assignment: Assignment) -> tuple[date, date]:
+    """Calendar days occupied by the booking; midnight ends are exclusive."""
+    if assignment.start_at is not None and assignment.end_at is not None:
+        return assignment.start_at.date(), (
+            assignment.end_at - timedelta(microseconds=1)
+        ).date()
+    if assignment.start_date is not None and assignment.end_date is not None:
+        return assignment.start_date, assignment.end_date
+    raise ValueError(f"Assignment {assignment.id} has no complete booking interval")

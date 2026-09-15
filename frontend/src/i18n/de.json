@@ -113,7 +113,7 @@
     "planningFreezeDesc": "Erster noch änderbarer Tag. Änderungen an Zuordnungen, die davor liegen, werden abgelehnt — auch das Verschieben aus dem gesperrten Zeitraum heraus und das Löschen. Nur Administratoren können den Zeitraum noch ändern; das wird im Änderungsprotokoll festgehalten. Leer lassen für keine Sperre.",
     "planningFreezeNone": "keine Sperre",
     "schedulerEnabled": "Wartungsläufe automatisch ausführen",
-    "schedulerEnabledDesc": "Führt die Bereinigung von Änderungsprotokoll und Planständen täglich aus. Ohne dies bleiben die Aufbewahrungsfristen oben wirkungslos — es wird nichts gelöscht.",
+    "schedulerEnabledDesc": "Prüft Belegungskonflikte alle 15 Minuten und bereinigt Änderungsprotokoll und Planstände täglich gemäß den Aufbewahrungsfristen. Prüfungen direkt nach Änderungen und Importen bleiben immer aktiv.",
     "maintenanceHour": "Stunde für Wartungsläufe",
     "maintenanceHourDesc": "Stunde in der Zeitzone des Servers, üblicherweise UTC. Ein ausgelassener Tag wird beim nächsten Start einmal nachgeholt, nicht einmal pro versäumtem Tag."
   },
@@ -1124,5 +1124,17 @@
   "projectFolder": {
     "customer": "Kunde",
     "customerDesc": "Gilt für alle Projekte in diesem Ordner und in Unterordnern, die keinen eigenen Kunden nennen."
+  },
+  "conflictCheck": {
+    "lastChecked": "Zuletzt vollständig geprüft: {time}",
+    "never": "Noch keine vollständige Konfliktprüfung",
+    "unavailable": "Prüfstatus nicht verfügbar",
+    "disabled": "Regelmäßige Prüfung deaktiviert",
+    "failed": "Letzte Prüfung fehlgeschlagen; erneuter Versuch folgt automatisch",
+    "overdue": "Vollständige Prüfung überfällig",
+    "loading": "Prüfstatus wird geladen …",
+    "running": "Prüfung läuft",
+    "importFailed": "Import gespeichert. Die anschließende Konfliktprüfung ist fehlgeschlagen. Der regelmäßige Abgleich prüft erneut, sofern aktiviert.",
+    "importResult": "Konfliktprüfung abgeschlossen: {count} Belegungskonflikte bei den geprüften Ressourcen"
   }
 }

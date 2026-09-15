@@ -9,6 +9,7 @@ case of :class:`ImportResult` and :func:`_parse_header`, by every domain).
 
 import csv
 import io
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
@@ -27,6 +28,7 @@ from app.models.skill import (
     Skill,
     SkillAttribute,
 )
+from app.services.conflict_refresh import refresh_resources
 
 from .shape import SHAPE_REJECTION_MESSAGES, ImportShape, detect_import_shape
 
@@ -39,6 +41,8 @@ class ImportResult:
     updated: int = 0
     skipped: int = 0
     errors: list[str] = field(default_factory=list)
+    conflicts_found: int | None = None
+    conflict_check_failed: bool = False
 
 
 # ===========================================================================
@@ -483,6 +487,7 @@ async def _import_resources(
         sites_result = await session.execute(select(Site))
         sites_by_name = {s.name: s.id for s in sites_result.scalars().all()}
 
+    affected: set[UUID] = set()
     for row_idx, row in enumerate(rows[1:], start=2):
         cells = [str(cell).strip() if cell else "" for cell in row]
         name = cells[0] if len(cells) > 0 else ""
@@ -542,6 +547,8 @@ async def _import_resources(
             await session.flush()
             result.created += 1
 
+        affected.add(resource.id)
+
         # Handle optional skill assignment
         if skill_name and attr_name and resource:
             skill = skills_by_name.get(skill_name.lower())
@@ -569,6 +576,7 @@ async def _import_resources(
                 existing_assignments.add(assign_key)
 
     await session.commit()
+    await check_import_conflicts(session, result, affected)
     return result
 
 
@@ -635,3 +643,17 @@ def resolve_site(
         f"name would produce a plant with no holiday calendar. Create it first under "
         f"Working time, then re-import. Known sites: {known}."
     )
+
+
+async def check_import_conflicts(
+    session: AsyncSession, result: ImportResult, resource_ids: set[UUID]
+) -> None:
+    """Report checking independently from an already committed import."""
+    if not resource_ids:
+        return
+    try:
+        result.conflicts_found = await refresh_resources(session, resource_ids)
+    except Exception:
+        await session.rollback()
+        logging.getLogger(__name__).exception("Conflict check after import failed")
+        result.conflict_check_failed = True

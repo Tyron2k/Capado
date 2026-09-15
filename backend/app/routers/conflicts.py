@@ -26,6 +26,71 @@ from app.services.permissions import get_current_user
 router = APIRouter(tags=["Conflicts"])
 
 
+@router.get("/conflicts/check-status")
+async def get_conflict_check_status(
+    session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(get_current_user),
+):
+    """Only check health, not administrative maintenance details."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models.organization_settings import OrganizationSettings
+    from app.models.scheduled_job_run import JobRunStatus, ScheduledJobRun
+    from app.services.conflict_refresh import (
+        CONFLICT_CHECK_INTERVAL_MINUTES,
+        CONFLICT_CHECK_JOB,
+    )
+
+    latest = (
+        (
+            await session.execute(
+                select(ScheduledJobRun)
+                .where(ScheduledJobRun.job_name == CONFLICT_CHECK_JOB)
+                .order_by(ScheduledJobRun.started_at.desc())
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    success = (
+        (
+            await session.execute(
+                select(ScheduledJobRun)
+                .where(
+                    ScheduledJobRun.job_name == CONFLICT_CHECK_JOB,
+                    ScheduledJobRun.status == JobRunStatus.succeeded,
+                )
+                .order_by(ScheduledJobRun.finished_at.desc())
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    settings = (
+        (await session.execute(select(OrganizationSettings).limit(1))).scalars().first()
+    )
+    last_checked = success.finished_at if success else None
+    now = datetime.now(UTC).replace(tzinfo=None)
+    # Allow one polling cycle of scheduling jitter; a crashed running row must
+    # eventually show as overdue rather than claiming a check is still healthy.
+    stale = last_checked is None or now - last_checked > timedelta(
+        minutes=CONFLICT_CHECK_INTERVAL_MINUTES * 2
+    )
+    if last_checked is None and latest and latest.status == JobRunStatus.running:
+        stale = now - latest.started_at > timedelta(
+            minutes=CONFLICT_CHECK_INTERVAL_MINUTES * 2
+        )
+    return {
+        "last_checked_at": last_checked.isoformat() + "Z" if last_checked else None,
+        "status": latest.status if latest else "never",
+        "stale": stale,
+        "enabled": settings.scheduler_enabled if settings else True,
+        "interval_minutes": CONFLICT_CHECK_INTERVAL_MINUTES,
+    }
+
+
 @router.get(
     "/conflicts/{conflict_id}/suggestions",
     response_model=list[ConflictSuggestionResponse],

@@ -51,8 +51,9 @@ class OrganizationSettings(SQLModel, table=True):
             freeze. Changes touching an earlier date are refused for non-admins. Both the
             state before and after a change are tested, so a booking cannot be dragged out
             of the frozen period either — see app/services/planning_freeze.py.
-        scheduler_enabled: Whether the in-process maintenance loop runs the pruning jobs.
-            ON by default — see the inline comment.
+        scheduler_enabled: Whether the in-process maintenance loop runs periodic conflict
+            reconciliation and the pruning jobs. Immediate checks after edits and imports
+            are independent of this switch. ON by default — see the inline comment.
         maintenance_hour: Hour of day (0-23) after which maintenance jobs may run, in the
             process clock. A missed day is made up ONCE on return, not once per missed day.
         smtp_enabled: Whether the mail path is active. OFF by default.

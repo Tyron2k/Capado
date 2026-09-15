@@ -14,7 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from .common import ImportResult, _parse_header
+from .common import ImportResult, _parse_header, check_import_conflicts
 
 
 async def _load_assignments_export_rows(session: AsyncSession) -> list[tuple]:
@@ -184,6 +184,7 @@ async def import_assignments(session: AsyncSession, rows: list[tuple]) -> Import
         (a.resource_id, a.work_package_id) for a in existing_result.scalars().all()
     }
 
+    affected: set[UUID] = set()
     for row_idx, row in enumerate(rows[1:], start=2):
         cells = [str(cell).strip() if cell else "" for cell in row]
 
@@ -291,6 +292,8 @@ async def import_assignments(session: AsyncSession, rows: list[tuple]) -> Import
             )
             continue
 
+        affected.add(resource_id)
+
         # Check for duplicate
         assign_key = (resource_id, wp.id)
         if assign_key in existing_assignments:
@@ -325,4 +328,5 @@ async def import_assignments(session: AsyncSession, rows: list[tuple]) -> Import
         result.created += 1
 
     await session.commit()
+    await check_import_conflicts(session, result, affected)
     return result
