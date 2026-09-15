@@ -14,6 +14,8 @@
  */
 
 import { useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../../api/queryClient'
 import {
   ActionIcon,
   Alert,
@@ -45,6 +47,8 @@ interface ImportOutcome {
   updated: number
   skipped: number
   errors: string[]
+  conflicts_found?: number | null
+  conflict_check_failed?: boolean
 }
 
 interface ImportExportBarProps {
@@ -65,6 +69,7 @@ export function ImportExportBar({
   onImportSuccess,
 }: ImportExportBarProps) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
@@ -104,7 +109,17 @@ export function ImportExportBar({
         updated: data.updated ?? 0,
         skipped: data.skipped ?? 0,
         errors: data.errors ?? [],
+        conflicts_found: data.conflicts_found,
+        conflict_check_failed: data.conflict_check_failed,
       })
+      for (const queryKey of [
+        queryKeys.conflicts.all,
+        queryKeys.planning.all,
+        queryKeys.gantt.all,
+        queryKeys.dashboard.all,
+      ]) {
+        void queryClient.invalidateQueries({ queryKey })
+      }
       onImportSuccess?.()
     } catch (error: unknown) {
       showErrorNotification(error, t('common.error'), t('importExport.importFailed'))
@@ -181,6 +196,13 @@ export function ImportExportBar({
               )}
             </Group>
 
+            {outcome.conflict_check_failed ? (
+              <Alert color="yellow">{t('conflictCheck.importFailed')}</Alert>
+            ) : outcome.conflicts_found != null ? (
+              <Text size="sm">
+                {t('conflictCheck.importResult', { count: outcome.conflicts_found })}
+              </Text>
+            ) : null}
             {outcome.errors.length === 0 ? (
               <Text size="sm" c="dimmed">
                 {t('importExport.logNoErrors')}

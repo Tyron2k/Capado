@@ -31,6 +31,7 @@ from app.models.calendar import (
     WorkWeekProfile,
 )
 from app.models.site import Site
+from app.services.conflict_refresh import refresh_resources
 
 
 def _utcnow() -> datetime:
@@ -76,6 +77,7 @@ class CalendarService:
         site = Site(name=name, region_code=region_code, is_default=is_default)
         self.session.add(site)
         await self.session.commit()
+        await refresh_resources(self.session)
         await self.session.refresh(site)
         return site
 
@@ -90,6 +92,7 @@ class CalendarService:
         site.updated_at = _utcnow()
         self.session.add(site)
         await self.session.commit()
+        await refresh_resources(self.session)
         await self.session.refresh(site)
         return site
 
@@ -105,6 +108,7 @@ class CalendarService:
         site.updated_at = _utcnow()
         self.session.add(site)
         await self.session.commit()
+        await refresh_resources(self.session)
 
     async def _clear_default_site(self) -> None:
         """Unset the current default site.
@@ -158,6 +162,7 @@ class CalendarService:
         )
         self.session.add(holiday)
         await self.session.commit()
+        await refresh_resources(self.session)
         await self.session.refresh(holiday)
         return holiday
 
@@ -172,6 +177,7 @@ class CalendarService:
         holiday.updated_at = _utcnow()
         self.session.add(holiday)
         await self.session.commit()
+        await refresh_resources(self.session)
         await self.session.refresh(holiday)
         return holiday
 
@@ -182,6 +188,7 @@ class CalendarService:
             raise NotFoundError("Holiday", holiday_id)
         await self.session.delete(holiday)
         await self.session.commit()
+        await refresh_resources(self.session)
 
     # ------------------------------------------------------------- profiles
 
@@ -208,6 +215,7 @@ class CalendarService:
         profile = WorkWeekProfile(**fields)
         self.session.add(profile)
         await self.session.commit()
+        await refresh_resources(self.session)
         await self.session.refresh(profile)
         return profile
 
@@ -224,6 +232,7 @@ class CalendarService:
         profile.updated_at = _utcnow()
         self.session.add(profile)
         await self.session.commit()
+        await refresh_resources(self.session)
         await self.session.refresh(profile)
         return profile
 
@@ -247,6 +256,7 @@ class CalendarService:
             )
         await self.session.delete(profile)
         await self.session.commit()
+        await refresh_resources(self.session)
 
     async def _clear_default_profile(self) -> None:
         """Unset the current default week profile.
@@ -311,6 +321,9 @@ class CalendarService:
         )
         self.session.add(binding)
         await self.session.commit()
+        await refresh_resources(
+            self.session, [resource_id] if resource_id is not None else None
+        )
         await self.session.refresh(binding)
         return binding
 
@@ -321,6 +334,10 @@ class CalendarService:
             raise NotFoundError("ResourceWorkProfile", binding_id)
         await self.session.delete(binding)
         await self.session.commit()
+        await refresh_resources(
+            self.session,
+            [binding.resource_id] if binding.resource_id is not None else None,
+        )
 
     # -------------------------------------------------------------- windows
 
@@ -350,6 +367,9 @@ class CalendarService:
         )
         self.session.add(window)
         await self.session.commit()
+        await refresh_resources(
+            self.session, [resource_id] if resource_id is not None else None
+        )
         await self.session.refresh(window)
         return window
 
@@ -364,6 +384,10 @@ class CalendarService:
             raise NotFoundError("InfrastructureAvailabilityWindow", window_id)
         await self.session.delete(window)
         await self.session.commit()
+        await refresh_resources(
+            self.session,
+            [window.resource_id] if window.resource_id is not None else None,
+        )
 
     async def delete_windows_for_resource(self, resource_id: UUID) -> int:
         """Remove every window of a resource, making it unrestricted."""
@@ -373,4 +397,7 @@ class CalendarService:
             )
         )
         await self.session.commit()
+        await refresh_resources(
+            self.session, [resource_id] if resource_id is not None else None
+        )
         return int(result.rowcount or 0)

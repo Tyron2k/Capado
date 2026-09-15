@@ -7,6 +7,7 @@
  * selectable options, then fetches Gantt data for the selected option.
  */
 
+import { ConflictCheckStatus } from '../conflicts/ConflictCheckStatus'
 import { useEffect, useMemo, useState } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
@@ -77,6 +78,7 @@ export function GanttSection() {
    */
   const overviewQuery = useQuery({
     queryKey: queryKeys.dashboard.projectOverview(),
+    refetchInterval: 60_000,
     queryFn: () => getProjectOverview(),
     enabled: perspective === 'project',
   })
@@ -124,6 +126,7 @@ export function GanttSection() {
    * whichever this perspective uses — two perspectives over one group must not share an entry.
    */
   const resourceGanttQuery = useQuery({
+    refetchInterval: 60_000,
     queryKey:
       perspective === 'infrastructure'
         ? queryKeys.gantt.infraGroup(selectedGroup?.id ?? 'none')
@@ -163,6 +166,7 @@ export function GanttSection() {
 
   return (
     <Stack gap="md">
+      <ConflictCheckStatus />
       <SegmentedControl
         value={perspective}
         onChange={handlePerspectiveChange}

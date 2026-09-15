@@ -18,6 +18,7 @@ from app.models.user import User
 from app.schemas.absence import AbsenceCreate, AbsenceResponse, AbsenceUpdate
 from app.schemas.pagination import PaginatedResponse
 from app.services.absence_service import AbsenceService
+from app.services.conflict_refresh import refresh_resources
 from app.services.permissions import (
     EntityType,
     check_write_permission,
@@ -130,6 +131,7 @@ async def create_absence(
         note=body.note,
     )
     await session.commit()
+    await refresh_resources(session, [absence.resource_id])
     return AbsenceResponse.model_validate(absence)
 
 
@@ -172,6 +174,7 @@ async def update_absence(
         note=body.note if body.note is not None else ...,
     )
     await session.commit()
+    await refresh_resources(session, [absence.resource_id])
     return AbsenceResponse.model_validate(absence)
 
 
@@ -199,5 +202,7 @@ async def delete_absence(
         session, existing.resource_id, existing.resource_type
     )
     check_write_permission(current_user, EntityType.resource, group_id=group_id)
+    resource_id = existing.resource_id
     await service.delete(absence_id)
     await session.commit()
+    await refresh_resources(session, [resource_id])

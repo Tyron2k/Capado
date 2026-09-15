@@ -1,12 +1,13 @@
-"""One-off helper: refresh conflicts for every active resource.
+"""One-off helper: refresh conflicts for resources that have plan data.
 
 Usage (inside the backend container)::
 
     python -m app.scripts.refresh_conflicts
 
 Useful after bulk seed loads, because the seed loader inserts Assignments
-directly without going through the AssignmentService, which means the
-normal "refresh on create/update/delete" trigger is bypassed.
+directly without going through the AssignmentService, which means the normal
+"refresh on create/update/delete" trigger is bypassed. Resources with stored
+conflicts but no remaining assignments are included so stale rows are cleared.
 """
 
 from __future__ import annotations
@@ -15,34 +16,14 @@ import asyncio
 import logging
 import sys
 
-from sqlmodel import select
-
 from app.database import async_session_factory
-from app.models.resource import InfrastructureResource, PersonalResource
-from app.services.conflict_service import ConflictService
 
 
 async def _refresh_all() -> int:
     async with async_session_factory() as session:
-        personal_stmt = select(PersonalResource).where(
-            PersonalResource.is_active == True  # noqa: E712
-        )
-        infra_stmt = select(InfrastructureResource).where(
-            InfrastructureResource.is_active == True  # noqa: E712
-        )
+        from app.services.conflict_refresh import refresh_resources
 
-        personal_ids = [
-            r.id for r in (await session.execute(personal_stmt)).scalars().all()
-        ]
-        infra_ids = [r.id for r in (await session.execute(infra_stmt)).scalars().all()]
-
-        service = ConflictService(session)
-
-        total = 0
-        for rid in personal_ids + infra_ids:
-            conflicts = await service.refresh_conflicts(rid)
-            total += len(conflicts)
-        return total
+        return await refresh_resources(session)
 
 
 def main() -> int:

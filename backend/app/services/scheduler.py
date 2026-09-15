@@ -24,16 +24,22 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from sqlmodel import select
 
 from app.models.organization_settings import OrganizationSettings
 from app.models.scheduled_job_run import JobRunStatus, ScheduledJobRun
 from app.services.audit_retention import prune_audit_log
 from app.services.baseline_retention import prune_baselines
+from app.services.conflict_refresh import (
+    CONFLICT_CHECK_INTERVAL_MINUTES,
+    CONFLICT_CHECK_JOB,
+    refresh_resources,
+)
 from app.services.job_schedule import JobSchedule, is_due, next_wake_seconds
 
 logger = logging.getLogger(__name__)
@@ -70,7 +76,7 @@ async def _last_success(session: AsyncSession, job_name: str) -> datetime | None
         .limit(1)
     )
     run = result.scalars().first()
-    return run.started_at if run else None
+    return (run.finished_at or run.started_at) if run else None
 
 
 async def _try_lock(session: AsyncSession, job_name: str) -> bool:
@@ -195,7 +201,59 @@ async def _prune_baselines_job(session: AsyncSession) -> tuple[int, str]:
     return result.deleted, detail
 
 
+async def _conflict_check_job(session: AsyncSession) -> tuple[int, str]:
+    count = await refresh_resources(session)
+    return count, f"Vollständige Konfliktprüfung: {count} Konflikte"
+
+
+@asynccontextmanager
+async def _job_lock(session: AsyncSession, job_name: str):
+    """Pin session-level advisory locks to one physical connection across commits.
+
+    A normal pooled session can return its connection on commit; unlocking on
+    another connection would leak the lock and silently stop later checks.
+    """
+    bind = session.bind
+    if isinstance(bind, AsyncEngine) and bind.dialect.name == "postgresql":
+        async with (
+            bind.connect() as connection,
+            AsyncSession(bind=connection) as lock_session,
+        ):
+            acquired = await _try_lock(lock_session, job_name)
+            try:
+                yield acquired
+            finally:
+                if acquired:
+                    await _unlock(lock_session, job_name)
+    else:
+        acquired = await _try_lock(session, job_name)
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                await _unlock(session, job_name)
+
+
+def _job_due(
+    job_name: str,
+    moment: datetime,
+    last_success: datetime | None,
+    enabled: bool,
+    hour: int,
+) -> bool:
+    if job_name == CONFLICT_CHECK_JOB:
+        return enabled and (
+            last_success is None
+            or moment - last_success
+            >= timedelta(minutes=CONFLICT_CHECK_INTERVAL_MINUTES)
+        )
+    return is_due(
+        JobSchedule(name=job_name, hour=hour, enabled=enabled), moment, last_success
+    )
+
+
 JOBS: dict[str, Callable[[AsyncSession], Awaitable[tuple[int, str]]]] = {
+    CONFLICT_CHECK_JOB: _conflict_check_job,
     PRUNE_AUDIT: _prune_audit_job,
     PRUNE_BASELINES: _prune_baselines_job,
 }
@@ -218,26 +276,34 @@ async def run_due_jobs(
 
     started: list[str] = []
     for job_name, job in JOBS.items():
-        schedule = JobSchedule(name=job_name, hour=hour, enabled=enabled)
-        if not is_due(schedule, moment, await _last_success(session, job_name)):
+        if not _job_due(
+            job_name, moment, await _last_success(session, job_name), enabled, hour
+        ):
             continue
-        if not await _try_lock(session, job_name):
-            logger.info("Job %s läuft bereits in einer anderen Instanz", job_name)
-            continue
-        started.append(job_name)
-        run = await _record_start(session, job_name)
-        try:
-            items, detail = await job(session)
-            await _record_end(session, run, JobRunStatus.succeeded, items, detail)
-            logger.info("Job %s: %s", job_name, detail)
-        except Exception as exc:  # noqa: BLE001 — one job must not stop the others
-            await session.rollback()
-            await _record_end(
-                session, run, JobRunStatus.failed, None, f"{type(exc).__name__}: {exc}"
-            )
-            logger.exception("Job %s fehlgeschlagen", job_name)
-        finally:
-            await _unlock(session, job_name)
+        async with _job_lock(session, job_name) as acquired:
+            if not acquired:
+                continue
+            # Another process may have finished between the first read and lock.
+            if not _job_due(
+                job_name, moment, await _last_success(session, job_name), enabled, hour
+            ):
+                continue
+            started.append(job_name)
+            run = await _record_start(session, job_name)
+            try:
+                items, detail = await job(session)
+                await _record_end(session, run, JobRunStatus.succeeded, items, detail)
+                logger.info("Job %s: %s", job_name, detail)
+            except Exception as exc:
+                await session.rollback()
+                await _record_end(
+                    session,
+                    run,
+                    JobRunStatus.failed,
+                    None,
+                    f"{type(exc).__name__}: {exc}",
+                )
+                logger.exception("Job %s fehlgeschlagen", job_name)
     return started
 
 

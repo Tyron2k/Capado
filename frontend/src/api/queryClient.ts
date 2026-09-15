@@ -73,6 +73,7 @@ export const queryKeys = {
   /** Detected conflicts. Derived from capacity and assignments, never edited directly. */
   conflicts: {
     all: ['conflicts'] as const,
+    checkStatus: () => ['conflicts', 'check-status'] as const,
     /**
      * Who is FREE and QUALIFIED for a window, as searched from the assignment form.
      *

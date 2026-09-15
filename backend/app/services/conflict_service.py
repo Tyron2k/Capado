@@ -18,7 +18,7 @@ Two consequences of that model are deliberate and easy to mistake for bugs:
 Infrastructure conflicts remain time-interval overlaps (``start_at`` /
 ``end_at``, minute granularity), since infrastructure is exclusive rather than
 proportionally allocated. Bookings outside an availability window are a
-separate conflict cause (ADR-005) and are not yet detected here.
+separate conflict cause (ADR-005).
 
 Conflicts are stored per resource as ``Conflict``, with ``ConflictAssignment``
 as a join table to the involved assignments. The stored percentages are derived
@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -38,7 +39,6 @@ from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment, ConflictCause
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.services.working_time_service import (
-    NORMATIVE_DAY_MINUTES,
     WorkingTimeService,
     minutes_to_percent,
     percent_to_minutes,
@@ -124,7 +124,11 @@ class ConflictService:
     ) -> list[Assignment]:
         if self._preloaded_assignments is not None:
             return self._preloaded_assignments.get(resource_id, [])
-        statement = select(Assignment).where(Assignment.resource_id == resource_id)
+        statement = (
+            select(Assignment)
+            .where(Assignment.resource_id == resource_id)
+            .execution_options(populate_existing=True)
+        )
         result = await self.session.execute(statement)
         return list(result.scalars().all())
 
@@ -347,32 +351,47 @@ class ConflictService:
         return saved
 
     async def refresh_conflicts(self, resource_id: UUID) -> list[Conflict]:
+        """Serialize recalculations and atomically replace a resource's results.
+
+        The transaction lock covers reading inputs through committing results. All
+        entry points (edits, imports, scheduled runs) use this same boundary.
+        """
+        try:
+            if (
+                isinstance(self.session, AsyncSession)
+                and self.session.get_bind().dialect.name == "postgresql"
+            ):
+                await self.session.execute(
+                    text("SELECT pg_advisory_xact_lock(:key)"),
+                    {"key": resource_id.int % (2**63 - 1)},
+                )
+            return await self._refresh_conflicts(resource_id)
+        except BaseException:
+            await self.session.rollback()
+            raise
+
+    async def _refresh_conflicts(self, resource_id: UUID) -> list[Conflict]:
         """Recalculate and persist conflicts for a resource.
 
         Uses an event-driven sweep-line algorithm instead of iterating each
-        calendar day. Collects start/end events from all assignments and
-        absences, sorts them, and sweeps once to detect periods where total
-        allocation exceeds 100%. Complexity is O(n log n) in the number of
-        interval endpoints rather than O(days × assignments).
+        calendar day. Personal assignments are swept into stable date spans;
+        infrastructure bookings are swept at timestamp precision. Complexity
+        is O(n log n) in the number of interval endpoints rather than
+        O(days × assignments).
         """
-        await self._delete_conflicts_for_resource(resource_id)
-
         resource_type = await self._get_resource_type(resource_id)
         if resource_type is None:
-            await self.session.commit()
-            return []
+            return await self._replace_periods(resource_id, [])
 
         # Load all assignments for this resource
         all_assignments = await self._get_assignments_for_resource(resource_id)
         if not all_assignments:
-            await self.session.commit()
-            return []
+            return await self._replace_periods(resource_id, [])
 
         # Determine date range
         date_range = self._get_date_range(all_assignments, resource_type)
         if date_range is None:
-            await self.session.commit()
-            return []
+            return await self._replace_periods(resource_id, [])
         start_date, end_date = date_range
 
         # Absences are NOT demand intervals. They reduce availability, and
@@ -384,29 +403,26 @@ class ConflictService:
             working_time = WorkingTimeService(self.session)
             await working_time.prepare([resource_id], start_date, end_date)
 
+        if resource_type == ResourceType.infrastructure:
+            periods = self._infrastructure_overlaps(all_assignments, resource_id)
+            periods.extend(
+                self._detect_window_violations(
+                    all_assignments, resource_id, working_time
+                )
+            )
+            return await self._replace_periods(resource_id, periods)
+
         # Build day-range intervals: (start_inclusive, end_inclusive, pct, id|None)
         intervals: list[tuple[date, date, float, UUID | None]] = []
 
         for a in all_assignments:
-            if resource_type == ResourceType.personal:
-                if a.start_date is not None and a.end_date is not None:
-                    intervals.append(
-                        (a.start_date, a.end_date, a.allocation_percent or 0.0, a.id)
-                    )
-            else:
-                # Infrastructure: convert timestamps to date range
-                if a.start_at is not None and a.end_at is not None:
-                    i_start = a.start_at.date()
-                    i_end = a.end_at.date()
-                    # If end_at is exactly midnight, it doesn't occupy the next day
-                    if a.end_at == datetime.combine(i_end, datetime.min.time()):
-                        i_end = i_end - timedelta(days=1)
-                    if i_end >= i_start:
-                        intervals.append((i_start, i_end, 100.0, a.id))
+            if a.start_date is not None and a.end_date is not None:
+                intervals.append(
+                    (a.start_date, a.end_date, a.allocation_percent or 0.0, a.id)
+                )
 
         if not intervals:
-            await self.session.commit()
-            return []
+            return await self._replace_periods(resource_id, [])
 
         # Sweep-line: boundaries are where the active ASSIGNMENT SET changes.
         # Capacity itself varies per day (weekend, holiday, absence), so each
@@ -439,20 +455,9 @@ class ConflictService:
 
             current = span_start
             while current <= span_end:
-                if resource_type == ResourceType.personal:
-                    available_minutes = working_time.available_minutes(
-                        resource_id, current
-                    )
-                    is_working = working_time.is_working_day(resource_id, current)
-                    demand_minutes = (
-                        percent_to_minutes(demand_percent) if is_working else 0
-                    )
-                else:
-                    # Infrastructure keeps exclusive-occupancy semantics; its
-                    # availability windows are a separate conflict cause
-                    # (ADR-005) and are not folded into this threshold.
-                    available_minutes = NORMATIVE_DAY_MINUTES
-                    demand_minutes = percent_to_minutes(demand_percent)
+                available_minutes = working_time.available_minutes(resource_id, current)
+                is_working = working_time.is_working_day(resource_id, current)
+                demand_minutes = percent_to_minutes(demand_percent) if is_working else 0
 
                 if demand_minutes > available_minutes:
                     conflict_days.append(
@@ -470,16 +475,99 @@ class ConflictService:
             conflict_days, resource_id, resource_type
         )
 
-        if resource_type == ResourceType.infrastructure:
-            periods.extend(
-                self._detect_window_violations(
-                    all_assignments, resource_id, working_time
-                )
-            )
+        return await self._replace_periods(resource_id, periods)
 
+    async def _replace_periods(
+        self, resource_id: UUID, periods: list[ConflictPeriod]
+    ) -> list[Conflict]:
+        # Calculate first. DELETE + INSERT then share one transaction, so readers
+        # see either the old complete result or the new one, never an empty gap.
+        if isinstance(self.session, AsyncSession):
+            existing = list(
+                (
+                    await self.session.execute(
+                        select(Conflict).where(Conflict.resource_id == resource_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if existing:
+                links = (
+                    (
+                        await self.session.execute(
+                            select(ConflictAssignment).where(
+                                ConflictAssignment.conflict_id.in_(
+                                    [c.id for c in existing]
+                                )
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                ids: dict[UUID, set[UUID]] = {}
+                for link in links:
+                    ids.setdefault(link.conflict_id, set()).add(link.assignment_id)
+
+                def signature(c, assignments):
+                    return (
+                        c.cause,
+                        c.start_date,
+                        c.end_date,
+                        c.total_assigned_percent,
+                        c.available_percent,
+                        tuple(sorted(assignments)),
+                    )
+
+                old = sorted(signature(c, ids.get(c.id, set())) for c in existing)
+                new = sorted(signature(p, p.assignment_ids) for p in periods)
+                if old == new:
+                    await self.session.commit()
+                    return existing
+        await self._delete_conflicts_for_resource(resource_id)
         saved = await self._save_conflict_periods(periods)
         await self.session.commit()
         return saved
+
+    def _infrastructure_overlaps(
+        self, assignments: list[Assignment], resource_id: UUID
+    ) -> list[ConflictPeriod]:
+        """Half-open booking intervals: an end at 10:00 permits a start at 10:00.
+
+        Emit only the assignments actually overlapping in each span. A third
+        booking elsewhere in a connected cluster must not inherit a conflict.
+        """
+        events: dict[datetime, list[tuple[int, UUID]]] = {}
+        for assignment in assignments:
+            if assignment.start_at is None or assignment.end_at is None:
+                continue
+            events.setdefault(assignment.start_at, []).append((1, assignment.id))
+            events.setdefault(assignment.end_at, []).append((-1, assignment.id))
+        active: set[UUID] = set()
+        previous: datetime | None = None
+        periods: list[ConflictPeriod] = []
+        for moment in sorted(events):
+            if previous is not None and moment > previous and len(active) > 1:
+                periods.append(
+                    ConflictPeriod(
+                        resource_id=resource_id,
+                        resource_type=ResourceType.infrastructure,
+                        cause=ConflictCause.booking_overlap,
+                        start_date=previous.date(),
+                        end_date=(moment - timedelta(microseconds=1)).date(),
+                        total_assigned_percent=len(active) * 100.0,
+                        available_percent=100.0,
+                        assignment_ids=sorted(active),
+                    )
+                )
+            for delta, aid in sorted(events[moment]):
+                if delta < 0:
+                    active.discard(aid)
+                else:
+                    active.add(aid)
+            previous = moment
+        return periods
 
     def _detect_window_violations(
         self,

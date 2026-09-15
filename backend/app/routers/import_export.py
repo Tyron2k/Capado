@@ -521,4 +521,6 @@ def _result_to_dict(result: ImportResult) -> ImportResultResponse:
         skipped=result.skipped,
         errors=result.errors,
         success=len(result.errors) == 0,
+        conflicts_found=result.conflicts_found,
+        conflict_check_failed=result.conflict_check_failed,
     )

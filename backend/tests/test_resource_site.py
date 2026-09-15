@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -175,3 +176,10 @@ class TestTheRouterContract:
 
     def test_create_defaults_the_site_to_none(self):
         assert ResourceCreate(name="Schmidt", group_id=GROUP).site_id is None
+
+
+@pytest.fixture(autouse=True)
+def mock_conflict_refresh(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.conflict_refresh.refresh_resources", AsyncMock(return_value=0)
+    )
