@@ -516,7 +516,7 @@ export function AppLayout() {
 
       <AppShell.Footer p="xs">
         <Text size="xs" c="dimmed" ta="center">
-          Capado v{APP_VERSION}
+          Capado {APP_VERSION}
         </Text>
       </AppShell.Footer>
 

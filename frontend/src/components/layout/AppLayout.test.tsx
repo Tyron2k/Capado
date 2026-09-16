@@ -18,6 +18,8 @@ import { I18nProvider } from '../../i18n'
 
 const mockIsAdmin = vi.fn(() => false)
 
+vi.mock('../../version', () => ({ APP_VERSION: 'v0.0.2' }))
+
 vi.mock('../../hooks/usePermissions', () => ({
   usePermissions: () => ({ isAdmin: mockIsAdmin(), canWrite: false, canEditGroup: () => false }),
 }))
@@ -133,5 +135,14 @@ describe('AppLayout navigation', () => {
 
     expect(screen.getByText('Planen')).toBeTruthy()
     expect(screen.getByText('Pflegen')).toBeTruthy()
+  })
+})
+
+describe('AppLayout footer', () => {
+  it('renders the release tag without adding another version prefix', () => {
+    renderShell()
+
+    expect(screen.getByText('Capado v0.0.2')).toBeTruthy()
+    expect(screen.queryByText('Capado vv0.0.2')).toBeNull()
   })
 })
