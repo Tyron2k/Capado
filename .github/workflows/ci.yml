@@ -35,6 +35,8 @@ jobs:
           python-version: "3.14"
 
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -132,6 +134,7 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
+          prune-cache: true
           cache-dependency-glob: "backend/uv.lock"
 
       - name: Install dependencies
@@ -174,6 +177,7 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
+          prune-cache: true
           cache-dependency-glob: "backend/uv.lock"
 
       - name: Install dependencies
@@ -269,6 +273,7 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
+          prune-cache: true
           cache-dependency-glob: "backend/uv.lock"
 
       - name: Python dependencies (pip-audit)
@@ -390,6 +395,7 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
+          prune-cache: true
           cache-dependency-glob: "backend/uv.lock"
 
       - name: Install production dependencies
