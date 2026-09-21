@@ -11,11 +11,11 @@ license = "GPL-3.0-only"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.141.1",
-    "uvicorn[standard]==0.52.4",  # CLI entry point: uv run uvicorn app.main:app
+    "uvicorn[standard]==0.53.0",  # CLI entry point: uv run uvicorn app.main:app
     "sqlmodel==0.0.42",
     "asyncpg==0.31.0",  # Engine driver loaded via postgresql+asyncpg:// URI
-    "sqlalchemy[asyncio]==2.0.52",
-    "alembic==1.19.2",
+    "sqlalchemy[asyncio]==2.0.54",
+    "alembic==1.20.0",
     "pydantic==2.13.5",
     "bcrypt==5.0.0",
     "PyJWT==2.13.0",  # Imported as 'jwt' in app/services/auth_service.py
@@ -154,7 +154,7 @@ dev = [
     # pytest-md-report was dropped: it silently stops producing any report from
     # pytest 8.4 on, and pytest-asyncio >= 1.0 requires pytest >= 8.4.
     "pytest-xdist>=3.8.0",  # Parallel test execution (addopts -n auto)
-    "ruff==0.16.7",  # Lint + format — must equal the rev in .pre-commit-config.yaml
+    "ruff==0.16.8",  # Lint + format — must equal the rev in .pre-commit-config.yaml
     "mypy==2.3.1",  # Type check — runs as its own CI job, see .github/workflows/ci.yml
     "types-openpyxl>=3.1.5",  # Stubs for the import/export workbook writers
 ]
