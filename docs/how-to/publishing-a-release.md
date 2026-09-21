@@ -5,15 +5,20 @@ What `release.yml` does on its own, and the one step it cannot do.
 ## Cutting the release
 
 Publishing a GitHub release triggers `release.yml`, which builds both images for `linux/amd64` and
-`linux/arm64` from the `production` targets and pushes them to GHCR. A release tagged `vMAJOR.MINOR.PATCH`
-produces four tags per image:
+`linux/arm64` from the `production` targets. It pushes candidates by digest, scans them, records a
+CycloneDX SBOM and build provenance, and only then promotes both images in GHCR. A stable release
+tagged `vMAJOR.MINOR.PATCH` produces five tags per image:
 
 | Tag     | Moves? |
 |---------|--------|
 | `MAJOR.MINOR.PATCH` | never — this is the one to pin |
+| `sha-<commit>` | never — identifies the exact source commit |
 | `MAJOR.MINOR`   | on every patch release |
 | `MAJOR`         | on every minor release |
-| `latest`| on every release, including across a breaking change |
+| `latest`| on every stable release, including across a breaking change |
+
+Prereleases receive only their exact version and `sha-<commit>` tags. They never move `latest` or
+the floating major/minor tags.
 
 `VITE_APP_VERSION` is passed the release tag at build time, so the version shown in the UI comes
 from the tag rather than from a file somebody has to remember to bump.

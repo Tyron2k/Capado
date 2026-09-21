@@ -58,17 +58,20 @@ visibility. See [publishing a release](publishing-a-release.md).
 
 ### If you track `main` rather than releases
 
-`build-images.yml` runs only when triggered, so `ghcr.io/.../backend:edge` can be older than `main` —
-possibly by many commits.
+`build-images.yml` checks every night whether `main` moved since the last successful publication. It
+also rebuilds unchanged sources after seven days so moving base-image security fixes reach `:edge`.
+If neither condition applies, the nightly run stops after the cheap decision job.
+
+To publish immediately instead of waiting for the next night:
 
 ```bash
-gh workflow run "Build images"
+gh workflow run "Build images" -f force=true
 gh run watch
 ```
 
-Roughly 9–10 minutes for both images on both platforms (measured: backend 248s, frontend 306s). The
-reason it is manual: it used to run on every push to `main`, and most of those images were never
-pulled, which was the largest avoidable line on a metered Actions budget.
+Roughly 9–10 minutes for both images on both platforms (measured: backend 248s, frontend 306s).
+Candidates are pushed by digest, scanned, and only promoted to public tags after both backend and
+frontend pass. A failed build or scan therefore leaves the previous `:edge` tag in place.
 
 Confirm which commit you are about to deploy. Either pull the **SHA tag**, which the build pushes
 alongside `:edge`:

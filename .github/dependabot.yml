@@ -4,8 +4,9 @@ updates:
   - package-ecosystem: "uv"
     directory: "/backend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
+      time: "01:00"
+      timezone: "Europe/Berlin"
     commit-message:
       prefix: "chore(deps)"
     labels:
@@ -21,8 +22,9 @@ updates:
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
+      time: "01:20"
+      timezone: "Europe/Berlin"
     commit-message:
       prefix: "chore(deps)"
     labels:
@@ -60,14 +62,20 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
+      time: "01:40"
+      timezone: "Europe/Berlin"
     commit-message:
       prefix: "ci(deps)"
     labels:
       - "dependencies"
       - "ci"
     open-pull-requests-limit: 5
+    groups:
+      all-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   # Without this, a ruff bump in backend/pyproject.toml leaves the hook rev in
   # .pre-commit-config.yaml behind, and the two lint with different versions. That drift is silent:
@@ -77,32 +85,50 @@ updates:
   - package-ecosystem: "pre-commit"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
+      time: "02:00"
+      timezone: "Europe/Berlin"
     commit-message:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
       - "tooling"
+    groups:
+      all-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "docker"
     directory: "/backend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
+      time: "02:20"
+      timezone: "Europe/Berlin"
     commit-message:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
       - "docker"
+    groups:
+      all-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "docker"
     directory: "/frontend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
+      time: "02:40"
+      timezone: "Europe/Berlin"
     commit-message:
       prefix: "chore(deps)"
     labels:
       - "dependencies"
       - "docker"
+    groups:
+      all-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"

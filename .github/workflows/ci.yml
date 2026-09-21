@@ -1,12 +1,14 @@
 name: CI
 
 # Pull requests only. A squash-merge of a green PR produces the same tree the PR just
-# verified, so re-running every gate on main spent about four minutes per merge to learn
-# nothing. The image build moved to build-images.yml, which is triggered by hand when a
-# deploy is actually wanted — see the note there on what this trades away.
+# verified, so re-running every gate on main adds latency without testing a different tree.
+# Edge images are handled separately by the conditional nightly build in build-images.yml.
 on:
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -18,23 +20,25 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     # Every job caps its runtime. Without a cap GitHub only stops a job after six
-    # hours, which is long enough to eat a fifth of the monthly Actions budget on
-    # a single hang. The limits are generous multiples of the observed durations
+    # hours, wasting runner capacity and delaying useful feedback. The limits are
+    # generous multiples of the observed durations
     # (lint ~1min, typecheck ~30s, tests ~1min, build ~10min), so they only fire
     # on a genuine hang rather than on a slow runner.
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          python-version: "3.12"
+          persist-credentials: false
 
-      - uses: astral-sh/setup-uv@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
-          node-version: 24
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -43,7 +47,10 @@ jobs:
         working-directory: frontend
 
       - name: Run prek (pre-commit hooks)
-        run: uvx prek run -a
+        run: uvx --from prek==0.5.3 prek run -a
+
+      - name: Audit workflow security (zizmor)
+        run: uvx --from zizmor==1.30.1 zizmor .github/workflows
 
       # DEAD CODE, BY A TOOL RATHER THAN BY HAND.
       #
@@ -65,7 +72,7 @@ jobs:
         working-directory: frontend
         run: |
           set -o pipefail
-          npx --yes knip@5 --no-progress 2>&1 | tee knip.txt
+          npx --no-install knip --no-progress 2>&1 | tee knip.txt
           {
             echo "### Dead code (knip)"
             echo '```'
@@ -80,11 +87,13 @@ jobs:
     needs: lint
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          node-version: 24
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -112,13 +121,15 @@ jobs:
     # dependency list into a pre-commit `additional_dependencies` block would
     # mean maintaining a second copy of uv.lock by hand.
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
           cache-dependency-glob: "backend/uv.lock"
@@ -139,22 +150,28 @@ jobs:
         run: uv run python scripts/check_attr_defined.py
 
   backend-tests:
-    name: Backend tests
+    name: Backend tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     needs: lint
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
     defaults:
       run:
         working-directory: backend
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          python-version: "3.12"
+          persist-credentials: false
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
           cache-dependency-glob: "backend/uv.lock"
@@ -190,11 +207,13 @@ jobs:
         working-directory: frontend
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          node-version: 24
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 26
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
@@ -233,13 +252,21 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
-          python-version: "3.12"
+          fail-on-severity: high
+          retry-on-snapshot-warnings: true
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
         with:
           enable-cache: true
           cache-dependency-glob: "backend/uv.lock"
@@ -249,7 +276,7 @@ jobs:
         run: |
           uv sync --frozen
           set -o pipefail
-          uv run --with pip-audit pip-audit --strict --desc 2>&1 | tee audit-python.txt
+          uv run --with pip-audit==2.10.1 pip-audit --strict --desc 2>&1 | tee audit-python.txt
 
       - name: Report Python audit
         if: always()
@@ -262,18 +289,17 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 24
+          node-version: 26
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
       - name: Node dependencies (npm audit)
         working-directory: frontend
         run: |
-          npm ci
           set -o pipefail
-          npm audit --audit-level=high 2>&1 | tee audit-node.txt
+          npm audit --package-lock-only --audit-level=high 2>&1 | tee audit-node.txt
 
       - name: Report Node audit
         if: always()
@@ -297,16 +323,18 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: hadolint (backend)
-        uses: hadolint/hadolint-action@v3.5.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: backend/Dockerfile
           config: .hadolint.yaml
 
       - name: hadolint (frontend)
-        uses: hadolint/hadolint-action@v3.5.0
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
         with:
           dockerfile: frontend/Dockerfile
           config: .hadolint.yaml
@@ -315,7 +343,7 @@ jobs:
       # HIGH/CRITICAL finding turns a misconfiguration into a failed build. Both are clean today
       # (verified locally); this keeps them that way.
       - name: Trivy config scan
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -323,3 +351,52 @@ jobs:
           exit-code: "1"
           # Only the runtime container definitions; the dev compose and dev stage are not shipped.
           trivyignores: ""
+
+  postgres-smoke:
+    name: PostgreSQL migration smoke
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: capado
+          POSTGRES_PASSWORD: capado
+          POSTGRES_DB: capado
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U capado -d capado"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://capado:capado@localhost:5432/capado
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install production dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Apply all migrations
+        run: uv run --no-sync python -m alembic upgrade head
+
+      - name: Import application
+        run: uv run --no-sync python -c "from app.main import app; assert app"

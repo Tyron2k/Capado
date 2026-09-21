@@ -1,0 +1,247 @@
+name: Publish container images
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        description: "Publication channel: edge or release"
+        required: true
+        type: string
+      version:
+        description: "Release tag; empty for edge builds"
+        required: false
+        default: ""
+        type: string
+      source-ref:
+        description: "Git ref to build; defaults to the caller SHA"
+        required: false
+        default: ""
+        type: string
+      platforms:
+        description: "Target platforms"
+        required: false
+        default: "linux/amd64,linux/arm64"
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-scan:
+    name: Build and scan (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: backend
+            context: ./backend
+          - image: frontend
+            context: ./frontend
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Resolve build metadata
+        id: metadata
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          repository=$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          sha=$(git rev-parse HEAD)
+          created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          if [ -n "$REQUESTED_VERSION" ]; then
+            app_version=$REQUESTED_VERSION
+          else
+            app_version="edge-${sha}"
+          fi
+          {
+            echo "image=ghcr.io/${repository}/${{ matrix.image }}"
+            echo "sha=$sha"
+            echo "created=$created"
+            echo "app-version=$app_version"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Push by digest only. Public tags are applied by the promote job after
+      # both images have passed their vulnerability scans.
+      - name: Build candidate by digest
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: ${{ matrix.context }}
+          target: production
+          platforms: ${{ inputs.platforms }}
+          outputs: >-
+            type=image,name=${{ steps.metadata.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+          labels: |
+            org.opencontainers.image.revision=${{ steps.metadata.outputs.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ steps.metadata.outputs.created }}
+            org.opencontainers.image.version=${{ steps.metadata.outputs.app-version }}
+          build-args: |
+            VITE_APP_VERSION=${{ steps.metadata.outputs.app-version }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Scan candidate (Trivy)
+        id: scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.metadata.outputs.image }}@${{ steps.build.outputs.digest }}
+          format: table
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          output: trivy-${{ matrix.image }}.txt
+
+      - name: Report scan findings
+        if: always() && steps.build.outcome == 'success'
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          report="trivy-${IMAGE}.txt"
+          if [ -s "$report" ]; then
+            cat "$report"
+          else
+            echo "Trivy: no fixable CRITICAL or HIGH findings in ${IMAGE}."
+          fi
+          {
+            echo "### Trivy — ${IMAGE}"
+            echo '```'
+            if [ -s "$report" ]; then tail -60 "$report"; else echo "none"; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate CycloneDX SBOM
+        if: always() && steps.build.outcome == 'success'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.metadata.outputs.image }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx
+          scanners: vuln
+          output: sbom-${{ matrix.image }}.json
+
+      - name: Upload scan report and SBOM
+        if: always() && steps.build.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: security-${{ matrix.image }}
+          path: |
+            trivy-${{ matrix.image }}.txt
+            sbom-${{ matrix.image }}.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Record approved digest
+        if: steps.scan.outcome == 'success'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          mkdir -p digests
+          printf '%s\n' "$DIGEST" > "digests/${IMAGE}"
+
+      - name: Upload approved digest
+        if: steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: digest-${{ matrix.image }}
+          path: digests/${{ matrix.image }}
+          retention-days: 1
+
+  promote:
+    name: Promote approved images
+    needs: build-and-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+          persist-credentials: false
+
+      - name: Download approved digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: digest-*
+          path: digests
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote digests to public tags
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          repository=$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          sha=$(git rev-parse HEAD)
+
+          case "$CHANNEL" in
+            edge)
+              common_tags=("edge" "edge-${sha}")
+              ;;
+            release)
+              if ! printf '%s' "$RELEASE_VERSION" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$'; then
+                echo "Release tag is not semantic versioning: $RELEASE_VERSION" >&2
+                exit 1
+              fi
+              version=${RELEASE_VERSION#v}
+              safe_version=${version//+/-}
+              common_tags=("$safe_version" "sha-${sha}")
+              if [[ "$version" != *-* ]]; then
+                major=${version%%.*}
+                remainder=${version#*.}
+                minor=${remainder%%.*}
+                common_tags+=("${major}.${minor}" "$major" "latest")
+              fi
+              ;;
+            *)
+              echo "Unknown publication channel: $CHANNEL" >&2
+              exit 1
+              ;;
+          esac
+
+          for component in backend frontend; do
+            image="ghcr.io/${repository}/${component}"
+            digest=$(<"digests/${component}")
+            tag_args=()
+            for tag in "${common_tags[@]}"; do
+              tag_args+=(--tag "${image}:${tag}")
+            done
+            docker buildx imagetools create "${tag_args[@]}" "${image}@${digest}"
+          done

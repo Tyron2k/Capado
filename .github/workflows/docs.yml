@@ -1,8 +1,8 @@
 name: Docs site
 
-# PATH-FILTERED ON PURPOSE. Actions minutes on this account are metered, and without the filter every
-# push to main — including one that only touches backend code — would rebuild and redeploy a site that
-# did not change. With it the job runs only when the docs or their configuration actually move.
+# PATH-FILTERED ON PURPOSE. Without the filter every push to main — including one that only touches
+# backend code — would rebuild and redeploy a site that did not change. With it the job runs only
+# when the docs or their configuration actually move.
 #
 # workflow_dispatch stays available so the site can be republished by hand, e.g. after switching Pages
 # on for the first time or after a theme pin changes.
@@ -14,14 +14,17 @@ on:
       - ".github/mkdocs.yml"
       - ".github/docs-requirements.txt"
       - ".github/workflows/docs.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/mkdocs.yml"
+      - ".github/docs-requirements.txt"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
-# Least privilege: the deploy needs to write Pages and to mint an OIDC token for the deployment, and
-# nothing else. contents stays read.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 # One deployment at a time, and do NOT cancel a running one: cancelling mid-deploy can leave Pages
 # serving a half-published site. Queueing is the safe behaviour here, unlike CI where cancelling a
@@ -36,9 +39,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.13"
           cache: pip
@@ -53,18 +58,24 @@ jobs:
       - name: Build
         run: mkdocs build -f .github/mkdocs.yml --strict
 
-      - uses: actions/upload-pages-artifact@v5
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: site
 
   deploy:
     name: Deploy to Pages
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

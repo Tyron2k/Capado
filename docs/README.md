@@ -21,7 +21,7 @@ docs/
 │   ├── layout-components.md
 │   ├── date-handling.md
 │   ├── import-export.md          The five import/export pairs: columns, resolution, limits
-│   ├── ci.md                     What runs when, and why the image build is manual
+│   ├── ci.md                     PR gates, nightly images, releases and dependency updates
 │   └── known-limitations.md      Deliberate omissions and what each costs
 ├── explanation/     Conceptual discussions (understanding-oriented)
 │   ├── architecture.md           Includes a map from each feature area to its rules
