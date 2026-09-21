@@ -85,8 +85,8 @@ async def test_oidc_provider_error_cannot_forge_log_entries(monkeypatch, caplog)
     message = caplog.records[-1].getMessage()
     assert "\r" not in message
     assert "\n" not in message
-    assert r"access_denied\r\nINFO forged entry" in message
-    assert r"The user cancelled\nWARNING forged entry" in message
+    assert r'"access_denied\r\nINFO forged entry"' in message
+    assert r'"The user cancelled\nWARNING forged entry"' in message
 
 
 class TestOidcUserResolution:

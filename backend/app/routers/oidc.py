@@ -25,6 +25,7 @@ from app.services.oidc_service import (
     get_userinfo,
 )
 from app.utils.auth_cookies import set_refresh_cookie
+from app.utils.logging import quote_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +37,6 @@ _STATE_SECRET = settings.jwt_secret_key
 
 # State expiry in seconds
 _STATE_EXPIRY_SECONDS = 300
-
-
-def _escape_log_value(value: str | None) -> str:
-    """Escape line breaks in untrusted values before writing them to text logs."""
-    if value is None:
-        return "<none>"
-    return value.replace("\r", r"\r").replace("\n", r"\n")
 
 
 def _sign_state(state: str) -> str:
@@ -209,8 +203,8 @@ async def oidc_callback(
     if error:
         logger.warning(
             "OIDC provider error: %s — %s",
-            _escape_log_value(error),
-            _escape_log_value(error_description),
+            quote_log_value(error),
+            quote_log_value(error_description),
         )
         return RedirectResponse(
             url=f"{FRONTEND_URL}/login?error=oidc_denied",
