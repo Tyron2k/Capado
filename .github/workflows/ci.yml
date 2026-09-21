@@ -300,13 +300,13 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: hadolint (backend)
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: backend/Dockerfile
           config: .hadolint.yaml
 
       - name: hadolint (frontend)
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: frontend/Dockerfile
           config: .hadolint.yaml
