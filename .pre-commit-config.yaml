@@ -58,7 +58,7 @@ repos:
     # Keep this in step with ruff in backend/pyproject.toml. Two ruff versions means the hook and a
     # developer's own `ruff check` can disagree, which produces a CI failure nobody can reproduce
     # locally. Dependabot now watches this file too, so both move together.
-    rev: v0.16.7
+    rev: v0.16.8
     hooks:
       - id: ruff
         name: ruff (lint, backend)
