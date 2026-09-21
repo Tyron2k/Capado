@@ -12,6 +12,7 @@ must record the event without the material, which is covered by
 A mock session stands in for the database, matching the style of the other router tests.
 """
 
+import logging
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -121,6 +122,23 @@ class TestAdminPasswordReset:
         )
 
         assert "a-fresh-password" not in target.password_hash
+
+    async def test_audit_log_quotes_user_ids(self, caplog):
+        """Actor and target IDs are safely delimited in the text log."""
+        caplog.set_level(logging.INFO, logger="app.routers.users")
+        target = _user()
+        admin = _admin()
+
+        await update_user(
+            target.id,
+            UserUpdateRequest(password="a-fresh-password"),
+            admin_user=admin,
+            session=_session_returning(target),
+        )
+
+        assert caplog.records[-1].getMessage() == (
+            f'Admin "{admin.id}" reset the password of user "{target.id}"'
+        )
 
     async def test_short_password_is_refused_by_the_schema(self):
         """Eight characters, matching the setup endpoint rather than a second rule."""

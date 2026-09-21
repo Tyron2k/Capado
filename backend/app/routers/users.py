@@ -20,6 +20,7 @@ from app.schemas.user import (
 )
 from app.services.auth_service import hash_password
 from app.services.permissions import get_current_user, require_admin
+from app.utils.logging import quote_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +208,11 @@ async def update_user(
         # The admin knows this value, so it is a handover credential rather than a password.
         user.must_change_password = True
         # The audit entry records THAT it changed; audit.REDACTED_FIELDS keeps the hash out.
-        logger.info("Admin %s reset the password of user %s", admin_user.id, user.id)
+        logger.info(
+            "Admin %s reset the password of user %s",
+            quote_log_value(admin_user.id),
+            quote_log_value(user.id),
+        )
     if body.clear_resource_id:
         user.resource_id = None
     elif body.resource_id is not None:
