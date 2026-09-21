@@ -124,30 +124,23 @@ be verified against anything.
 New migrations are linted manually before commit. If the exclusion is ever narrowed to
 just 001–003, that manual step goes away.
 
-## Image builds are verified by nothing automatic
+## Full container builds do not run on every pull request
 
-Since August 2026 the image build lives in its own workflow, `build-images.yml`, and runs **only
-when triggered by hand** (`gh workflow run "Build images"`). It used to run on every push to main.
+Pull requests lint both Dockerfiles and scan the production container configuration, but they do not
+perform the full emulated `linux/amd64` + `linux/arm64` build. That build costs about 9.3 minutes per
+run (backend 216s, frontend 339s — measured), with the emulated ARM layer accounting for most of the
+time and historical hangs.
 
-This is a budget decision with real numbers behind it. The build costs about 9.3 minutes per run
-(backend 216s, frontend 339s — measured), and on a day with eight merges and one deploy, seven of
-those builds produced an `:edge` image nobody pulled. The gates were also running twice per merged
-PR: once on the pull request, then again on main for the identical tree, about four minutes each
-time to learn nothing. `ci.yml` is therefore pull-request-only now.
+Instead, `build-images.yml` runs a cheap decision job every night. It publishes a new `:edge` pair
+when `main` changed since the last successful publication, or when the images are seven days old and
+need moving base-image security fixes. It can also be forced manually. Candidates are scanned by
+digest before tags move, so a failed build or HIGH/CRITICAL vulnerability leaves the previous good
+`:edge` in place.
 
-Two consequences, both real:
-
-- **A broken Dockerfile is caught by nothing until somebody builds.** Pull requests never verified
-  it before either, so this is not a regression — but main does not verify it now either.
-- **`:edge` can be older than main.** The second tag carries the commit (`edge-<sha>`), so which
-  commit an image contains is always answerable rather than assumed. Check it before deploying.
-
-The reason a pull-request build was rejected rather than made cheap: the expensive and fragile part
-is the emulated `linux/arm64` layer, where `npm ci` has hung until GitHub's six hour job ceiling.
-An amd64-only PR build would avoid that and cost roughly half — worth revisiting if the Actions
-budget stops being the binding constraint.
-
-A published release still builds and pushes its own images through `release.yml`, unchanged.
+The remaining limitation is timing: a Docker build regression can merge and is discovered by the
+next nightly build rather than by the pull request. `edge-<sha>` and the OCI revision label make the
+last published commit explicit. A published release uses the same build-and-scan workflow and will
+not promote release tags when either image fails.
 
 ## Free-text fields defeat the enum work
 
