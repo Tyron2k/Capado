@@ -38,6 +38,13 @@ _STATE_SECRET = settings.jwt_secret_key
 _STATE_EXPIRY_SECONDS = 300
 
 
+def _escape_log_value(value: str | None) -> str:
+    """Escape line breaks in untrusted values before writing them to text logs."""
+    if value is None:
+        return "<none>"
+    return value.replace("\r", r"\r").replace("\n", r"\n")
+
+
 def _sign_state(state: str) -> str:
     """Create a signed state value with timestamp for verification.
 
@@ -200,7 +207,11 @@ async def oidc_callback(
 
     # Handle provider errors
     if error:
-        logger.warning("OIDC provider error: %s — %s", error, error_description)
+        logger.warning(
+            "OIDC provider error: %s — %s",
+            _escape_log_value(error),
+            _escape_log_value(error_description),
+        )
         return RedirectResponse(
             url=f"{FRONTEND_URL}/login?error=oidc_denied",
             status_code=302,
