@@ -20,7 +20,7 @@ export const FINDING_KINDS = [
   'requirement_uncovered',
 ] as const
 
-export type FindingKind = (typeof FINDING_KINDS)[number]
+type FindingKind = (typeof FINDING_KINDS)[number]
 
 /**
  * How urgently a finding needs attention.

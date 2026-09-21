@@ -7,7 +7,7 @@
 
 import apiClient from './client'
 
-export interface DayEntry {
+interface DayEntry {
   work_package_name: string
   project_name: string
   allocation_percent: number
@@ -29,7 +29,7 @@ export interface DayCell {
   is_overbooked: boolean
 }
 
-export interface PersonRow {
+interface PersonRow {
   resource_id: string
   name: string
   cells: DayCell[]

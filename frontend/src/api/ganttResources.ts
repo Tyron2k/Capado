@@ -15,7 +15,7 @@ export interface ResourceGanttBar {
   has_conflict: boolean
 }
 
-export interface ResourceGanttProjectGroup {
+interface ResourceGanttProjectGroup {
   project_id: string
   project_name: string
   work_packages: ResourceGanttBar[]

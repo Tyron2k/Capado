@@ -38,7 +38,7 @@ export interface ResourceCreate {
   site_id?: string | null
 }
 
-export interface ResourceUpdate {
+interface ResourceUpdate {
   name?: string
   group_id?: string
   /**

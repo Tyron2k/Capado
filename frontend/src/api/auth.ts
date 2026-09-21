@@ -16,7 +16,7 @@ const authClient = axios.create({
   },
 })
 
-export interface UserScopes {
+interface UserScopes {
   scope_group_ids: string[] | null
   scope_project_ids: string[] | null
 }
