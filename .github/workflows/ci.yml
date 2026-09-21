@@ -396,7 +396,7 @@ jobs:
         run: uv sync --frozen --no-dev
 
       - name: Apply all migrations
-        run: uv run alembic upgrade head
+        run: uv run --no-sync python -m alembic upgrade head
 
       - name: Import application
-        run: uv run python -c "from app.main import app; assert app"
+        run: uv run --no-sync python -c "from app.main import app; assert app"
