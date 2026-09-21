@@ -52,7 +52,7 @@ import { resourceTypeLabel } from './bucketing'
 
 // --- Types ---
 
-export type ProblemType = 'capacity' | 'skill'
+type ProblemType = 'capacity' | 'skill'
 
 export interface ProblemBucket {
   type: ProblemType

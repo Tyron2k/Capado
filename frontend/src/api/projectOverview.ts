@@ -11,7 +11,7 @@ import apiClient from './client'
  * adjusted to make this go away — that would remove the signal rather than the
  * problem.
  */
-export interface LateWorkPackage {
+interface LateWorkPackage {
   work_package_id: string
   work_package_name: string
   /** The committed end date, unchanged. */
@@ -29,7 +29,7 @@ export interface LateWorkPackage {
  * and only the recorded working-day lead times do not. Every date-based report on such a
  * project looks fine.
  */
-export interface CommitmentBreach {
+interface CommitmentBreach {
   committed: string
   planned_end: string
   derived_end: string | null
@@ -43,7 +43,7 @@ export interface CommitmentBreach {
  * Carries both names: a warning naming only one side cannot be acted on, because the
  * reader has to know what waits on what before deciding which date moves.
  */
-export interface DependencyViolation {
+interface DependencyViolation {
   predecessor_id: string
   predecessor_name: string
   successor_id: string

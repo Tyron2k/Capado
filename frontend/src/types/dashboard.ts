@@ -4,7 +4,7 @@
  */
 
 /** Color indicator for utilization level (green = ok, yellow = warn, red = overloaded). */
-export type UtilizationColor = 'green' | 'yellow' | 'red'
+type UtilizationColor = 'green' | 'yellow' | 'red'
 
 export interface WeeklyUtilizationResponse {
   week_start: string
@@ -15,7 +15,7 @@ export interface WeeklyUtilizationResponse {
   color: UtilizationColor
 }
 
-export interface ProjectConflictSummary {
+interface ProjectConflictSummary {
   id: string
   name: string
   start_date: string

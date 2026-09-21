@@ -4,13 +4,13 @@
 
 import apiClient from './client'
 
-export interface GanttResourceInfo {
+interface GanttResourceInfo {
   id: string
   name: string
   resource_type: 'personal' | 'infrastructure'
 }
 
-export interface GanttResourceAssignment {
+interface GanttResourceAssignment {
   id: string
   name: string
   resource_type: 'personal' | 'infrastructure'
