@@ -17,6 +17,7 @@ import pytest
 
 from app.config import settings
 from app.models.user import User, UserRole
+from app.routers import oidc as oidc_router
 from app.routers.oidc import _find_or_create_user
 from app.services.oidc_service import OIDCUserInfo
 
@@ -68,6 +69,24 @@ def _session_returning(*scalars: object) -> AsyncMock:
     session.execute = AsyncMock(side_effect=results)
     session.add = MagicMock()
     return session
+
+
+async def test_oidc_provider_error_cannot_forge_log_entries(monkeypatch, caplog):
+    """Provider-controlled callback fields stay on one physical log line."""
+    monkeypatch.setattr(oidc_router, "OIDC_ENABLED", True)
+
+    response = await oidc_router.oidc_callback(
+        error="access_denied\r\nINFO forged entry",
+        error_description="The user cancelled\nWARNING forged entry",
+        session=AsyncMock(),
+    )
+
+    assert response.status_code == 302
+    message = caplog.records[-1].getMessage()
+    assert "\r" not in message
+    assert "\n" not in message
+    assert r"access_denied\r\nINFO forged entry" in message
+    assert r"The user cancelled\nWARNING forged entry" in message
 
 
 class TestOidcUserResolution:
