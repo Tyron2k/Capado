@@ -62,10 +62,12 @@ jobs:
           else
             app_version="edge-${sha}"
           fi
-          echo "image=ghcr.io/${repository}/${{ matrix.image }}" >> "$GITHUB_OUTPUT"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "created=$created" >> "$GITHUB_OUTPUT"
-          echo "app-version=$app_version" >> "$GITHUB_OUTPUT"
+          {
+            echo "image=ghcr.io/${repository}/${{ matrix.image }}"
+            echo "sha=$sha"
+            echo "created=$created"
+            echo "app-version=$app_version"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
