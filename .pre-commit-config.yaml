@@ -78,7 +78,7 @@ repos:
         name: prettier (format, frontend)
         files: ^frontend/(src|public)/.*\.(ts|tsx|js|jsx|css|scss|json|md|yaml|yml)$
         additional_dependencies:
-          - prettier@3.9.6
+          - prettier@3.9.8
 
   - repo: local
     hooks:
