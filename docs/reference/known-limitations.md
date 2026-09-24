@@ -185,20 +185,16 @@ keeps every pre-ADR-005 plan valid. The consequence is that the whole window-vio
 mechanism does nothing on a fresh deployment: a booking at 03:00 on a Sunday is accepted
 until somebody defines operating hours.
 
-## Imports have no size limit
+## Import limits do not include a time or decompressed-size bound
 
-None of the five importers enforces a maximum upload size, a row cap or a time limit. The file is read
-into memory in full (`content = await file.read()`) and parsed there.
+All five importers reject files over 20 MiB and files over 10,000 rows (including the header) before
+writing anything. The upload is read only up to the size limit plus one byte, and parsing runs in a
+thread pool. Imports remain admin-only.
 
-What keeps this tolerable rather than a denial-of-service vector is that all five endpoints are
-admin-only, and the parse runs in a thread pool rather than on the event loop, so a slow file does not
-block other requests. What it costs is a hard ceiling nobody has measured: a sufficiently large
-workbook exhausts the container's memory, and the failure mode is the backend being killed rather than
-the request being rejected.
-
-The fix is a size check in the router plus a row cap in the parser, which is a small change nobody has
-needed yet. It should happen before Capado is reachable by anybody less trusted than an administrator
-— note that "admin-only" is a weaker guarantee than it sounds if an admin token ever leaks.
+There is still no parsing time limit or separate bound on the decompressed contents of an Excel
+workbook. A compact, pathological `.xlsx` file can therefore consume more resources than its upload
+size suggests. This residual risk matters if the import endpoint is ever exposed to less-trusted
+administrators or a leaked admin token.
 
 See [import and export](import-export.md) for the formats themselves.
 

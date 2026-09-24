@@ -404,6 +404,8 @@ CSV-Format: **Projekt; Arbeitspaket; Ressource; Start; Ende; Auslastung**
 - **Ressourcen** und **Projekte** müssen bereits existieren — sie werden über den Namen aufgelöst.
 - Datumsangaben im ISO-Format (JJJJ-MM-TT).
 - Doppelte Zuweisungen (gleiche Ressource + Arbeitspaket) werden übersprungen.
+
+Importdateien dürfen höchstens 20 MiB groß sein und einschließlich Kopfzeile höchstens 10.000 Zeilen enthalten. Größere Importe werden vollständig abgelehnt.
     `.trim(),
   },
   {
@@ -453,7 +455,7 @@ Die Skill-Matrix hat ihre Kopfzeile über zwei Zeilen und Trennzeilen zwischen d
 
 **Dateiformat des flachen Exports:** fünf Spalten — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Alles außer Name und Group ist optional. **Eine unbekannte Betriebsstätte wird abgelehnt, nicht angelegt** — anders als bei Skills, denn eine Betriebsstätte besitzt den Feiertagskalender, und ein Tippfehler würde ein Werk ohne Feiertage erzeugen. Legen Sie sie zuerst unter Arbeitszeit an. Fehlt die Spalte ganz, bleibt die Zuordnung unverändert; ist die Zelle leer, wird sie **entfernt**. Die Kopfzeile muss mit \`Name\` und \`Group\` **in dieser Reihenfolge** beginnen; die Spalten werden nach Position gelesen, deshalb wird eine vertauschte Kopfzeile abgelehnt statt geraten. Groß-/Kleinschreibung ist gleichgültig, und \`Gruppe\` wird ebenfalls akzeptiert.
 
-Hochgeladen werden nur \`.xlsx\` und \`.csv\`. Der gesamte Import ist **eine Transaktion**: wird eine Zeile abgelehnt, wird nichts geschrieben. Nach dem Import öffnet sich ein Protokoll mit den Zahlen und jeder abgelehnten Zeile.
+Hochgeladen werden nur \`.xlsx\` und \`.csv\`, mit höchstens 20 MiB und 10.000 Zeilen einschließlich Kopfzeile. Gültige Zeilen werden gemeinsam gespeichert; fehlerhafte Zeilen werden übersprungen und im Ergebnisprotokoll aufgeführt. Eine zu große Datei wird vor dem Import vollständig abgelehnt.
     `.trim(),
   },
   {
