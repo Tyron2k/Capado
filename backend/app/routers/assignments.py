@@ -32,11 +32,14 @@ from app.models.user import User
 from app.schemas.assignment import (
     AssignmentCreate,
     AssignmentCreateResponse,
+    AssignmentPreviewRequest,
+    AssignmentPreviewResponse,
     AssignmentResponse,
     AssignmentUpdate,
     UnmetRequirementResponse,
 )
 from app.schemas.pagination import PaginatedResponse
+from app.services.assignment_preview import AssignmentPreviewService
 from app.services.assignment_service import AssignmentService
 from app.services.freeze_enforcement import enforce_freeze, span_of
 from app.services.permissions import (
@@ -345,6 +348,42 @@ async def get_assignments(
 
 
 @router.post(
+    "/preview",
+    response_model=AssignmentPreviewResponse,
+    summary="Preview the impact of an assignment without saving it",
+)
+async def preview_assignment(
+    data: AssignmentPreviewRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply the same permission and freeze checks as a real assignment change."""
+    service = AssignmentService(session)
+    existing = (
+        await service.get_by_id(data.assignment_id)
+        if data.assignment_id is not None
+        else None
+    )
+    if existing is not None:
+        await _check_assignment_permission(
+            session, current_user, existing.resource_id, existing.resource_type
+        )
+    await _check_assignment_permission(
+        session, current_user, data.resource_id, data.resource_type
+    )
+    await enforce_freeze(
+        session,
+        current_user,
+        before=span_of(existing) if existing is not None else None,
+        after=Span(
+            start=data.start_date or (data.start_at.date() if data.start_at else None),
+            end=data.end_date or (data.end_at.date() if data.end_at else None),
+        ),
+    )
+    return await AssignmentPreviewService(session).preview(data)
+
+
+@router.post(
     "",
     response_model=AssignmentCreateResponse,
     status_code=201,
@@ -570,6 +609,13 @@ async def update_assignment(
     await _check_assignment_permission(
         session, current_user, existing.resource_id, existing.resource_type
     )
+    if data.resource_id is not None and data.resource_id != existing.resource_id:
+        await _check_assignment_permission(
+            session,
+            current_user,
+            data.resource_id,
+            data.resource_type or existing.resource_type,
+        )
     # BOTH states are tested. Checking only the requested dates would let somebody drag a
     # frozen booking into the open period, rewriting frozen history through an edit that
     # looks entirely legitimate afterwards.

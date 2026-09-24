@@ -14,6 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.models.conflict import ConflictCause
 from app.models.resource import ResourceType
 
 
@@ -52,6 +53,48 @@ class AssignmentUpdate(BaseModel):
 
     start_at: datetime | None = None
     end_at: datetime | None = None
+
+
+class AssignmentPreviewRequest(AssignmentCreate):
+    """Complete proposed assignment, optionally replacing an existing one."""
+
+    assignment_id: UUID | None = None
+
+
+class PreviewConflict(BaseModel):
+    """A conflict in one preview state."""
+
+    cause: ConflictCause
+    start_date: date
+    end_date: date
+    total_assigned_percent: float
+    available_percent: float
+
+
+class PreviewCapacityDay(BaseModel):
+    """Personal-resource demand before and after the proposed change."""
+
+    date: date
+    available_percent: float
+    assigned_before_percent: float
+    assigned_after_percent: float
+
+
+class PreviewResource(BaseModel):
+    """Impact on an affected resource, including the old one on reassignment."""
+
+    resource_id: UUID
+    resource_name: str
+    resource_type: ResourceType
+    conflicts_before: list[PreviewConflict]
+    conflicts_after: list[PreviewConflict]
+    capacity_days: list[PreviewCapacityDay]
+
+
+class AssignmentPreviewResponse(BaseModel):
+    """Read-only what-if result; it does not reserve or save capacity."""
+
+    resources: list[PreviewResource]
 
 
 class AssignmentResponse(BaseModel):
