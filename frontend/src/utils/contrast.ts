@@ -43,6 +43,7 @@ export function contrastRatio(a: number, b: number): number {
 
 /** The dark foreground used when white does not carry enough contrast. */
 const DARK_FOREGROUND = '#1a1b1e'
+const BLACK_FOREGROUND = '#000000'
 
 /**
  * Contrast below which white is abandoned: WCAG 2.1 AA for large text.
@@ -55,9 +56,8 @@ const DARK_FOREGROUND = '#1a1b1e'
  * readability guard gets to make silently. The guard's job is preventing UNREADABLE, not optimising
  * readable.
  *
- * 3.0 rather than the 4.5 for normal text, because that is the standard's own bar for what the header
- * mostly is: the company name is bold `size="md"` and the icons are 20px. It is deliberately the
- * lower bar — see the note on `readableForeground` for what that leaves open.
+ * This helper is for large text or icons. Normal-sized labels must use
+ * `readableTextForeground`, which applies the stricter 4.5:1 threshold.
  */
 const MIN_CONTRAST_FOR_WHITE = 3.0
 
@@ -74,16 +74,27 @@ export function isHexColor(value: string): boolean {
  * and the theme resolves those to shade 6, dark enough for white by Mantine's own design. Guessing a
  * luminance from a colour name would be inventing a number.
  *
- * WHAT THIS DOES NOT FIX. Header text smaller than the company name — the user's name is `size="sm"`
- * at weight 500 — needs 4.5, not 3.0. On a brand colour sitting between the two bars, that text is
- * below AA while this function still answers white, on purpose: raising the threshold to 4.5 would
- * flip headers that read perfectly well, and the real answer for those is a larger or heavier label,
- * or a darker brand colour. That is a contrast pass over the header, not a decision this function can
- * make from one colour.
+ * Do not use this for normal-sized labels: its 3:1 threshold is intentionally lower than the 4.5:1
+ * that those labels require. The app shell uses `readableTextForeground` for text on brand surfaces.
  */
 export function readableForeground(brandColor: string): 'white' | typeof DARK_FOREGROUND {
   if (!isHexColor(brandColor)) return 'white'
 
   const againstWhite = contrastRatio(relativeLuminance(brandColor), relativeLuminance('#ffffff'))
   return againstWhite >= MIN_CONTRAST_FOR_WHITE ? 'white' : DARK_FOREGROUND
+}
+
+/** Choose an opaque foreground that meets AA contrast for normal-sized text. */
+export function readableTextForeground(
+  background: string,
+): 'white' | typeof DARK_FOREGROUND | typeof BLACK_FOREGROUND {
+  if (!isHexColor(background)) return 'white'
+
+  const luminance = relativeLuminance(background)
+  if (contrastRatio(luminance, 1) >= 4.5) return 'white'
+  if (contrastRatio(luminance, relativeLuminance(DARK_FOREGROUND)) >= 4.5) {
+    return DARK_FOREGROUND
+  }
+  // Near-black and white both miss AA on a narrow band of medium colours.
+  return BLACK_FOREGROUND
 }

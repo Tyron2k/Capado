@@ -3,7 +3,7 @@
  *
  * This lived inside App.tsx as a local `hexToShades`, which was fine while the Mantine theme was the
  * only consumer. It is shared now because the app shell needs two SPECIFIC shades as hex — not as CSS
- * variables — so it can ask `readableForeground` which text colour each of those two surfaces can
+ * variables — so it can ask `readableTextForeground` which text colour each of those two surfaces can
  * carry. A CSS variable cannot answer that question; only the value can.
  *
  * Duplicating the mixing arithmetic in two files was the alternative, and it is the kind of thing that
@@ -39,27 +39,21 @@ export function brandShade(hex: string, factor: number): string {
 /**
  * The ten shades Mantine wants, lightest to darkest, with the operator's colour at index 5.
  *
- * Index 5 being the untouched colour is what lets the shell use "the chosen colour, exactly" for one
- * surface and a darker step for another. Mantine's own `filled` default is index 6, which is why the
- * header was very slightly darker than the configured brand even before any of this.
+ * Index 5 remains the untouched colour for the theme. The shell uses darker steps for both brand
+ * surfaces; Mantine's own `filled` default is index 6.
  */
 export const BRAND_SHADE_FACTORS = [0.9, 0.75, 0.6, 0.4, 0.2, 0, -0.1, -0.25, -0.4, -0.55] as const
 
 /**
- * The shade the app shell paints the navigation with — one step darker than the configured colour.
+ * The shade the app shell paints the navigation with — darker than the configured colour.
  *
- * NOT THE COLOUR UNTOUCHED, and the reason is a threshold difference rather than a foreground flip.
- * `readableForeground` uses 3.0:1, which is the WCAG AA figure for LARGE text and UI components. The
- * navigation's labels are small text, where AA asks for 4.5:1. The product's default #0d9488 gives white
- * only 3.74:1 — enough to satisfy the helper, not enough for the labels it is being asked about. At -0.25
+ * NOT THE COLOUR UNTOUCHED: the navigation's labels are small text, where AA asks for 4.5:1.
+ * The product's default #0d9488 gives white only 3.74:1 on the raw colour. At -0.25
  * the same colour gives 6.04:1, and the header at -0.4 gives 8.20:1.
  *
- * Both shades resolve to white text, and so does the untouched colour: the helper was never going to pick
- * a dark foreground here. The shade exists to make white text actually legible rather than merely
- * permitted.
+ * Both shades resolve to white text. The shade keeps the chosen hue while making labels legible.
  *
- * The operator's colour is still the colour; it is one step deeper on the same hue, which is already true
- * of the header — Mantine's `filled` index is 6, never the raw value.
+ * The operator's colour still sets the hue; both shell surfaces use darker shades of it.
  */
 export const NAVBAR_SHADE = -0.25
 

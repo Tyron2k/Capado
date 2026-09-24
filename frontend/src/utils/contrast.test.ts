@@ -7,7 +7,13 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { contrastRatio, isHexColor, readableForeground, relativeLuminance } from './contrast'
+import {
+  contrastRatio,
+  isHexColor,
+  readableForeground,
+  readableTextForeground,
+  relativeLuminance,
+} from './contrast'
 
 describe('relativeLuminance', () => {
   it('anchors at black and white', () => {
@@ -94,5 +100,37 @@ describe('readableForeground', () => {
     expect(isHexColor('#zzzzzz')).toBe(false)
     expect(readableForeground('#zzzzzz')).toBe('white')
     expect(readableForeground('#12345')).toBe('white')
+  })
+})
+
+describe('readableTextForeground', () => {
+  it('keeps the existing white foreground on the default brand surfaces', () => {
+    expect(readableTextForeground('#085952')).toBe('white')
+    expect(readableTextForeground('#0a6f66')).toBe('white')
+  })
+
+  it('uses black when both white and near-black miss normal-text AA', () => {
+    expect(readableTextForeground('#808080')).toBe('#000000')
+  })
+
+  it('meets 4.5:1 across dark, mid, and pale brand colours', () => {
+    const backgrounds = [
+      '#000000',
+      '#0d9488',
+      '#2f9e44',
+      '#66cdaa',
+      '#808080',
+      '#b3d9c5',
+      '#ffffff',
+    ]
+    for (const background of backgrounds) {
+      const foreground = readableTextForeground(background)
+      expect(
+        contrastRatio(
+          relativeLuminance(background),
+          relativeLuminance(foreground === 'white' ? '#ffffff' : foreground),
+        ),
+      ).toBeGreaterThanOrEqual(4.5)
+    }
   })
 })
