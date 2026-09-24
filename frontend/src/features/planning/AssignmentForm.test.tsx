@@ -27,6 +27,7 @@ import { toIsoDateTime } from '../../utils/date'
 
 vi.mock('../../api/projects', () => ({ getProjects: vi.fn() }))
 vi.mock('../../api/workPackages', () => ({ getWorkPackages: vi.fn() }))
+vi.mock('../../api/assignments', () => ({ previewAssignment: vi.fn() }))
 
 // The stub surfaces the props the form drives, so a validation error on the
 // resource field stays visible instead of disappearing with the real component.
@@ -42,10 +43,12 @@ vi.mock('./SuggestionList', () => ({
 
 import { getProjects } from '../../api/projects'
 import { getWorkPackages } from '../../api/workPackages'
+import { previewAssignment } from '../../api/assignments'
 import { AssignmentForm } from './AssignmentForm'
 
 const mockedGetProjects = vi.mocked(getProjects)
 const mockedGetWorkPackages = vi.mocked(getWorkPackages)
+const mockedPreviewAssignment = vi.mocked(previewAssignment)
 
 const project = {
   id: 'project-1',
@@ -199,6 +202,54 @@ describe('AssignmentForm — personal date range', () => {
       expect(screen.getByText('End date must be after start date')).toBeInTheDocument(),
     )
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('shows a read-only impact and hides it after the form changes', async () => {
+    mockedPreviewAssignment.mockResolvedValue({
+      resources: [
+        {
+          resource_id: 'resource-1',
+          resource_name: 'Resource One',
+          resource_type: 'personal',
+          conflicts_before: [],
+          conflicts_after: [
+            {
+              cause: 'over_allocation',
+              start_date: '2026-03-02',
+              end_date: '2026-03-02',
+              total_assigned_percent: 120,
+              available_percent: 100,
+            },
+          ],
+          capacity_days: [
+            {
+              date: '2026-03-02',
+              available_percent: 100,
+              assigned_before_percent: 40,
+              assigned_after_percent: 120,
+            },
+          ],
+        },
+      ],
+    })
+    const { onSubmit } = renderForm(personalAssignment)
+    await waitFor(() => expect(screen.getByLabelText(/^Start Date/)).toHaveValue('02.03.2026'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    await waitFor(() =>
+      expect(mockedPreviewAssignment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          assignment_id: personalAssignment.id,
+          resource_id: personalAssignment.resource_id,
+          start_date: '2026-03-02',
+        }),
+      ),
+    )
+    expect(await screen.findByText('Conflicts: 0 → 1')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(/^End Date/), { target: { value: '07.03.2026' } })
+    await waitFor(() => expect(screen.queryByText('Conflicts: 0 → 1')).not.toBeInTheDocument())
   })
 })
 

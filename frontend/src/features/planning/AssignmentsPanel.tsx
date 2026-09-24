@@ -39,8 +39,8 @@ import {
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentForm, type AssignmentFormValues } from './AssignmentForm'
-import { formatDate, formatDateTime, toIsoDate, toIsoDateTime } from '../../utils/date'
-import { formatWarning, groupByProjectAndWorkPackage } from './assignmentUtils'
+import { formatDate, formatDateTime } from '../../utils/date'
+import { formatWarning, groupByProjectAndWorkPackage, toAssignmentPayload } from './assignmentUtils'
 
 function formatAssignmentStart(assignment: Assignment): string {
   if (assignment.resource_type === 'personal' && assignment.start_date) {
@@ -190,24 +190,7 @@ export function AssignmentsPanel() {
 
   const handleSubmit = (values: AssignmentFormValues) => {
     setWarnings([])
-    const payload: AssignmentCreate =
-      values.resource_type === 'personal'
-        ? {
-            resource_id: values.resource_id,
-            resource_type: values.resource_type,
-            work_package_id: values.work_package_id,
-            start_date: toIsoDate(values.start_date!),
-            end_date: toIsoDate(values.end_date!),
-            allocation_percent: values.allocation_percent,
-          }
-        : {
-            resource_id: values.resource_id,
-            resource_type: values.resource_type,
-            work_package_id: values.work_package_id,
-            start_at: toIsoDateTime(values.start_at!),
-            end_at: toIsoDateTime(values.end_at!),
-          }
-    saveMutation.mutate(payload)
+    saveMutation.mutate(toAssignmentPayload(values))
   }
 
   // Filter assignments based on search, type filter, and project filter

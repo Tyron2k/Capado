@@ -6,6 +6,7 @@ import apiClient from './client'
 import type {
   Assignment,
   AssignmentCreate,
+  AssignmentPreview,
   AssignmentUpdate,
   AssignmentWithWarnings,
   ConflictListResponse,
@@ -35,6 +36,14 @@ export async function getAssignments(
 /** Create a new assignment (returns warnings). */
 export async function createAssignment(data: AssignmentCreate): Promise<AssignmentWithWarnings> {
   const response = await apiClient.post<AssignmentWithWarnings>('/api/assignments', data)
+  return response.data
+}
+
+/** Compare a proposed assignment with the saved plan without persisting it. */
+export async function previewAssignment(
+  data: AssignmentCreate & { assignment_id?: string },
+): Promise<AssignmentPreview> {
+  const response = await apiClient.post<AssignmentPreview>('/api/assignments/preview', data)
   return response.data
 }
 

@@ -3,8 +3,28 @@
  * Extracted for testability.
  */
 
-import type { Assignment } from '../../types/assignment'
-import { formatDate } from '../../utils/date'
+import type { Assignment, AssignmentCreate } from '../../types/assignment'
+import { formatDate, toIsoDate, toIsoDateTime } from '../../utils/date'
+import type { AssignmentFormValues } from './AssignmentForm'
+
+export function toAssignmentPayload(values: AssignmentFormValues): AssignmentCreate {
+  return values.resource_type === 'personal'
+    ? {
+        resource_id: values.resource_id,
+        resource_type: values.resource_type,
+        work_package_id: values.work_package_id,
+        start_date: toIsoDate(values.start_date!),
+        end_date: toIsoDate(values.end_date!),
+        allocation_percent: values.allocation_percent,
+      }
+    : {
+        resource_id: values.resource_id,
+        resource_type: values.resource_type,
+        work_package_id: values.work_package_id,
+        start_at: toIsoDateTime(values.start_at!),
+        end_at: toIsoDateTime(values.end_at!),
+      }
+}
 
 interface WorkPackageGroup {
   wp_name: string

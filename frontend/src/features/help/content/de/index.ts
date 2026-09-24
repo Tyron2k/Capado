@@ -358,7 +358,10 @@ Sie haben mindestens ein Projekt mit Arbeitspaketen und verfügbare Ressourcen.
 4. Wählen Sie die Ressource und den Zeitraum:
    - **Personal**: Start-/Enddatum + Zuweisungsprozent (1–100%)
    - **Infrastruktur**: Start-/Endzeitpunkt (minutengenau)
-5. Klicken Sie auf "Speichern"
+5. Klicken Sie auf **Vorschau**, um die Auslastung und Konflikte vor und nach dieser einen Änderung zu vergleichen. Auch beim Bearbeiten einer Zuweisung ist die Vorschau verfügbar.
+6. Prüfen Sie das Ergebnis und klicken Sie dann auf **Speichern**.
+
+Die Vorschau speichert oder reserviert nichts. Sie berücksichtigt den aktuellen Plan und kann sich ändern, wenn inzwischen jemand anderes bucht. Bei einer Zuweisung zu einer anderen Ressource zeigt sie beide betroffenen Ressourcen. Sie ist auf Zeiträume bis 366 Tage je Zuweisung begrenzt.
 
 ### Konflikterkennung
 

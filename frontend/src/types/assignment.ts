@@ -57,6 +57,30 @@ export interface AssignmentWithWarnings {
   warnings: string[]
 }
 
+export interface AssignmentPreview {
+  resources: {
+    resource_id: string
+    resource_name: string
+    resource_type: ResourceType
+    conflicts_before: PreviewConflict[]
+    conflicts_after: PreviewConflict[]
+    capacity_days: {
+      date: string
+      available_percent: number
+      assigned_before_percent: number
+      assigned_after_percent: number
+    }[]
+  }[]
+}
+
+export interface PreviewConflict {
+  cause: 'over_allocation' | 'booking_overlap' | 'outside_availability'
+  start_date: string
+  end_date: string
+  total_assigned_percent: number
+  available_percent: number
+}
+
 /** Conflict severity derived from overload_ratio. */
 export type ConflictSeverity = 'low' | 'medium' | 'high'
 
