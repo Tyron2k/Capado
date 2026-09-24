@@ -379,19 +379,34 @@ class ConflictService:
         is O(n log n) in the number of interval endpoints rather than
         O(days × assignments).
         """
+        periods = await self.calculate_periods(resource_id)
+        return await self._replace_periods(resource_id, periods)
+
+    async def calculate_periods(
+        self, resource_id: UUID, assignments: list[Assignment] | None = None
+    ) -> list[ConflictPeriod]:
+        """Calculate conflicts without changing the session or stored conflicts.
+
+        Preview and persistence use this same calculation. The optional
+        assignments replace database rows with a hypothetical schedule.
+        """
         resource_type = await self._get_resource_type(resource_id)
         if resource_type is None:
-            return await self._replace_periods(resource_id, [])
+            return []
 
         # Load all assignments for this resource
-        all_assignments = await self._get_assignments_for_resource(resource_id)
+        all_assignments = (
+            assignments
+            if assignments is not None
+            else await self._get_assignments_for_resource(resource_id)
+        )
         if not all_assignments:
-            return await self._replace_periods(resource_id, [])
+            return []
 
         # Determine date range
         date_range = self._get_date_range(all_assignments, resource_type)
         if date_range is None:
-            return await self._replace_periods(resource_id, [])
+            return []
         start_date, end_date = date_range
 
         # Absences are NOT demand intervals. They reduce availability, and
@@ -410,7 +425,7 @@ class ConflictService:
                     all_assignments, resource_id, working_time
                 )
             )
-            return await self._replace_periods(resource_id, periods)
+            return periods
 
         # Build day-range intervals: (start_inclusive, end_inclusive, pct, id|None)
         intervals: list[tuple[date, date, float, UUID | None]] = []
@@ -422,7 +437,7 @@ class ConflictService:
                 )
 
         if not intervals:
-            return await self._replace_periods(resource_id, [])
+            return []
 
         # Sweep-line: boundaries are where the active ASSIGNMENT SET changes.
         # Capacity itself varies per day (weekend, holiday, absence), so each
@@ -475,7 +490,7 @@ class ConflictService:
             conflict_days, resource_id, resource_type
         )
 
-        return await self._replace_periods(resource_id, periods)
+        return periods
 
     async def _replace_periods(
         self, resource_id: UUID, periods: list[ConflictPeriod]
