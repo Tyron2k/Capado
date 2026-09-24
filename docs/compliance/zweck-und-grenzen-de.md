@@ -166,11 +166,11 @@ Bestehende Installationen erhalten beim Update ebenfalls 24 Monate — nicht
 „unbegrenzt". Die unbegrenzte Aufbewahrung ist der behobene Zustand, sie
 stillschweigend fortzuschreiben hätte die Einstellung zur Zierde gemacht.
 
-**Ein Hinweis, der zur Ehrlichkeit gehört:** die Löschung erfolgt durch einen
-wiederkehrenden Auftrag im Serverbetrieb. Ist dieser nicht eingerichtet, wird **nichts
-gelöscht**, gleichgültig welcher Wert eingestellt ist. ⟨Der Betrieb richtet den
-Auftrag ein und hält dessen Protokollausgabe fest — sie ist der Nachweis, dass die
-Frist tatsächlich angewendet wird.⟩
+**Ein Hinweis, der zur Ehrlichkeit gehört:** Die Anwendung startet selbst einen
+wiederkehrenden Wartungsauftrag, sofern der Scheduler aktiviert ist. Der Betrieb muss
+prüfen, ob der Auftrag erfolgreich läuft; die gespeicherten Laufprotokolle sind der
+Nachweis, dass die Frist tatsächlich angewendet wird. Ist der Scheduler deaktiviert
+oder schlägt der Auftrag fehl, wird trotz eingestellter Frist nichts gelöscht.
 
 ## 7. Personenbezogene Auslastung
 
@@ -322,11 +322,9 @@ Diese Punkte sind nicht zugesagt, sondern gebaut, und im Quellcode nachprüfbar:
 Diese vier Punkte kann die Software nicht für Sie beantworten. Ohne sie ist das
 Dokument nicht vollständig:
 
-1. **Löschauftrag einrichten.** Die 24-Monats-Frist ist umgesetzt, greift aber nur
-   durch einen wiederkehrenden Auftrag im Serverbetrieb. Ist er nicht eingerichtet,
-   wird **nichts** gelöscht, gleichgültig welcher Wert eingestellt ist. Halten Sie
-   die Protokollausgabe des Auftrags fest — sie ist der Nachweis, dass die Frist
-   tatsächlich angewendet wird.
+1. **Löschauftrag überwachen.** Der interne Scheduler führt den Auftrag aus, sofern
+   er aktiviert ist. Prüfen Sie die gespeicherten Laufprotokolle auf erfolgreiche
+   Ausführungen; die eingestellte Frist allein beweist noch keine tatsächliche Löschung.
 2. **Rollenzuordnung** festlegen und entscheiden, ob die personenbezogene
    Auslastungsansicht auf bestimmte Rollen begrenzt wird (Abschnitt 7).
 3. **Organisatorische Zusagen** treffen: Zweckbindung der Freitextfelder
