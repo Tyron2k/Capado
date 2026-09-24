@@ -247,11 +247,23 @@ class CapacityService:
         self, resource_id: UUID, start_date: date, end_date: date
     ) -> list[DailyUtilization]:
         """Daily utilization for a resource over a date range."""
+        assignments = await self._get_assignments(resource_id)
+        return await self.calculate_utilization_for_assignments(
+            resource_id, start_date, end_date, assignments
+        )
+
+    async def calculate_utilization_for_assignments(
+        self,
+        resource_id: UUID,
+        start_date: date,
+        end_date: date,
+        assignments: list[Assignment],
+    ) -> list[DailyUtilization]:
+        """Calculate daily utilization from supplied, possibly hypothetical rows."""
         rtype = await self._resolve_resource_type(resource_id)
         if rtype is None:
             return []
 
-        assignments = await self._get_assignments(resource_id)
         working_time = await self._get_working_time(resource_id, start_date, end_date)
 
         results: list[DailyUtilization] = []

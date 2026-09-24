@@ -239,6 +239,22 @@ def _service(
 class TestSingleAssignmentWithinCapacity:
     """A single assignment within capacity produces no conflict."""
 
+    async def test_hypothetical_periods_do_not_persist(self) -> None:
+        existing = _personal_assignment(start=MONDAY, end=FRIDAY, percent=50.0)
+        proposed = _personal_assignment(start=MONDAY, end=FRIDAY, percent=60.0)
+        svc, session = _service(assignments=[existing])
+
+        before = await svc.calculate_periods(RESOURCE_ID)
+        after = await svc.calculate_periods(
+            RESOURCE_ID, assignments=[existing, proposed]
+        )
+
+        assert before == []
+        assert len(after) == 1
+        assert after[0].total_assigned_percent == pytest.approx(110.0)
+        assert session.commits == 0
+        assert session.added == []
+
     async def test_one_assignment_at_fifty_percent(self) -> None:
         a = _personal_assignment(start=MONDAY, end=FRIDAY, percent=50.0)
         svc, session = _service(assignments=[a])
