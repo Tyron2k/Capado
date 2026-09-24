@@ -8,6 +8,8 @@ Project exports include work package requirements inline.
 import asyncio
 import csv
 import io
+from collections.abc import Iterable
+from itertools import islice
 from zipfile import BadZipFile
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -49,6 +51,10 @@ router = APIRouter(tags=["Import/Export"])
 #: Named once because it appears six times and a typo in one of them produces a download that the
 #: browser saves with the right extension and Excel then refuses to open.
 _XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# Bound both the upload and the parsed rows before an admin import can exhaust the backend.
+_MAX_IMPORT_BYTES = 20 * 1024 * 1024
+_MAX_IMPORT_ROWS = 10_000  # Includes the header row.
 
 
 # ===========================================================================
@@ -463,8 +469,21 @@ async def _parse_upload(file: UploadFile) -> list[tuple]:
             as the kind its name claims.
 
     """
-    content = await file.read()
     filename = (file.filename or "").lower()
+    if not filename.endswith((".xlsx", ".csv")):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported file type '{filename or 'unnamed'}'. Upload a .xlsx or .csv file — "
+                "use the 'Excel (flat)' or CSV export to get one in the expected shape."
+            ),
+        )
+
+    content = await file.read(_MAX_IMPORT_BYTES + 1)
+    if len(content) > _MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=413, detail="Import files must not exceed 20 MiB."
+        )
 
     if filename.endswith(".xlsx"):
         try:
@@ -478,31 +497,36 @@ async def _parse_upload(file: UploadFile) -> list[tuple]:
                     "If it came from an older Excel, save it as .xlsx or export as CSV."
                 ),
             ) from exc
-    if filename.endswith(".csv"):
-        try:
-            return await asyncio.to_thread(_parse_csv, content)
-        except UnicodeDecodeError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "The CSV could not be read as UTF-8. Save it from Excel as "
-                    "'CSV UTF-8 (comma delimited)'."
-                ),
-            ) from exc
-    raise HTTPException(
-        status_code=400,
-        detail=(
-            f"Unsupported file type '{filename or 'unnamed'}'. Upload a .xlsx or .csv file — "
-            "use the 'Excel (flat)' or CSV export to get one in the expected shape."
-        ),
-    )
+    try:
+        return await asyncio.to_thread(_parse_csv, content)
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The CSV could not be read as UTF-8. Save it from Excel as "
+                "'CSV UTF-8 (comma delimited)'."
+            ),
+        ) from exc
+
+
+def _limited_rows(rows: Iterable[tuple]) -> list[tuple]:
+    """Materialize no more than the supported number of import rows."""
+    result = list(islice(rows, _MAX_IMPORT_ROWS + 1))
+    if len(result) > _MAX_IMPORT_ROWS:
+        raise HTTPException(
+            status_code=413, detail="Imports must not exceed 10,000 rows."
+        )
+    return result
 
 
 def _parse_xlsx(content: bytes) -> list[tuple]:
     """Parse Excel content into row tuples (CPU-bound, runs in thread pool)."""
     wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
-    ws = wb.active
-    return list(ws.iter_rows(values_only=True))
+    try:
+        ws = wb.active
+        return _limited_rows(ws.iter_rows(values_only=True))
+    finally:
+        wb.close()
 
 
 def _parse_csv(content: bytes) -> list[tuple]:
@@ -510,7 +534,7 @@ def _parse_csv(content: bytes) -> list[tuple]:
     text = content.decode("utf-8-sig")
     delimiter = ";" if ";" in text.split("\n")[0] else ","
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
-    return [tuple(row) for row in reader]
+    return _limited_rows(tuple(row) for row in reader)
 
 
 def _result_to_dict(result: ImportResult) -> ImportResultResponse:

@@ -191,10 +191,9 @@ that has none.
 
 ## Limits
 
-**There is no file size limit.** No maximum upload size, no row cap, no time limit is enforced on any
-of the five imports. A large file is read into memory in full and parsed in a thread. This is
-tolerable because the endpoints are admin-only, but it is a limit somebody should set before Capado
-faces a less trusted network — see [known limitations](known-limitations.md).
+All five imports reject uploads over **20 MiB** or **10,000 rows including the header** with HTTP 413,
+before any data is written. Uploads are read only up to 20 MiB plus one byte. There is no separate
+time limit or cap on an Excel file's decompressed contents — see [known limitations](known-limitations.md).
 
 Parsing runs in a thread pool rather than on the event loop, so a slow file does not block other
 requests.

@@ -397,6 +397,8 @@ CSV format: **Project; Work Package; Resource; Start; End; Allocation**
 - **Resources** and **projects** must already exist — they are resolved by name.
 - Dates in ISO format (YYYY-MM-DD).
 - Duplicate assignments (same resource + work package) are skipped.
+
+Import files must be no larger than 20 MiB and contain no more than 10,000 rows including the header. Larger imports are rejected in full.
     `.trim(),
   },
   {
@@ -446,7 +448,7 @@ The skill matrix has its header across two rows and separator rows between group
 
 **File format of the flat export:** five columns — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Everything but Name and Group is optional. **An unknown site is rejected, not created** — unlike a skill, because a site owns the holiday calendar and a typo would produce a plant with no holidays. Create it under Working time first. A missing column leaves the site untouched; an empty cell **removes** it. The header must start with \`Name\` and \`Group\` **in that order**; columns are read positionally, so a swapped header is refused rather than guessed. Case does not matter, and \`Gruppe\` is accepted too.
 
-Only \`.xlsx\` and \`.csv\` are accepted. The whole import is **one transaction**: if any row is rejected, nothing is written. A log opens afterwards with the counts and every rejected row.
+Only \`.xlsx\` and \`.csv\` are accepted, up to 20 MiB and 10,000 rows including the header. Valid rows are saved together; invalid rows are skipped and listed in the result log. An oversized file is rejected before import.
     `.trim(),
   },
   {
