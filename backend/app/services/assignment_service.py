@@ -403,6 +403,22 @@ class AssignmentService:
         if work_package_id is not None:
             await self._check_work_package_exists(effective_work_package_id)
 
+        if (
+            effective_resource_id != assignment.resource_id
+            or effective_work_package_id != assignment.work_package_id
+        ):
+            duplicate_result = await self.session.execute(
+                select(Assignment).where(
+                    Assignment.resource_id == effective_resource_id,
+                    Assignment.work_package_id == effective_work_package_id,
+                    Assignment.id != assignment_id,
+                )
+            )
+            if duplicate_result.scalars().first() is not None:
+                raise ConflictError(
+                    "This resource is already assigned to this work package."
+                )
+
         previous_resource_id = assignment.resource_id
 
         assignment.resource_id = effective_resource_id
