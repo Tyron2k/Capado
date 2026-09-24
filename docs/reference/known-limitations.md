@@ -338,26 +338,16 @@ rearrangement of year, month and day, or it needs a different mechanism — a lo
 month NAMES would need them translated, and that is the point at which this approach stops
 being enough.
 
-## Small header text is below AA on a brand colour that passes the guard
+## Brand-colour contrast has not had a full interface audit
 
-`readableForeground` keeps the header readable by switching the foreground when white stops working,
-and its threshold is 3.0 — WCAG AA for large text, which is what the header mostly is: a bold
-`size="md"` company name and 20px icons.
+The navigation and header use darker shades of the configured brand colour rather than the raw value.
+For the default `#0d9488`, white text has about 6.04:1 contrast on the navigation and 8.20:1 on the
+header; the user's small name in the header is not the failure previously described here.
 
-The user's name next to it is `size="sm"` at weight 500, which is normal text and wants **4.5**.
-Measured on a real installation whose brand colour is `#0d9488`, white scores **3.74**: above the bar
-this guard applies, below the bar that label needs. So the guard answers correctly and one label in
-the header is still short of AA.
-
-Raising the threshold to 4.5 is the wrong fix. It would flip headers that read perfectly well to dark
-text — including that one — and the flip is visible on every screen at once, in exchange for one small
-label. The proportionate answers are local to the label: make it `size="md"` or weight 600, or move it
-out of the brand-coloured bar. Both are decisions about the header's design rather than about contrast
-arithmetic, which is why the guard was not stretched to cover them.
-
-Nothing else in the application paints text on the brand colour, so this is the only place the gap
-exists. It is also the only place measured: **the interface has had no contrast audit**, and the
-figures above come from adding the guard, not from a pass over the product.
+The small company subtitles and navigation labels now use a fully opaque foreground selected for the
+4.5:1 normal-text threshold on those surfaces, including pale custom brand colours. The generic
+`readableForeground` helper still uses the 3:1 threshold for large text and icons. A full contrast
+audit of the rest of the interface is still outstanding.
 
 ## The query layer does not cover session state or client state
 

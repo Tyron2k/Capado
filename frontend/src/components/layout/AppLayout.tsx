@@ -43,7 +43,7 @@ import { useSettings } from '../../context/SettingsContext'
 import { useTranslation, type Locale } from '../../i18n'
 import { useAuth } from '../../context/AuthContext'
 import { usePermissions } from '../../hooks/usePermissions'
-import { readableForeground } from '../../utils/contrast'
+import { readableTextForeground } from '../../utils/contrast'
 import { brandShade, HEADER_SHADE, NAVBAR_SHADE } from '../../utils/brand'
 import { ChangePasswordModal } from '../../features/auth/ChangePasswordModal'
 import { HelpDrawer } from '../../features/help/HelpDrawer'
@@ -143,21 +143,11 @@ export function AppLayout() {
   const navigate = useNavigate()
   const { settings, updatePreferences, hasUploadedLogo } = useSettings()
   /**
-   * The readable foreground for the header, derived from the operator's brand colour.
-   *
-   * Every label and icon in the header used to be hard-coded white, on a colour the operator sets in
-   * settings and `hexToShades` accepts unchecked. A yellow or beige brand therefore produced a header
-   * nobody could read — through a field the product invites them to change. This asks which of the two
-   * foregrounds actually has more contrast rather than assuming.
-   */
-  /**
    * TWO BRAND SURFACES, TWO FOREGROUNDS, COMPUTED SEPARATELY.
    *
-   * The navigation carries the operator's colour untouched; the header carries a darker step of it. Each
-   * one is asked independently which text colour it can actually support, because for a pale brand the
-   * answer differs: a light yellow navigation needs dark text while the darkened header of the same
-   * yellow needs white. Reusing one foreground for both is the bug this whole helper exists to prevent,
-   * just moved one surface along.
+   * Both surfaces use shades of the operator's colour, and each picks an opaque foreground that
+   * clears 4.5:1 for its small labels. Their backgrounds can require different foregrounds for a
+   * pale brand, so the result must be calculated independently.
    */
   // 68px is the icon plus the navbar's own padding: wide enough that the icons are not touching the
   // edges, narrow enough that the gain over 260px is worth the labels.
@@ -165,8 +155,8 @@ export function AppLayout() {
 
   const navBg = brandShade(settings.primaryColor, NAVBAR_SHADE)
   const headerBg = brandShade(settings.primaryColor, HEADER_SHADE)
-  const onNav = readableForeground(navBg)
-  const onBrand = readableForeground(headerBg)
+  const onNav = readableTextForeground(navBg)
+  const onBrand = readableTextForeground(headerBg)
   const { t } = useTranslation()
 
   // Ctrl+/ (⌘+/ on Mac) opens the help drawer
@@ -281,11 +271,7 @@ export function AppLayout() {
                   {settings.companyName}
                 </Text>
                 {settings.companySubtitle && (
-                  // Opacity rather than a second hard-coded colour: the subtitle wants to sit back
-                  // from the company name, and 70% of whatever foreground is readable does that in
-                  // both directions. `rgba(255,255,255,0.7)` only worked while the foreground was
-                  // always white.
-                  <Text size="xs" c={onBrand} opacity={0.7} lh={1.2}>
+                  <Text size="xs" c={onBrand} lh={1.2}>
                     {settings.companySubtitle}
                   </Text>
                 )}
@@ -418,16 +404,7 @@ export function AppLayout() {
                       aria-label={t(group.labelKey)}
                     />
                   ) : (
-                    <Text
-                      size="xs"
-                      fw={600}
-                      c={onNav}
-                      opacity={0.65}
-                      tt="uppercase"
-                      px="sm"
-                      pt="sm"
-                      pb={4}
-                    >
+                    <Text size="xs" fw={600} c={onNav} tt="uppercase" px="sm" pt="sm" pb={4}>
                       {t(group.labelKey)}
                     </Text>
                   ))}
@@ -495,10 +472,8 @@ export function AppLayout() {
             <Divider my="sm" color={onNav} opacity={0.25} />
 
             <Box px="sm" py="xs">
-              {/* Same treatment as the group headings: a theme grey would be the one unreadable element
-                  left on a brand surface, and 65% of a foreground that is known to have contrast recedes
-                  in both directions -- pale brand or dark. */}
-              <Text size="xs" c={onNav} opacity={0.65}>
+              {/* Keep small text opaque: fading a readable foreground can drop it below AA. */}
+              <Text size="xs" c={onNav}>
                 {settings.companySubtitle || settings.companyName}
               </Text>
             </Box>
