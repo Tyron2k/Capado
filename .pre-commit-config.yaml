@@ -23,7 +23,7 @@ exclude: |
     backend/\.venv/.*|
     backend/\.hypothesis/.*|
     backend/\.pytest_cache/.*|
-    backend/alembic/versions/.*|
+    backend/alembic/versions/001_consolidated_baseline_schema\.py|
     frontend/node_modules/.*|
     frontend/dist/.*|
     .*\.min\.(js|css)|

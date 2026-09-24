@@ -51,7 +51,7 @@ extend-exclude = [
     ".venv",
     ".hypothesis",
     ".pytest_cache",
-    "alembic/versions",
+    "alembic/versions/001_consolidated_baseline_schema.py",
     "fix_docstrings.py",
 ]
 

@@ -114,15 +114,12 @@ it, which is a separate button.
 If this becomes unacceptable, the path is a secrets backend (the environment variable override,
 or a mounted file), not encryption-at-rest with a co-located key.
 
-## Migrations 001–003 are excluded from lint
+## The applied baseline migration is excluded from lint
 
-`.pre-commit-config.yaml` excludes `backend/alembic/versions/` globally. Those three
-migrations carry 21 ruff findings and are left alone on purpose: they have been applied to
-every existing database, and reformatting an applied migration produces a diff that cannot
-be verified against anything.
-
-New migrations are linted manually before commit. If the exclusion is ever narrowed to
-just 001–003, that manual step goes away.
+The consolidated migration `001_consolidated_baseline_schema.py` is excluded from ruff and
+pre-commit lint. It has already been applied or stamped on existing databases, so changing it
+for formatting alone is not worth the migration-history risk. The exclusion names only that
+file; new migrations are linted normally.
 
 ## Full container builds do not run on every pull request
 
