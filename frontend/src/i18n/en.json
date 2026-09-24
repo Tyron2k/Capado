@@ -684,6 +684,19 @@
     "toggleColorScheme": "Toggle color scheme"
   },
   "assignmentForm": {
+    "preview": "Preview",
+    "previewTitle": "Planning preview",
+    "previewDisclaimer": "This is an estimate. Save to apply the change; the plan may change in the meantime.",
+    "previewConflicts": "Conflicts: {before} → {after}",
+    "changedDays": "Days with changed allocation: {count}",
+    "available": "available",
+    "moreConflicts": "More conflicts: {count}",
+    "moreDays": "More days: {count}",
+    "conflictCause": {
+      "over_allocation": "Over-allocation",
+      "booking_overlap": "Double booking",
+      "outside_availability": "Outside availability"
+    },
     "resource": "Resource",
     "personal": "Personal",
     "infrastructure": "Infrastructure",

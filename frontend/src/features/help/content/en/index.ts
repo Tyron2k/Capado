@@ -351,7 +351,10 @@ You have at least one project with work packages and available resources.
 4. Choose the resource and time range:
    - **People**: Start/end date + allocation percentage (1–100%)
    - **Infrastructure**: Start/end timestamp (minute precision)
-5. Click "Save"
+5. Click **Preview** to compare allocation and conflicts before and after this single change. Preview is also available when editing an assignment.
+6. Review the result, then click **Save**.
+
+Preview neither saves nor reserves anything. It uses the current plan and may change if someone else books in the meantime. Reassigning to another resource shows both affected resources. Preview is limited to assignment periods of 366 days or less.
 
 ### Conflict detection
 

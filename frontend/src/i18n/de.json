@@ -684,6 +684,19 @@
     "toggleColorScheme": "Farbschema wechseln"
   },
   "assignmentForm": {
+    "preview": "Vorschau",
+    "previewTitle": "Planungs-Vorschau",
+    "previewDisclaimer": "Unverbindliche Berechnung. Erst Speichern übernimmt die Änderung; bis dahin kann sich der Plan ändern.",
+    "previewConflicts": "Konflikte: {before} → {after}",
+    "changedDays": "Tage mit geänderter Auslastung: {count}",
+    "available": "verfügbar",
+    "moreConflicts": "Weitere Konflikte: {count}",
+    "moreDays": "Weitere Tage: {count}",
+    "conflictCause": {
+      "over_allocation": "Überlastung",
+      "booking_overlap": "Doppelbelegung",
+      "outside_availability": "Außerhalb der Verfügbarkeit"
+    },
     "resource": "Ressource",
     "personal": "Personal",
     "infrastructure": "Infrastruktur",

@@ -10,22 +10,35 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-import { useQuery } from '@tanstack/react-query'
-import { Button, Group, NumberInput, SegmentedControl, Select, Stack } from '@mantine/core'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import {
+  Alert,
+  Button,
+  Group,
+  NumberInput,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
+} from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { DateField, DateTimeField } from '../../components/DateField'
 import type { WorkPackage } from '../../types/workPackage'
 import type { Project } from '../../types/project'
-import type { Assignment, ResourceType } from '../../types/assignment'
+import type { Assignment, AssignmentPreview, ResourceType } from '../../types/assignment'
+import { previewAssignment } from '../../api/assignments'
 import { getProjects } from '../../api/projects'
 import { getWorkPackages } from '../../api/workPackages'
 import { AutocompleteField } from '../../components/AutocompleteField'
 import { SuggestionList } from './SuggestionList'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
+import { showErrorNotification } from '../../utils/errorHandling'
+import { toAssignmentPayload } from './assignmentUtils'
 import {
   compareDateTimes,
   compareDates,
+  formatDate,
   toIsoDate,
   toIsoDateTime,
   type DateFormValue,
@@ -55,6 +68,9 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
   const { t } = useTranslation()
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [resourceType, setResourceType] = useState<ResourceType>('personal')
+  const [preview, setPreview] = useState<{ signature: string; result: AssignmentPreview } | null>(
+    null,
+  )
 
   const form = useForm<AssignmentFormValues>({
     initialValues: {
@@ -203,6 +219,24 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
   const isPersonal = resourceType === 'personal'
 
   const isEditing = !!assignment
+  const currentSignature = JSON.stringify(form.values)
+  const visiblePreview = preview?.signature === currentSignature ? preview.result : null
+  const previewMutation = useMutation({
+    mutationFn: (values: AssignmentFormValues) =>
+      previewAssignment({ ...toAssignmentPayload(values), assignment_id: assignment?.id }),
+    onError: (error) =>
+      showErrorNotification(error, t('common.error'), t('common.unexpectedError')),
+  })
+
+  const handlePreview = () => {
+    if (form.validate().hasErrors) return
+    const values = { ...form.values }
+    const signature = JSON.stringify(values)
+    setPreview(null)
+    previewMutation.mutate(values, {
+      onSuccess: (result) => setPreview({ signature, result }),
+    })
+  }
 
   return (
     <form onSubmit={form.onSubmit(onSubmit)}>
@@ -299,9 +333,68 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
           </>
         )}
 
+        {visiblePreview && (
+          <Alert title={t('assignmentForm.previewTitle')} color="blue" aria-live="polite">
+            <Stack gap="sm">
+              <Text size="xs">{t('assignmentForm.previewDisclaimer')}</Text>
+              {visiblePreview.resources.map((resource) => (
+                <Stack key={resource.resource_id} gap={4}>
+                  <Text fw={600} size="sm">
+                    {resource.resource_name}
+                  </Text>
+                  <Text size="sm">
+                    {t('assignmentForm.previewConflicts', {
+                      before: resource.conflicts_before.length,
+                      after: resource.conflicts_after.length,
+                    })}
+                  </Text>
+                  {resource.conflicts_after.slice(0, 5).map((conflict, index) => (
+                    <Text key={`${conflict.cause}-${conflict.start_date}-${index}`} size="xs">
+                      {t(`assignmentForm.conflictCause.${conflict.cause}`)}:{' '}
+                      {formatDate(conflict.start_date)}–{formatDate(conflict.end_date)}
+                    </Text>
+                  ))}
+                  {resource.conflicts_after.length > 5 && (
+                    <Text size="xs">
+                      {t('assignmentForm.moreConflicts', {
+                        count: resource.conflicts_after.length - 5,
+                      })}
+                    </Text>
+                  )}
+                  {resource.resource_type === 'personal' && (
+                    <Text size="xs">
+                      {t('assignmentForm.changedDays', { count: resource.capacity_days.length })}
+                    </Text>
+                  )}
+                  {resource.capacity_days.slice(0, 5).map((day) => (
+                    <Text key={day.date} size="xs">
+                      {formatDate(day.date)}: {Math.round(day.assigned_before_percent)}% →{' '}
+                      {Math.round(day.assigned_after_percent)}% ({t('assignmentForm.available')}:{' '}
+                      {Math.round(day.available_percent)}%)
+                    </Text>
+                  ))}
+                  {resource.capacity_days.length > 5 && (
+                    <Text size="xs">
+                      {t('assignmentForm.moreDays', { count: resource.capacity_days.length - 5 })}
+                    </Text>
+                  )}
+                </Stack>
+              ))}
+            </Stack>
+          </Alert>
+        )}
+
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={onCancel}>
             {t('common.cancel')}
+          </Button>
+          <Button
+            type="button"
+            variant="light"
+            onClick={handlePreview}
+            loading={previewMutation.isPending}
+          >
+            {t('assignmentForm.preview')}
           </Button>
           <Button type="submit" loading={loading}>
             {t('common.save')}
