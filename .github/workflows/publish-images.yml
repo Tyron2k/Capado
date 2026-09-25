@@ -100,6 +100,10 @@ jobs:
             org.opencontainers.image.version=${{ steps.metadata.outputs.app-version }}
           build-args: |
             VITE_APP_VERSION=${{ steps.metadata.outputs.app-version }}
+          # The production stages update OS packages from the live Alpine/Debian
+          # repositories. Reusing that layer would freeze yesterday's package set
+          # even when a security fix is already available upstream.
+          no-cache-filters: production
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
           provenance: mode=max
