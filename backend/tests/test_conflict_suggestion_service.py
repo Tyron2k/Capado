@@ -347,6 +347,28 @@ class TestReduceAllocationLowPercent:
 class TestSwapResourceMinimumHeadroom:
     """swap_resource rejects candidates without headroom on ALL days."""
 
+    async def test_candidate_already_on_work_package_is_not_suggested(self) -> None:
+        """The uniqueness rule holds even when the existing assignment is later."""
+        wp_id = uuid4()
+        assignment = _personal_assignment(percent=50.0, wp_id=wp_id)
+        later_assignment = _personal_assignment(
+            resource_id=CANDIDATE_ID,
+            wp_id=wp_id,
+            start=date(2026, 7, 1),
+            end=date(2026, 7, 2),
+            percent=10.0,
+        )
+
+        results = await _get_suggestions(
+            conflict=_conflict(),
+            assignments=[assignment],
+            working_time=_working_time(),
+            personal_candidates=[_personal_resource(id=CANDIDATE_ID)],
+            candidate_assignments=[later_assignment],
+        )
+
+        assert not any(s.type == "swap_resource" for s in results)
+
     async def test_candidate_rejected_when_headroom_insufficient_on_one_day(
         self,
     ) -> None:
@@ -547,6 +569,34 @@ class TestSwapResourceFallbackToResourceSkills:
         swap = [s for s in results if s.type == "swap_resource"]
         assert len(swap) == 1
         assert swap[0].target_resource_id == CANDIDATE_ID
+
+
+# ---------------------------------------------------------------------------
+# swap_resource — infrastructure uniqueness
+# ---------------------------------------------------------------------------
+
+
+class TestInfraSwapDuplicate:
+    """Infrastructure swaps obey the same work-package uniqueness rule."""
+
+    async def test_candidate_already_on_work_package_is_not_suggested(self) -> None:
+        wp_id = uuid4()
+        assignment = _infra_assignment(wp_id=wp_id)
+        later_assignment = _infra_assignment(
+            resource_id=CANDIDATE_ID,
+            wp_id=wp_id,
+            start=datetime(2026, 7, 1, 8),
+            end=datetime(2026, 7, 1, 10),
+        )
+
+        results = await _get_suggestions(
+            conflict=_conflict(resource_type=ResourceType.infrastructure),
+            assignments=[assignment],
+            infra_candidates=[_infra_resource(id=CANDIDATE_ID)],
+            candidate_assignments=[later_assignment],
+        )
+
+        assert not any(s.type == "swap_resource" for s in results)
 
 
 # ---------------------------------------------------------------------------

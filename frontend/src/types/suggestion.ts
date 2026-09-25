@@ -24,4 +24,5 @@ export interface SuggestionParams {
   start_date: string
   end_date: string
   allocation_percent: number
+  work_package_id?: string
 }

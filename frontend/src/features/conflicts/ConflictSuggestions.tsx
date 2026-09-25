@@ -112,7 +112,10 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
       return { suggestion, patch, result }
     },
     onSuccess: setActive,
-    onError: (error) => showErrorNotification(error, t('common.error'), t('common.genericError')),
+    onError: (error) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.suggestions(conflictId) })
+      showErrorNotification(error, t('common.error'), t('common.genericError'))
+    },
   })
 
   const applyMutation = useMutation({

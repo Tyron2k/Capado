@@ -54,6 +54,7 @@ class SuggestionService:
         start_date: date,
         end_date: date,
         allocation_percent: float,
+        work_package_id: UUID | None = None,
     ) -> list[ResourceSuggestion]:
         """Compute resource suggestions ranked by availability.
 
@@ -68,6 +69,7 @@ class SuggestionService:
             start_date: Start of the planning window.
             end_date: End of the planning window.
             allocation_percent: Required daily allocation percentage.
+            work_package_id: Exclude resources already assigned to this work package.
 
         Returns:
             Sorted list of available/partially-available resources.
@@ -77,6 +79,18 @@ class SuggestionService:
         resources = await self._load_active_personal_resources()
         if not resources:
             return []
+
+        if work_package_id is not None:
+            assigned_stmt = select(Assignment.resource_id).where(
+                Assignment.work_package_id == work_package_id
+            )
+            assigned_result = await self.session.execute(assigned_stmt)
+            assigned_ids = set(assigned_result.scalars().all())
+            resources = [
+                resource for resource in resources if resource.id not in assigned_ids
+            ]
+            if not resources:
+                return []
 
         resource_ids = [r.id for r in resources]
 

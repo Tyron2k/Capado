@@ -5,6 +5,7 @@ Endpoints:
 """
 
 from datetime import date
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +36,10 @@ async def get_suggestions(
         alias="allocation_percent",
         description="Required allocation percent (required)",
     ),
+    work_package_id: UUID | None = Query(
+        default=None,
+        description="Exclude resources already assigned to this work package",
+    ),
     session: AsyncSession = Depends(get_session),
     _current_user: User = Depends(get_current_user),
 ):
@@ -47,6 +52,7 @@ async def get_suggestions(
         start_date: Start date of the time range.
         end_date: End date of the time range.
         allocation_percent: Required allocation percentage.
+        work_package_id: Optional work package whose assigned resources are excluded.
         session: Database session.
 
     Returns:
@@ -75,6 +81,7 @@ async def get_suggestions(
         start_date=start_date,
         end_date=end_date,
         allocation_percent=allocation_percent,
+        work_package_id=work_package_id,
     )
 
     return [
