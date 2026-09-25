@@ -223,6 +223,10 @@
     "noUnmetRequirements": "All work package requirements are covered.",
     "unmetSuggestions": "Suggested Resources",
     "unmetAssign": "Assign",
+    "unmetPreviewTitle": "Preview: assign {name}",
+    "unmetPreviewPersonal": "Proposed assignment: {start}–{end} at 100% allocation.",
+    "unmetPreviewInfrastructure": "Proposed booking: {start} 08:00 to {end} 17:00.",
+    "unmetPreviewDisclaimer": "This is an estimate. Only Assign creates the assignment; the plan may change in the meantime.",
     "unmetAssigned_success": "Resource assigned successfully.",
     "unmetNoSuggestions": "No matching resources available."
   },
