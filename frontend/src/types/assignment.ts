@@ -73,7 +73,7 @@ export interface AssignmentPreview {
   }[]
 }
 
-export interface PreviewConflict {
+interface PreviewConflict {
   cause: 'over_allocation' | 'booking_overlap' | 'outside_availability'
   start_date: string
   end_date: string
