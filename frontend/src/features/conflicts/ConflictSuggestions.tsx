@@ -221,7 +221,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
                 previewMutation.mutate(s)
               }}
             >
-              {t('suggestions.applyPreview')}
+              {t('assignmentForm.preview')}
             </Button>
           </Group>
         )

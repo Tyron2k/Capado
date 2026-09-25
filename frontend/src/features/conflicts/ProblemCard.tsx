@@ -8,7 +8,6 @@ import React, { useMemo, useState } from 'react'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ActionIcon,
   Alert,
   Badge,
   Box,
@@ -20,7 +19,6 @@ import {
   Stack,
   Table,
   Text,
-  Tooltip,
   UnstyledButton,
 } from '@mantine/core'
 import {
@@ -495,7 +493,7 @@ export const ProblemCard = React.memo(function ProblemCard({
                             <Table.Th>{t('suggestionList.name')}</Table.Th>
                             <Table.Th>{t('suggestionList.qualification')}</Table.Th>
                             <Table.Th>{t('suggestionList.freeCapacity')}</Table.Th>
-                            <Table.Th style={{ width: 80 }}>{t('common.actions')}</Table.Th>
+                            <Table.Th style={{ width: 120 }}>{t('common.actions')}</Table.Th>
                           </Table.Tr>
                         }
                       >
@@ -518,25 +516,24 @@ export const ProblemCard = React.memo(function ProblemCard({
                               </Text>
                             </Table.Td>
                             <Table.Td>
-                              <Tooltip label={t('conflicts.previewSwap')} withArrow>
-                                <ActionIcon
-                                  size="sm"
-                                  variant="light"
-                                  color="teal"
-                                  loading={
-                                    previewSwapMutation.isPending &&
-                                    previewSwapMutation.variables === s
-                                  }
-                                  disabled={previewSwapMutation.isPending || swapMutation.isPending}
-                                  onClick={() => {
-                                    setSwapPreview(null)
-                                    previewSwapMutation.mutate(s)
-                                  }}
-                                  aria-label={t('conflicts.previewSwap')}
-                                >
-                                  <IconSwitchHorizontal size={14} />
-                                </ActionIcon>
-                              </Tooltip>
+                              <Button
+                                size="compact-xs"
+                                variant="light"
+                                color="teal"
+                                leftSection={<IconSwitchHorizontal size={14} />}
+                                loading={
+                                  previewSwapMutation.isPending &&
+                                  previewSwapMutation.variables === s
+                                }
+                                disabled={previewSwapMutation.isPending || swapMutation.isPending}
+                                onClick={() => {
+                                  setSwapPreview(null)
+                                  previewSwapMutation.mutate(s)
+                                }}
+                                aria-label={t('conflicts.previewSwap')}
+                              >
+                                {t('assignmentForm.preview')}
+                              </Button>
                             </Table.Td>
                           </Table.Tr>
                         ))}

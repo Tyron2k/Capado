@@ -107,6 +107,7 @@ describe('resolving a conflict writes the plan', () => {
     vi.mocked(deleteAssignment).mockResolvedValue(undefined)
 
     const { invalidated, onChanged } = renderActions()
+    expect(screen.getByTestId('resolution-open').textContent).toBe('Aktionen')
     fireEvent.click(screen.getByTestId('resolution-open'))
     await waitFor(() => expect(screen.getByTestId('resolution-delete')).toBeTruthy())
     fireEvent.click(screen.getByTestId('resolution-delete'))

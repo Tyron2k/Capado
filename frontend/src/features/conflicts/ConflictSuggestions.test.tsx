@@ -103,7 +103,7 @@ beforeEach(() => {
 describe('conflict suggestions in the planning overview', () => {
   it('shows the impact without writing, then applies the same shift after confirmation', async () => {
     const onApplied = renderSuggestions()
-    fireEvent.click(await screen.findByRole('button', { name: 'Vorschau anzeigen' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Vorschau' }))
 
     expect(await screen.findByText('Konflikte: 0 → 0')).toBeInTheDocument()
     expect(getAssignment).toHaveBeenCalledWith('a1')
@@ -128,7 +128,7 @@ describe('conflict suggestions in the planning overview', () => {
 
   it('closes the preview without changing the plan', async () => {
     renderSuggestions()
-    fireEvent.click(await screen.findByRole('button', { name: 'Vorschau anzeigen' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Vorschau' }))
     expect(await screen.findByText('Konflikte: 0 → 0')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
     expect(updateAssignment).not.toHaveBeenCalled()

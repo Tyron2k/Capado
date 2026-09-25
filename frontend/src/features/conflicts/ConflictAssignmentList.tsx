@@ -70,10 +70,16 @@ export function ConflictAssignmentList({ assignments, onChanged, focusedWorkPack
           <Table withTableBorder striped fz="xs" layout="fixed">
             <Table.Thead>
               <Table.Tr>
-                <Table.Th style={{ width: '35%' }}>{t('conflicts.workPackage')}</Table.Th>
-                <Table.Th style={{ width: '35%' }}>{t('conflicts.period')}</Table.Th>
-                <Table.Th style={{ width: '20%' }}>{t('conflicts.allocation')}</Table.Th>
-                {canWrite && <Table.Th style={{ width: '10%' }} aria-label={t('common.actions')} />}
+                <Table.Th style={{ width: canWrite ? '30%' : '35%' }}>
+                  {t('conflicts.workPackage')}
+                </Table.Th>
+                <Table.Th style={{ width: canWrite ? '30%' : '35%' }}>
+                  {t('conflicts.period')}
+                </Table.Th>
+                <Table.Th style={{ width: canWrite ? '20%' : '30%' }}>
+                  {t('conflicts.allocation')}
+                </Table.Th>
+                {canWrite && <Table.Th style={{ width: '20%' }} aria-label={t('common.actions')} />}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
