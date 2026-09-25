@@ -127,6 +127,7 @@ describe('skill-conflict resource swap', () => {
     const previewButton = await screen.findByRole('button', {
       name: 'Vorschau — Ressource tauschen',
     })
+    expect(getSuggestions).toHaveBeenCalledWith(expect.objectContaining({ work_package_id: 'w1' }))
     expect(previewButton.textContent).toBe('Vorschau')
     fireEvent.click(previewButton)
     expect(await screen.findByText('Konflikte: 0 → 0')).toBeInTheDocument()

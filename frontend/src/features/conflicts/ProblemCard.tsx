@@ -171,6 +171,7 @@ export const ProblemCard = React.memo(function ProblemCard({
           start_date: startDate!,
           end_date: endDate!,
           allocation_percent: assignment.allocation_percent ?? 100,
+          work_package_id: assignment.work_package_id,
         }),
       ])
 
@@ -252,7 +253,15 @@ export const ProblemCard = React.memo(function ProblemCard({
       }
     },
     onSuccess: setSwapPreview,
-    onError: (err) => showErrorNotification(err, t('common.error'), t('common.genericError')),
+    onError: (err) => {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.conflicts.swapCandidates(
+          firstRawAssignmentId ?? 'none',
+          bucket.resource_id,
+        ),
+      })
+      showErrorNotification(err, t('common.error'), t('common.genericError'))
+    },
   })
 
   // --- Badge & summary ---

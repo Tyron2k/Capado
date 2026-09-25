@@ -211,6 +211,31 @@ class ConflictSuggestionService:
             )
         return skills_by_resource
 
+    async def _load_already_assigned_candidate_ids(
+        self, work_package_id: UUID, candidate_ids: list[UUID]
+    ) -> set[UUID]:
+        """Candidates already on this work package cannot be swap targets.
+
+        The duplicate rule applies regardless of date overlap, so the conflict-
+        window assignment loaders below cannot answer this question.
+        """
+        if not candidate_ids:
+            return set()
+        if self._preloaded_candidate_assignments is not None:
+            candidate_id_set = set(candidate_ids)
+            return {
+                a.resource_id
+                for a in self._preloaded_candidate_assignments
+                if a.work_package_id == work_package_id
+                and a.resource_id in candidate_id_set
+            }
+        stmt = select(Assignment.resource_id).where(
+            Assignment.work_package_id == work_package_id,
+            Assignment.resource_id.in_(candidate_ids),
+        )
+        result = await self.session.execute(stmt)
+        return set(result.scalars().all())
+
     async def _load_candidate_assignments_in_range(
         self, candidate_ids: list[UUID], start: date, end: date
     ) -> list[Assignment]:
@@ -510,6 +535,13 @@ class ConflictSuggestionService:
         if not candidates:
             return None
 
+        already_assigned = await self._load_already_assigned_candidate_ids(
+            assignment.work_package_id, [c.id for c in candidates]
+        )
+        candidates = [c for c in candidates if c.id not in already_assigned]
+        if not candidates:
+            return None
+
         candidate_ids = [c.id for c in candidates]
 
         skills_by_resource = await self._load_candidate_skills(
@@ -624,6 +656,13 @@ class ConflictSuggestionService:
         wp_name = await self._get_work_package_name(assignment.work_package_id)
 
         candidates = await self._load_infra_candidates(assignment.resource_id)
+        if not candidates:
+            return None
+
+        already_assigned = await self._load_already_assigned_candidate_ids(
+            assignment.work_package_id, [c.id for c in candidates]
+        )
+        candidates = [c for c in candidates if c.id not in already_assigned]
         if not candidates:
             return None
 
