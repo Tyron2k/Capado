@@ -14,7 +14,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 
 import { createTestQueryClient } from '../../../testUtils/queryClient'
 import { MantineProvider } from '@mantine/core'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getGanttData = vi.fn()
@@ -140,6 +140,24 @@ describe('ProjectsOverviewChart', () => {
     await waitFor(() => expect(screen.getByTestId('gantt-bar-wp-1')).toBeTruthy())
     // Kept, not re-requested: reopening is free.
     expect(getGanttData).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes previously expanded work packages every minute', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    try {
+      const view = renderChart()
+      fireEvent.click(screen.getByTestId('project-toggle-p-1'))
+      await waitFor(() => expect(getGanttData).toHaveBeenCalledTimes(1))
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000)
+      })
+
+      await waitFor(() => expect(getGanttData).toHaveBeenCalledTimes(2))
+      view.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reports aria-expanded so the toggle is not a mystery to a screen reader', async () => {

@@ -135,6 +135,7 @@ export function ProjectsOverviewChart({
     queries: fetchedIds.map((projectId) => ({
       queryKey: queryKeys.gantt.projects(projectId),
       queryFn: () => getGanttData(projectId),
+      refetchInterval: 60_000,
     })),
   })
 
