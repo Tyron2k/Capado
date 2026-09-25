@@ -12,9 +12,11 @@ import {
   Alert,
   Badge,
   Box,
+  Button,
   Collapse,
   Group,
   Loader,
+  Modal,
   Stack,
   Table,
   Text,
@@ -33,6 +35,7 @@ import type {
   Assignment,
   Conflict,
   ConflictAssignmentInfo,
+  AssignmentPreview,
   ResourceType,
 } from '../../types/assignment'
 import type { WorkPackageRequirement } from '../../types/workPackage'
@@ -41,7 +44,7 @@ import { differenceInDays, formatDate, startOfDayUtc } from '../../utils/date'
 import { showErrorNotification } from '../../utils/errorHandling'
 import { getSuggestions } from '../../api/suggestions'
 import { getWorkPackageRequirements } from '../../api/workPackages'
-import { updateAssignment } from '../../api/assignments'
+import { getAssignment, previewAssignment, updateAssignment } from '../../api/assignments'
 import { searchByQualification } from '../../api/skills'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
@@ -49,6 +52,8 @@ import { ConflictSeverityBadge } from './ConflictSeverityBadge'
 import { ConflictAssignmentList } from './ConflictAssignmentList'
 import { ConflictSuggestions } from './ConflictSuggestions'
 import { resourceTypeLabel } from './bucketing'
+import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
+import { previewPayloadForPatch } from './suggestionChange'
 
 // --- Types ---
 
@@ -102,6 +107,12 @@ export const ProblemCard = React.memo(function ProblemCard({
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(initiallyOpen)
+  const [swapPreview, setSwapPreview] = useState<{
+    assignmentId: string
+    targetResourceId: string
+    targetResourceName: string
+    result: AssignmentPreview
+  } | null>(null)
 
   // Skill mismatch state
 
@@ -200,9 +211,15 @@ export const ProblemCard = React.memo(function ProblemCard({
    * ONLY thing that happened, so what got refreshed depended on which screen this card was inside.
    */
   const swapMutation = useMutation({
-    mutationFn: (targetResourceId: string) =>
-      updateAssignment(firstRawAssignment!.id, { resource_id: targetResourceId }),
+    mutationFn: ({
+      assignmentId,
+      targetResourceId,
+    }: {
+      assignmentId: string
+      targetResourceId: string
+    }) => updateAssignment(assignmentId, { resource_id: targetResourceId }),
     onSuccess: async () => {
+      setSwapPreview(null)
       notifications.show({
         title: t('common.saved'),
         message: t('conflicts.swapDone'),
@@ -223,12 +240,22 @@ export const ProblemCard = React.memo(function ProblemCard({
     onError: (err) => showErrorNotification(err, t('common.error'), t('conflicts.swapFailed')),
   })
 
-  const swapping = swapMutation.isPending ? (swapMutation.variables ?? null) : null
-
-  const handleApplySwap = (targetResourceId: string) => {
-    if (!firstRawAssignment) return
-    swapMutation.mutate(targetResourceId)
-  }
+  const previewSwapMutation = useMutation({
+    mutationFn: async (target: ResourceSuggestion) => {
+      const assignment = await getAssignment(firstRawAssignmentId!)
+      const result = await previewAssignment(
+        previewPayloadForPatch(assignment, { resource_id: target.resource_id }),
+      )
+      return {
+        assignmentId: assignment.id,
+        targetResourceId: target.resource_id,
+        targetResourceName: target.resource_name,
+        result,
+      }
+    },
+    onSuccess: setSwapPreview,
+    onError: (err) => showErrorNotification(err, t('common.error'), t('common.genericError')),
+  })
 
   // --- Badge & summary ---
   const badgeColor = isCapacity ? 'red' : 'orange'
@@ -258,6 +285,54 @@ export const ProblemCard = React.memo(function ProblemCard({
           : undefined,
       }}
     >
+      <Modal
+        opened={swapPreview !== null}
+        onClose={() => {
+          if (!swapMutation.isPending) setSwapPreview(null)
+        }}
+        title={
+          swapPreview
+            ? t('suggestions.previewAction', {
+                action: t('suggestions.descSwap', { name: swapPreview.targetResourceName }),
+              })
+            : ''
+        }
+        size="lg"
+        closeOnClickOutside={!swapMutation.isPending}
+        closeOnEscape={!swapMutation.isPending}
+      >
+        {swapPreview && (
+          <Stack gap="md">
+            <AssignmentPreviewSummary
+              preview={swapPreview.result}
+              disclaimer={t('suggestions.previewDisclaimer')}
+            />
+            <Text size="xs" c="dimmed">
+              {t('suggestions.skillPreviewNote')}
+            </Text>
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                onClick={() => setSwapPreview(null)}
+                disabled={swapMutation.isPending}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={() =>
+                  swapMutation.mutate({
+                    assignmentId: swapPreview.assignmentId,
+                    targetResourceId: swapPreview.targetResourceId,
+                  })
+                }
+                loading={swapMutation.isPending}
+              >
+                {t('suggestions.apply')}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       <UnstyledButton
         onClick={() => setOpen((s) => !s)}
         aria-expanded={open}
@@ -443,14 +518,21 @@ export const ProblemCard = React.memo(function ProblemCard({
                               </Text>
                             </Table.Td>
                             <Table.Td>
-                              <Tooltip label={t('conflicts.applySwap')} withArrow>
+                              <Tooltip label={t('conflicts.previewSwap')} withArrow>
                                 <ActionIcon
                                   size="sm"
                                   variant="light"
                                   color="teal"
-                                  loading={swapping === s.resource_id}
-                                  onClick={() => handleApplySwap(s.resource_id)}
-                                  aria-label={t('conflicts.applySwap')}
+                                  loading={
+                                    previewSwapMutation.isPending &&
+                                    previewSwapMutation.variables === s
+                                  }
+                                  disabled={previewSwapMutation.isPending || swapMutation.isPending}
+                                  onClick={() => {
+                                    setSwapPreview(null)
+                                    previewSwapMutation.mutate(s)
+                                  }}
+                                  aria-label={t('conflicts.previewSwap')}
                                 >
                                   <IconSwitchHorizontal size={14} />
                                 </ActionIcon>
