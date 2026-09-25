@@ -10,6 +10,7 @@ import { ConflictCheckStatus } from '../conflicts/ConflictCheckStatus'
 import { useCallback, useEffect, useMemo } from 'react'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { Loader, Stack } from '@mantine/core'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
@@ -17,10 +18,23 @@ import { getPlanningOverview } from '../../api/assignments'
 import { showErrorNotification } from '../../utils/errorHandling'
 import { UnmetRequirementsSection } from './UnmetRequirementsAlert'
 import { ConflictsSection } from './ConflictsSection'
+import { parseConflictFocus } from './conflictFocus'
 
 export function PlanningOverviewPanel() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const conflictFocus = parseConflictFocus(searchParams)
+
+  const clearConflictFocus = useCallback(() => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous)
+      next.delete('project')
+      next.delete('work_package')
+      next.delete('resource')
+      return next
+    })
+  }, [setSearchParams])
 
   const overviewQuery = useQuery({
     queryKey: queryKeys.planning.overview(),
@@ -77,6 +91,8 @@ export function PlanningOverviewPanel() {
         conflicts={data?.conflicts ?? []}
         mismatches={data?.mismatched_assignments ?? []}
         onChanged={reload}
+        focus={conflictFocus}
+        onClearFocus={clearConflictFocus}
       />
     </Stack>
   )

@@ -70,6 +70,8 @@ export interface ProblemBucket {
 interface Props {
   bucket: ProblemBucket
   onChanged: () => void
+  initiallyOpen?: boolean
+  focusedWorkPackageId?: string
 }
 
 // --- Helpers ---
@@ -91,10 +93,15 @@ function buildWeekdayPattern(conflicts: Conflict[]) {
 
 // --- Component ---
 
-export const ProblemCard = React.memo(function ProblemCard({ bucket, onChanged }: Props) {
+export const ProblemCard = React.memo(function ProblemCard({
+  bucket,
+  onChanged,
+  initiallyOpen = false,
+  focusedWorkPackageId,
+}: Props) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(initiallyOpen)
 
   // Skill mismatch state
 
@@ -251,7 +258,11 @@ export const ProblemCard = React.memo(function ProblemCard({ bucket, onChanged }
           : undefined,
       }}
     >
-      <UnstyledButton onClick={() => setOpen((s) => !s)} style={{ width: '100%', padding: 12 }}>
+      <UnstyledButton
+        onClick={() => setOpen((s) => !s)}
+        aria-expanded={open}
+        style={{ width: '100%', padding: 12 }}
+      >
         <Group justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             {open ? <IconChevronDown size={16} /> : <IconChevronRight size={16} />}
@@ -378,7 +389,11 @@ export const ProblemCard = React.memo(function ProblemCard({ bucket, onChanged }
               <Text fw={600} size="sm" mb={4}>
                 {t('conflicts.assignments')}
               </Text>
-              <ConflictAssignmentList assignments={bucket.assignments} onChanged={onChanged} />
+              <ConflictAssignmentList
+                assignments={bucket.assignments}
+                onChanged={onChanged}
+                focusedWorkPackageId={focusedWorkPackageId}
+              />
 
               {/* Suggestions */}
               {isCapacity && conflicts.length > 0 && (

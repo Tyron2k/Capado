@@ -6,13 +6,14 @@
  * Receives pre-fetched data from PlanningOverviewPanel to avoid
  * redundant API requests.
  */
-import { useMemo } from 'react'
-import { Stack, Text } from '@mantine/core'
+import { useEffect, useMemo, useRef } from 'react'
+import { Button, Group, Stack, Text } from '@mantine/core'
 import type { Assignment, Conflict, ConflictAssignmentInfo } from '../../types/assignment'
 import { useTranslation } from '../../i18n'
 import { SectionHeader } from '../../components/layout'
 import { buildResourceBuckets, SEVERITY_ORDER } from '../conflicts/bucketing'
 import { ProblemCard, type ProblemBucket } from '../conflicts/ProblemCard'
+import { matchesFocusedConflict, matchesFocusedMismatch, type ConflictFocus } from './conflictFocus'
 
 interface ConflictsSectionProps {
   /** Pre-fetched conflict records. */
@@ -21,21 +22,64 @@ interface ConflictsSectionProps {
   mismatches: Assignment[]
   /** Called when user applies a resolution (swap, dismiss, etc.). */
   onChanged: () => void
+  focus?: ConflictFocus | null
+  onClearFocus?: () => void
 }
 
 /**
  * Renders capacity overloads and skill mismatches as unified ProblemCards.
  * Data is passed in as props (fetched by PlanningOverviewPanel).
  */
-export function ConflictsSection({ conflicts, mismatches, onChanged }: ConflictsSectionProps) {
+export function ConflictsSection({
+  conflicts,
+  mismatches,
+  onChanged,
+  focus,
+  onClearFocus,
+}: ConflictsSectionProps) {
   const { t } = useTranslation()
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const focusKey = focus
+    ? `${focus.projectId ?? ''}:${focus.workPackageId ?? ''}:${focus.resourceId ?? ''}`
+    : null
+  useEffect(() => {
+    if (focusKey) sectionRef.current?.scrollIntoView?.({ block: 'start' })
+  }, [focusKey])
+
+  const visibleConflicts = useMemo(
+    () =>
+      focus ? conflicts.filter((conflict) => matchesFocusedConflict(conflict, focus)) : conflicts,
+    [conflicts, focus],
+  )
+  const visibleMismatches = useMemo(
+    () =>
+      focus
+        ? mismatches.filter((assignment) => matchesFocusedMismatch(assignment, focus))
+        : mismatches,
+    [mismatches, focus],
+  )
+
+  const focusedName = focus?.workPackageId
+    ? (visibleConflicts
+        .flatMap((conflict) => conflict.assignments)
+        .find((assignment) => assignment.work_package_id === focus.workPackageId)
+        ?.work_package_name ??
+      visibleMismatches.find((assignment) => assignment.work_package_id === focus.workPackageId)
+        ?.work_package_name)
+    : focus?.projectId
+      ? (visibleConflicts
+          .flatMap((conflict) => conflict.assignments)
+          .find((assignment) => assignment.project_id === focus.projectId)?.project_name ??
+        visibleMismatches.find((assignment) => assignment.project_id === focus.projectId)
+          ?.project_name)
+      : (visibleConflicts[0]?.resource_name ?? visibleMismatches[0]?.resource_name)
 
   /** Build unified ProblemBucket list from both sources. */
   const problemBuckets = useMemo<ProblemBucket[]>(() => {
     const buckets: ProblemBucket[] = []
 
     // Capacity problems (grouped by resource via bucketing)
-    const capacityBuckets = buildResourceBuckets(conflicts)
+    const capacityBuckets = buildResourceBuckets(visibleConflicts)
     capacityBuckets.sort((a, b) => {
       const s = SEVERITY_ORDER[a.worstSeverity] - SEVERITY_ORDER[b.worstSeverity]
       if (s !== 0) return s
@@ -61,7 +105,7 @@ export function ConflictsSection({ conflicts, mismatches, onChanged }: Conflicts
 
     // Skill mismatch problems (grouped by resource)
     const mismatchMap = new Map<string, Assignment[]>()
-    for (const a of mismatches) {
+    for (const a of visibleMismatches) {
       const existing = mismatchMap.get(a.resource_id)
       if (existing) existing.push(a)
       else mismatchMap.set(a.resource_id, [a])
@@ -96,27 +140,49 @@ export function ConflictsSection({ conflicts, mismatches, onChanged }: Conflicts
     }
 
     return buckets
-  }, [conflicts, mismatches])
+  }, [visibleConflicts, visibleMismatches])
 
-  const totalProblems = conflicts.length + mismatches.length
+  const totalProblems = visibleConflicts.length + visibleMismatches.length
+
+  const focusNotice = focus && (
+    <Group justify="space-between" gap="sm">
+      <Text size="sm">
+        {t('planning.conflictsFiltered')}
+        {focusedName ? `: ${focusedName}` : ''}
+      </Text>
+      {onClearFocus && (
+        <Button variant="subtle" size="xs" onClick={onClearFocus}>
+          {t('planning.showAllConflicts')}
+        </Button>
+      )}
+    </Group>
+  )
 
   if (totalProblems === 0) {
     return (
-      <div>
+      <div ref={sectionRef}>
         <SectionHeader title={t('conflicts.title')} />
+        {focusNotice}
         <Text c="dimmed" size="sm">
-          {t('conflicts.noConflicts')}
+          {t(focus ? 'planning.noMatchingConflicts' : 'conflicts.noConflicts')}
         </Text>
       </div>
     )
   }
 
   return (
-    <div>
+    <div ref={sectionRef}>
       <SectionHeader title={`${t('conflicts.title')} (${totalProblems})`} />
+      {focusNotice}
       <Stack gap="xs">
         {problemBuckets.map((b) => (
-          <ProblemCard key={`${b.type}-${b.resource_id}`} bucket={b} onChanged={onChanged} />
+          <ProblemCard
+            key={`${b.type}-${b.resource_id}-${focus?.projectId ?? ''}-${focus?.workPackageId ?? ''}-${focus?.resourceId ?? ''}`}
+            bucket={b}
+            onChanged={onChanged}
+            initiallyOpen={Boolean(focus)}
+            focusedWorkPackageId={focus?.workPackageId}
+          />
         ))}
       </Stack>
     </div>

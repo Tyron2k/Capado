@@ -16,9 +16,10 @@ import { ConflictResolutionActions } from './ConflictResolutionActions'
 interface Props {
   assignments: ConflictAssignmentInfo[]
   onChanged: () => void
+  focusedWorkPackageId?: string
 }
 
-export function ConflictAssignmentList({ assignments, onChanged }: Props) {
+export function ConflictAssignmentList({ assignments, onChanged, focusedWorkPackageId }: Props) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { canWrite } = usePermissions()
@@ -92,7 +93,15 @@ export function ConflictAssignmentList({ assignments, onChanged }: Props) {
                     ? `${formatDateTime(a.start_at)} – ${formatDateTime(a.end_at)}`
                     : `${formatDate(a.start_date)} – ${formatDate(a.end_date)}`
                 return (
-                  <Table.Tr key={a.assignment_id}>
+                  <Table.Tr
+                    key={a.assignment_id}
+                    data-focused={a.work_package_id === focusedWorkPackageId ? 'true' : undefined}
+                    style={
+                      a.work_package_id === focusedWorkPackageId
+                        ? { backgroundColor: 'var(--mantine-color-yellow-light)' }
+                        : undefined
+                    }
+                  >
                     <Table.Td>
                       <Group gap={4} wrap="nowrap">
                         {a.work_package_name ?? '—'}

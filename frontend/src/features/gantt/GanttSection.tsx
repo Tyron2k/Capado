@@ -27,6 +27,7 @@ import { ProjectsOverviewChart } from './projectGantt/ProjectsOverviewChart'
 import type { TimeScale } from './timeAxis'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
+import { planningConflictUrl } from '../planning/conflictFocus'
 
 type Perspective = 'project' | 'personal' | 'infrastructure'
 
@@ -225,9 +226,9 @@ export function GanttSection() {
             projects={projects}
             timeScale={timeScale}
             onTimeScaleChange={setTimeScale}
-            onConflictClick={() => navigate('/planning')}
+            onConflictClick={(bar) => navigate(planningConflictUrl({ workPackageId: bar.id }))}
             conflictCounts={conflictCounts}
-            onProjectConflictClick={() => navigate('/planning')}
+            onProjectConflictClick={(projectId) => navigate(planningConflictUrl({ projectId }))}
           />
         </>
       )}
@@ -241,13 +242,14 @@ export function GanttSection() {
             data={resourceGantt}
             timeScale={timeScale}
             onTimeScaleChange={setTimeScale}
-            onConflictClick={(bar) => {
-              if (bar.resource_id) {
-                navigate(`/planning?resource=${bar.resource_id}`)
-              } else {
-                navigate('/planning')
-              }
-            }}
+            onConflictClick={(bar) =>
+              navigate(
+                planningConflictUrl({
+                  workPackageId: bar.id,
+                  resourceId: bar.resource_id,
+                }),
+              )
+            }
           />
         )}
     </Stack>
