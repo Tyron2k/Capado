@@ -315,7 +315,6 @@
   "suggestions": {
     "title": "Resolution Suggestions",
     "apply": "Apply",
-    "applyPreview": "Show preview",
     "previewAction": "Preview: {action}",
     "previewDisclaimer": "This is an estimate. Only Apply saves the change; the plan may change in the meantime.",
     "skillPreviewNote": "The preview shows capacity conflicts. The replacement's qualifications were checked for the suggestion list but are not recalculated here.",

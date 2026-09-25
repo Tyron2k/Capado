@@ -13,16 +13,7 @@
 import { useState } from 'react'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import {
-  ActionIcon,
-  Button,
-  Divider,
-  Group,
-  NumberInput,
-  Popover,
-  Stack,
-  Text,
-} from '@mantine/core'
+import { Button, Divider, Group, NumberInput, Popover, Stack, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../utils/errorHandling'
 import {
@@ -222,16 +213,17 @@ export function ConflictResolutionActions({
       shadow="md"
     >
       <Popover.Target>
-        <ActionIcon
-          size="sm"
+        <Button
+          size="compact-xs"
           variant="subtle"
           color="gray"
+          leftSection={<IconDotsVertical size={14} />}
           data-testid="resolution-open"
           onClick={() => setOpened((s) => !s)}
           aria-label={t('conflicts.conflictActions')}
         >
-          <IconDotsVertical size={14} />
-        </ActionIcon>
+          {t('common.actions')}
+        </Button>
       </Popover.Target>
       <Popover.Dropdown>
         {mode === 'root' && (

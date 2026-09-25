@@ -315,7 +315,6 @@
   "suggestions": {
     "title": "Lösungsvorschläge",
     "apply": "Anwenden",
-    "applyPreview": "Vorschau anzeigen",
     "previewAction": "Vorschau: {action}",
     "previewDisclaimer": "Unverbindliche Berechnung. Erst Anwenden übernimmt die Änderung; bis dahin kann sich der Plan ändern.",
     "skillPreviewNote": "Die Vorschau zeigt Kapazitätskonflikte. Die Eignung des Ersatzes wurde für die Vorschlagsliste geprüft, wird hier aber nicht neu berechnet.",

@@ -124,7 +124,11 @@ describe('skill-conflict resource swap', () => {
     )
 
     fireEvent.click(screen.getByText('Original Resource'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Vorschau — Ressource tauschen' }))
+    const previewButton = await screen.findByRole('button', {
+      name: 'Vorschau — Ressource tauschen',
+    })
+    expect(previewButton.textContent).toBe('Vorschau')
+    fireEvent.click(previewButton)
     expect(await screen.findByText('Konflikte: 0 → 0')).toBeInTheDocument()
     expect(previewAssignment).toHaveBeenCalledWith(
       expect.objectContaining({
