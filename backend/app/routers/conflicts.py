@@ -122,6 +122,7 @@ async def get_conflict_suggestions(
             new_allocation_percent=s.new_allocation_percent,
             target_resource_id=s.target_resource_id,
             target_resource_name=s.target_resource_name,
+            new_start_at=s.new_start_at,
         )
         for s in suggestions
     ]
