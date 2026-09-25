@@ -23,6 +23,12 @@ Services will be available at:
 - Backend: http://localhost:3001/docs
 - Database: localhost:5432
 
+The development frontend sends API requests to the same-origin `/api` path.
+Vite proxies them to the backend, so login and the rest of the app use the
+same URL scheme whether the frontend runs natively or in Docker. Do not set
+`VITE_API_BASE_URL` to a bare backend URL such as `http://localhost:3001`:
+that omits the backend's `/api` prefix and makes login return 404.
+
 On first visit, you'll be redirected to the setup page to create the
 initial admin account.
 
