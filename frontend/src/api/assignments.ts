@@ -39,6 +39,12 @@ export async function createAssignment(data: AssignmentCreate): Promise<Assignme
   return response.data
 }
 
+/** Fetch one current assignment before calculating a suggested change. */
+export async function getAssignment(id: string): Promise<Assignment> {
+  const response = await apiClient.get<Assignment>(`/api/assignments/${id}`)
+  return response.data
+}
+
 /** Compare a proposed assignment with the saved plan without persisting it. */
 export async function previewAssignment(
   data: AssignmentCreate & { assignment_id?: string },
@@ -66,13 +72,15 @@ export async function deleteAssignment(id: string): Promise<void> {
 // --- Conflict Suggestions ---
 
 export interface ConflictSuggestion {
-  type: 'shift_forward' | 'shift_backward' | 'reduce_allocation' | 'swap_resource'
+  type:
+    'shift_forward' | 'shift_backward' | 'shift_into_window' | 'reduce_allocation' | 'swap_resource'
   assignment_id: string
   description: string
   shift_days?: number | null
   new_allocation_percent?: number | null
   target_resource_id?: string | null
   target_resource_name?: string | null
+  new_start_at?: string | null
 }
 
 /** Fetch resolution suggestions for a conflict. */

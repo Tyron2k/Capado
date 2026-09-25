@@ -11,16 +11,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import {
-  Alert,
-  Button,
-  Group,
-  NumberInput,
-  SegmentedControl,
-  Select,
-  Stack,
-  Text,
-} from '@mantine/core'
+import { Button, Group, NumberInput, SegmentedControl, Select, Stack } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { DateField, DateTimeField } from '../../components/DateField'
 import type { WorkPackage } from '../../types/workPackage'
@@ -31,6 +22,7 @@ import { getProjects } from '../../api/projects'
 import { getWorkPackages } from '../../api/workPackages'
 import { AutocompleteField } from '../../components/AutocompleteField'
 import { SuggestionList } from './SuggestionList'
+import { AssignmentPreviewSummary } from './AssignmentPreviewSummary'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { showErrorNotification } from '../../utils/errorHandling'
@@ -38,7 +30,6 @@ import { toAssignmentPayload } from './assignmentUtils'
 import {
   compareDateTimes,
   compareDates,
-  formatDate,
   toIsoDate,
   toIsoDateTime,
   type DateFormValue,
@@ -333,56 +324,7 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
           </>
         )}
 
-        {visiblePreview && (
-          <Alert title={t('assignmentForm.previewTitle')} color="blue" aria-live="polite">
-            <Stack gap="sm">
-              <Text size="xs">{t('assignmentForm.previewDisclaimer')}</Text>
-              {visiblePreview.resources.map((resource) => (
-                <Stack key={resource.resource_id} gap={4}>
-                  <Text fw={600} size="sm">
-                    {resource.resource_name}
-                  </Text>
-                  <Text size="sm">
-                    {t('assignmentForm.previewConflicts', {
-                      before: resource.conflicts_before.length,
-                      after: resource.conflicts_after.length,
-                    })}
-                  </Text>
-                  {resource.conflicts_after.slice(0, 5).map((conflict, index) => (
-                    <Text key={`${conflict.cause}-${conflict.start_date}-${index}`} size="xs">
-                      {t(`assignmentForm.conflictCause.${conflict.cause}`)}:{' '}
-                      {formatDate(conflict.start_date)}–{formatDate(conflict.end_date)}
-                    </Text>
-                  ))}
-                  {resource.conflicts_after.length > 5 && (
-                    <Text size="xs">
-                      {t('assignmentForm.moreConflicts', {
-                        count: resource.conflicts_after.length - 5,
-                      })}
-                    </Text>
-                  )}
-                  {resource.resource_type === 'personal' && (
-                    <Text size="xs">
-                      {t('assignmentForm.changedDays', { count: resource.capacity_days.length })}
-                    </Text>
-                  )}
-                  {resource.capacity_days.slice(0, 5).map((day) => (
-                    <Text key={day.date} size="xs">
-                      {formatDate(day.date)}: {Math.round(day.assigned_before_percent)}% →{' '}
-                      {Math.round(day.assigned_after_percent)}% ({t('assignmentForm.available')}:{' '}
-                      {Math.round(day.available_percent)}%)
-                    </Text>
-                  ))}
-                  {resource.capacity_days.length > 5 && (
-                    <Text size="xs">
-                      {t('assignmentForm.moreDays', { count: resource.capacity_days.length - 5 })}
-                    </Text>
-                  )}
-                </Stack>
-              ))}
-            </Stack>
-          </Alert>
-        )}
+        {visiblePreview && <AssignmentPreviewSummary preview={visiblePreview} />}
 
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={onCancel}>

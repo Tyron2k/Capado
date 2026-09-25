@@ -1,10 +1,11 @@
 /**
- * Displays AI-generated resolution suggestions for a conflict.
- * Each suggestion is a clickable action that applies the fix.
+ * Displays computed resolution suggestions for a conflict.
+ * A suggestion is previewed before it can change the plan.
  */
 
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Group, Loader, Stack, Text } from '@mantine/core'
+import { Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../utils/errorHandling'
 import {
@@ -13,14 +14,20 @@ import {
   IconPercentage,
   IconSwitchHorizontal,
   IconBulb,
+  IconClock,
 } from '@tabler/icons-react'
 import {
+  getAssignment,
   getConflictSuggestions,
+  previewAssignment,
   updateAssignment,
   type ConflictSuggestion,
 } from '../../api/assignments'
+import type { AssignmentPreview, AssignmentUpdate } from '../../types/assignment'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
+import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
+import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
 
 interface Props {
   conflictId: string
@@ -30,6 +37,7 @@ interface Props {
 const ICON_MAP = {
   shift_forward: IconArrowRight,
   shift_backward: IconArrowLeft,
+  shift_into_window: IconClock,
   reduce_allocation: IconPercentage,
   swap_resource: IconSwitchHorizontal,
 }
@@ -37,6 +45,7 @@ const ICON_MAP = {
 const COLOR_MAP = {
   shift_forward: 'blue',
   shift_backward: 'blue',
+  shift_into_window: 'blue',
   reduce_allocation: 'orange',
   swap_resource: 'teal',
 }
@@ -50,6 +59,8 @@ function buildDescription(
       return t('suggestions.descShiftForward', { days: s.shift_days ?? 0 })
     case 'shift_backward':
       return t('suggestions.descShiftBackward', { days: Math.abs(s.shift_days ?? 0) })
+    case 'shift_into_window':
+      return t('suggestions.descShiftIntoWindow', { time: s.new_start_at?.slice(11, 16) ?? '—' })
     case 'reduce_allocation':
       return t('suggestions.descReduce', { percent: s.new_allocation_percent ?? 0 })
     case 'swap_resource':
@@ -62,6 +73,11 @@ function buildDescription(
 export function ConflictSuggestions({ conflictId, onApplied }: Props) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const [active, setActive] = useState<{
+    suggestion: ConflictSuggestion
+    patch: AssignmentUpdate
+    result: AssignmentPreview
+  } | null>(null)
 
   /**
    * Suggestions fail SILENTLY, and that stays true.
@@ -81,30 +97,39 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
   /**
    * APPLYING A SUGGESTION WRITES AN ASSIGNMENT, so it changes the plan.
    *
-   * Four keys: assignments because one changed, conflicts because this one may now be gone, the digest
-   * because its findings are derived from both, and planning because the coverage figures are. The
-   * hand-written version called `onApplied()` and left it to the parent to decide what to refresh —
+   * Assignments change, conflicts may disappear, and the digest and planning figures derive from both.
+   * The hand-written version called `onApplied()` and left it to the parent to decide what to refresh —
    * which meant the answer depended on which screen the card happened to be rendered inside.
    *
    * `onApplied()` is still called: the parent uses it to close the card, which is presentation and not
    * data.
    */
-  /** What one applied suggestion needs: the write, plus what to say and how to key the spinner. */
-  interface ApplyVars {
-    assignmentId: string
-    payload: Record<string, unknown>
-    description: string
-    type: ConflictSuggestion['type']
-  }
+  const previewMutation = useMutation({
+    mutationFn: async (suggestion: ConflictSuggestion) => {
+      const assignment = await getAssignment(suggestion.assignment_id)
+      const patch = patchForSuggestion(suggestion, assignment)
+      const result = await previewAssignment(previewPayloadForPatch(assignment, patch))
+      return { suggestion, patch, result }
+    },
+    onSuccess: setActive,
+    onError: (error) => showErrorNotification(error, t('common.error'), t('common.genericError')),
+  })
 
   const applyMutation = useMutation({
-    mutationFn: ({ assignmentId, payload }: ApplyVars) => updateAssignment(assignmentId, payload),
-    onSuccess: async (_result, { description }) => {
+    mutationFn: ({
+      suggestion,
+      patch,
+    }: {
+      suggestion: ConflictSuggestion
+      patch: AssignmentUpdate
+    }) => updateAssignment(suggestion.assignment_id, patch),
+    onSuccess: async (_result, { suggestion }) => {
       notifications.show({
         title: t('common.saved'),
-        message: description,
+        message: buildDescription(suggestion, t),
         color: 'green',
       })
+      setActive(null)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.assignments.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.all }),
@@ -113,53 +138,58 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
         // leaving each screen to remember is the same argument as the rest of this layer.
         queryClient.invalidateQueries({ queryKey: queryKeys.gantt.all }),
         queryClient.invalidateQueries({ queryKey: queryKeys.planning.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.resources.all }),
       ])
       onApplied()
     },
     onError: (error) => showErrorNotification(error, t('common.error'), t('common.genericError')),
   })
 
-  // Which row shows a spinner. The mutation's own variables carry it, so there is no second piece of
-  // state to keep in step with the request.
-  const applying = applyMutation.isPending
-    ? `${applyMutation.variables.assignmentId}${applyMutation.variables.type}`
-    : null
-
-  const applySuggestion = (suggestion: ConflictSuggestion) => {
-    const payload: Record<string, unknown> = {}
-
-    if (suggestion.type === 'reduce_allocation' && suggestion.new_allocation_percent) {
-      payload.allocation_percent = suggestion.new_allocation_percent
-    } else if (
-      (suggestion.type === 'shift_forward' || suggestion.type === 'shift_backward') &&
-      suggestion.shift_days
-    ) {
-      // A shift needs absolute dates, which this component does not have: updateAssignment takes
-      // dates, not a delta. Rather than guess them, the user is told what to do by hand.
-      notifications.show({
-        title: t('suggestions.shiftHint'),
-        message: suggestion.description,
-        color: 'blue',
-      })
-      return
-    } else if (suggestion.type === 'swap_resource' && suggestion.target_resource_id) {
-      payload.resource_id = suggestion.target_resource_id
-    }
-
-    if (Object.keys(payload).length === 0) return
-    applyMutation.mutate({
-      assignmentId: suggestion.assignment_id,
-      payload,
-      description: suggestion.description,
-      type: suggestion.type,
-    })
-  }
-
   if (loading) return <Loader size="xs" />
   if (suggestions.length === 0) return null
 
   return (
     <Stack gap="xs" mt="sm">
+      <Modal
+        opened={active !== null}
+        onClose={() => {
+          if (!applyMutation.isPending) setActive(null)
+        }}
+        title={
+          active
+            ? t('suggestions.previewAction', { action: buildDescription(active.suggestion, t) })
+            : ''
+        }
+        size="lg"
+        closeOnClickOutside={!applyMutation.isPending}
+        closeOnEscape={!applyMutation.isPending}
+      >
+        {active && (
+          <Stack gap="md">
+            <AssignmentPreviewSummary
+              preview={active.result}
+              disclaimer={t('suggestions.previewDisclaimer')}
+            />
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                onClick={() => setActive(null)}
+                disabled={applyMutation.isPending}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={() =>
+                  applyMutation.mutate({ suggestion: active.suggestion, patch: active.patch })
+                }
+                loading={applyMutation.isPending}
+              >
+                {t('suggestions.apply')}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       <Group gap="xs">
         <IconBulb size={14} color="var(--mantine-color-yellow-6)" />
         <Text size="xs" fw={600} c="dimmed">
@@ -184,10 +214,14 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
               size="compact-xs"
               variant="light"
               color={color}
-              loading={applying === s.assignment_id + s.type}
-              onClick={() => applySuggestion(s)}
+              loading={previewMutation.isPending && previewMutation.variables === s}
+              disabled={previewMutation.isPending || applyMutation.isPending}
+              onClick={() => {
+                setActive(null)
+                previewMutation.mutate(s)
+              }}
             >
-              {t('suggestions.apply')}
+              {t('suggestions.applyPreview')}
             </Button>
           </Group>
         )
