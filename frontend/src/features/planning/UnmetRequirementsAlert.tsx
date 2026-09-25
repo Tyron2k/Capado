@@ -3,22 +3,40 @@
  *
  * Renders pre-fetched unmet requirements grouped by work package as
  * collapsible cards. Each card shows the unmet skills with FTE gap values
- * and suggested resources that can be directly assigned via an "Assign" button.
+ * and suggested resources that can be previewed before assignment.
  *
  * Data fetching is handled by the parent (PlanningOverviewPanel) which makes
  * a single API call for all resource types and splits the results.
  */
 
 import { useMemo, useState } from 'react'
-import { Badge, Box, Button, Collapse, Group, Stack, Text, UnstyledButton } from '@mantine/core'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  Badge,
+  Box,
+  Button,
+  Collapse,
+  Group,
+  Modal,
+  Stack,
+  Text,
+  UnstyledButton,
+} from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { IconAlertTriangle, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
 import { useTranslation } from '../../i18n'
-import { createAssignment } from '../../api/assignments'
+import { createAssignment, previewAssignment } from '../../api/assignments'
+import { queryKeys } from '../../api/queryClient'
 import { showErrorNotification } from '../../utils/errorHandling'
 import { formatDate } from '../../utils/date'
 import { SectionHeader } from '../../components/layout'
-import type { UnmetRequirementSuggestion, UnmetRequirement } from '../../types/assignment'
+import type {
+  AssignmentCreate,
+  AssignmentPreview,
+  UnmetRequirementSuggestion,
+  UnmetRequirement,
+} from '../../types/assignment'
+import { AssignmentPreviewSummary } from './AssignmentPreviewSummary'
 
 /** A group of unmet requirements belonging to the same work package. */
 interface WpBucket {
@@ -53,6 +71,35 @@ function buildWpBuckets(items: UnmetRequirement[]): WpBucket[] {
     bucket.requirements.push(item)
   }
   return Array.from(map.values())
+}
+
+/** Keep preview and creation on the same proposed assignment. */
+function proposedAssignment(
+  bucket: WpBucket,
+  suggestion: UnmetRequirementSuggestion,
+): AssignmentCreate {
+  const common = {
+    resource_id: suggestion.resource_id,
+    work_package_id: bucket.work_package_id,
+  }
+  if (suggestion.resource_type === 'personal') {
+    return {
+      ...common,
+      resource_type: 'personal',
+      start_date: bucket.start_date,
+      end_date: bucket.end_date,
+      allocation_percent: 100,
+    }
+  }
+  if (suggestion.resource_type === 'infrastructure') {
+    return {
+      ...common,
+      resource_type: 'infrastructure',
+      start_at: `${bucket.start_date}T08:00:00`,
+      end_at: `${bucket.end_date}T17:00:00`,
+    }
+  }
+  throw new Error('Unsupported resource type')
 }
 
 interface UnmetRequirementsSectionProps {
@@ -115,42 +162,46 @@ function UnmetRequirementCard({
   onAssigned: () => void
 }) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [assigningId, setAssigningId] = useState<string | null>(null)
+  const [activePreview, setActivePreview] = useState<{
+    suggestion: UnmetRequirementSuggestion
+    payload: AssignmentCreate
+    result: AssignmentPreview
+  } | null>(null)
 
   const totalGap = bucket.requirements.reduce((sum, r) => sum + r.gap, 0)
 
-  const handleAssign = async (suggestion: UnmetRequirementSuggestion) => {
-    setAssigningId(suggestion.resource_id)
-    try {
-      const isInfra = suggestion.resource_type === 'infrastructure'
-      await createAssignment({
-        resource_id: suggestion.resource_id,
-        work_package_id: bucket.work_package_id,
-        resource_type: suggestion.resource_type as 'personal' | 'infrastructure',
-        ...(isInfra
-          ? {
-              start_at: `${bucket.start_date}T08:00:00`,
-              end_at: `${bucket.end_date}T17:00:00`,
-            }
-          : {
-              start_date: bucket.start_date,
-              end_date: bucket.end_date,
-              allocation_percent: 100,
-            }),
-      })
+  const previewMutation = useMutation({
+    mutationFn: async (suggestion: UnmetRequirementSuggestion) => {
+      const payload = proposedAssignment(bucket, suggestion)
+      const result = await previewAssignment(payload)
+      return { suggestion, payload, result }
+    },
+    onSuccess: setActivePreview,
+    onError: (err) => showErrorNotification(err, t('common.error'), t('common.genericError')),
+  })
+
+  const assignMutation = useMutation({
+    mutationFn: (payload: AssignmentCreate) => createAssignment(payload),
+    onSuccess: async () => {
       notifications.show({
         title: t('common.success'),
         message: t('planning.unmetAssigned_success'),
         color: 'green',
       })
+      setActivePreview(null)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.assignments.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.digest.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.gantt.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.resources.all }),
+      ])
       onAssigned()
-    } catch (err: unknown) {
-      showErrorNotification(err, t('common.error'), t('common.genericError'))
-    } finally {
-      setAssigningId(null)
-    }
-  }
+    },
+    onError: (err) => showErrorNotification(err, t('common.error'), t('common.genericError')),
+  })
 
   return (
     <Box
@@ -162,6 +213,57 @@ function UnmetRequirementCard({
           : undefined,
       }}
     >
+      <Modal
+        opened={activePreview !== null}
+        onClose={() => {
+          if (!assignMutation.isPending) setActivePreview(null)
+        }}
+        title={
+          activePreview
+            ? t('planning.unmetPreviewTitle', {
+                name: activePreview.suggestion.resource_name,
+              })
+            : ''
+        }
+        size="lg"
+        closeOnClickOutside={!assignMutation.isPending}
+        closeOnEscape={!assignMutation.isPending}
+      >
+        {activePreview && (
+          <Stack gap="md">
+            <Text size="sm">
+              {activePreview.payload.resource_type === 'personal'
+                ? t('planning.unmetPreviewPersonal', {
+                    start: formatDate(bucket.start_date),
+                    end: formatDate(bucket.end_date),
+                  })
+                : t('planning.unmetPreviewInfrastructure', {
+                    start: formatDate(bucket.start_date),
+                    end: formatDate(bucket.end_date),
+                  })}
+            </Text>
+            <AssignmentPreviewSummary
+              preview={activePreview.result}
+              disclaimer={t('planning.unmetPreviewDisclaimer')}
+            />
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                onClick={() => setActivePreview(null)}
+                disabled={assignMutation.isPending}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                onClick={() => assignMutation.mutate(activePreview.payload)}
+                loading={assignMutation.isPending}
+              >
+                {t('planning.unmetAssign')}
+              </Button>
+            </Group>
+          </Stack>
+        )}
+      </Modal>
       <UnstyledButton
         onClick={() => setOpen((s) => !s)}
         style={{ width: '100%', padding: 12 }}
@@ -233,10 +335,14 @@ function UnmetRequirementCard({
                           <Button
                             size="compact-xs"
                             variant="light"
-                            loading={assigningId === s.resource_id}
-                            onClick={() => handleAssign(s)}
+                            loading={previewMutation.isPending && previewMutation.variables === s}
+                            disabled={previewMutation.isPending || assignMutation.isPending}
+                            onClick={() => {
+                              setActivePreview(null)
+                              previewMutation.mutate(s)
+                            }}
                           >
-                            {t('planning.unmetAssign')}
+                            {t('assignmentForm.preview')}
                           </Button>
                         </Group>
                       ))}

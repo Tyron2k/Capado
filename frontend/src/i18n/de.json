@@ -223,6 +223,10 @@
     "noUnmetRequirements": "Alle Arbeitspaket-Anforderungen sind gedeckt.",
     "unmetSuggestions": "Vorgeschlagene Ressourcen",
     "unmetAssign": "Zuweisen",
+    "unmetPreviewTitle": "Vorschau: {name} zuweisen",
+    "unmetPreviewPersonal": "Geplante Zuordnung: {start}–{end} mit 100 % Auslastung.",
+    "unmetPreviewInfrastructure": "Geplante Buchung: {start} 08:00 bis {end} 17:00 Uhr.",
+    "unmetPreviewDisclaimer": "Unverbindliche Berechnung. Erst Zuweisen erstellt die Zuordnung; bis dahin kann sich der Plan ändern.",
     "unmetAssigned_success": "Ressource erfolgreich zugewiesen.",
     "unmetNoSuggestions": "Keine passenden Ressourcen verfügbar."
   },
