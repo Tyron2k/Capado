@@ -323,12 +323,14 @@ it finished, is in [known limitations](../reference/known-limitations.md).
 ## Database Migrations
 
 Alembic runs automatically on backend startup (`alembic upgrade head`).
-Migrations create schema only — no seed data. Each revision has a
-reversible `downgrade()`.
+Migrations create no seed data. Some also transform existing rows: revision
+`002` interprets legacy booking times and converts all stored instants to UTC.
+It cannot be safely downgraded; back up before upgrading (see the
+[upgrade guide](../how-to/upgrading.md)).
 
 ## Seed Data
 
-Seeding is external to the application. Migrations create schema only, so a fresh
+Seeding is external to the application. Migrations do not seed data, so a fresh
 deployment starts empty and the setup page creates the first admin account.
 
 After a bulk load that inserts assignments directly, run

@@ -14,6 +14,12 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.services.time_zone import (
+    local_date,
+    local_wall_time_to_utc,
+    planning_zone,
+)
+
 from .common import ImportResult, _parse_header, check_import_conflicts
 
 
@@ -82,8 +88,10 @@ async def _load_assignments_export_rows(session: AsyncSession) -> list[tuple]:
             row.project_name,
             row.wp_name,
             row.resource_name,
-            row.start_at.date().isoformat() if row.start_at else "",
-            row.end_at.date().isoformat() if row.end_at else "",
+            local_date(row.start_at, planning_zone()).isoformat()
+            if row.start_at
+            else "",
+            local_date(row.end_at, planning_zone()).isoformat() if row.end_at else "",
             "100",
         )
         for row in infra_result.all()
@@ -306,11 +314,13 @@ async def import_assignments(session: AsyncSession, rows: list[tuple]) -> Import
                 resource_id=resource_id,
                 resource_type=resource_type,
                 work_package_id=wp.id,
-                start_at=datetime_type(
-                    start_date.year, start_date.month, start_date.day, 6, 0, 0
+                start_at=local_wall_time_to_utc(
+                    datetime_type(start_date.year, start_date.month, start_date.day, 6),
+                    planning_zone(),
                 ),
-                end_at=datetime_type(
-                    end_date.year, end_date.month, end_date.day, 18, 0, 0
+                end_at=local_wall_time_to_utc(
+                    datetime_type(end_date.year, end_date.month, end_date.day, 18),
+                    planning_zone(),
                 ),
             )
         else:

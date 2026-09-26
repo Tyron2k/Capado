@@ -19,8 +19,8 @@ MINUTES_PER_DAY = 1440
 
 
 def _utcnow() -> datetime:
-    """UTC timestamp as naive datetime (for TIMESTAMP WITHOUT TIME ZONE)."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    """Current timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class Holiday(SQLModel, table=True):

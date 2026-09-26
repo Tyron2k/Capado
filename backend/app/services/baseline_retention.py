@@ -56,9 +56,9 @@ def cutoff_for(retention_months: int, now: datetime | None = None) -> datetime |
     """
     if retention_months <= KEEP_FOREVER:
         return None
-    reference = now or datetime.now(UTC).replace(tzinfo=None)
+    reference = now or datetime.now(UTC)
     boundary = months_before(reference.date(), retention_months)
-    return datetime.combine(boundary, reference.time())
+    return datetime.combine(boundary, reference.timetz())
 
 
 async def prune_baselines(

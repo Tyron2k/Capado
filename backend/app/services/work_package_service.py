@@ -13,7 +13,7 @@ from app.services.partial_update import UNSET, UnsetType
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 def _validate_work_package_fields(

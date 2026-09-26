@@ -21,7 +21,7 @@ from app.services.project_service import _clean_ref
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 def _validate_name(name: str | None) -> str:

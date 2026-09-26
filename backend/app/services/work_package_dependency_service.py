@@ -19,7 +19,7 @@ from app.services.dependencies import DependencyEdge, would_create_cycle
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 class WorkPackageDependencyService:

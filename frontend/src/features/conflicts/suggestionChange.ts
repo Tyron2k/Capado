@@ -8,10 +8,18 @@ function shiftCalendarDays(value: string, days: number): string {
   return date + value.slice(10)
 }
 
-function parseNaiveTimestamp(value: string): number {
-  const result = Date.parse(`${value.replace(/Z$/, '')}Z`)
+function parseInstant(value: string): number {
+  const result = Date.parse(value)
   if (Number.isNaN(result)) throw new Error('Invalid assignment timestamp')
   return result
+}
+
+function suggestedInterval(suggestion: ConflictSuggestion): AssignmentUpdate {
+  const { new_start_at, new_end_at } = suggestion
+  if (!new_start_at || !new_end_at || parseInstant(new_end_at) <= parseInstant(new_start_at)) {
+    throw new Error('Suggestion must include a valid UTC interval')
+  }
+  return { start_at: new_start_at, end_at: new_end_at }
 }
 
 /** Turn a suggestion into the exact partial update that Apply will send. */
@@ -41,23 +49,12 @@ export function patchForSuggestion(
         assignment.start_at &&
         assignment.end_at
       ) {
-        return {
-          start_at: shiftCalendarDays(assignment.start_at, days),
-          end_at: shiftCalendarDays(assignment.end_at, days),
-        }
+        return suggestedInterval(suggestion)
       }
       break
     }
     case 'shift_into_window': {
-      if (!assignment.start_at || !assignment.end_at || !suggestion.new_start_at) break
-      const duration =
-        parseNaiveTimestamp(assignment.end_at) - parseNaiveTimestamp(assignment.start_at)
-      if (duration <= 0) break
-      const newStart = parseNaiveTimestamp(suggestion.new_start_at)
-      return {
-        start_at: suggestion.new_start_at,
-        end_at: new Date(newStart + duration).toISOString().replace(/Z$/, ''),
-      }
+      return suggestedInterval(suggestion)
     }
   }
   throw new Error('Suggestion cannot be applied to this assignment')

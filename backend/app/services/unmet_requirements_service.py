@@ -30,6 +30,7 @@ from app.models.work_package_requirement import (
     WorkPackageRequirement,
 )
 from app.schemas.assignment import ResourceSuggestion, UnmetRequirementResponse
+from app.services.time_zone import local_date, local_day_bounds, planning_zone
 
 
 def assignment_span(assignment: Assignment) -> tuple[date, date] | None:
@@ -47,7 +48,10 @@ def assignment_span(assignment: Assignment) -> tuple[date, date] | None:
     if assignment.start_date is not None and assignment.end_date is not None:
         return assignment.start_date, assignment.end_date
     if assignment.start_at is not None and assignment.end_at is not None:
-        return assignment.start_at.date(), assignment.end_at.date()
+        zone = planning_zone()
+        return local_date(assignment.start_at, zone), local_date(
+            assignment.end_at, zone
+        )
     return None
 
 
@@ -524,8 +528,10 @@ async def _load_suggestion_data(
     resource_assignments: dict[UUID, list[tuple[date, date]]] = {}
     candidate_ids = set(resource_map.keys())
     if min_start and max_end and candidate_ids:
-        from sqlalchemy import Date as SADate
-        from sqlalchemy import and_, cast, or_
+        from sqlalchemy import and_, or_
+
+        range_start, _ = local_day_bounds(min_start, planning_zone())
+        _, range_end = local_day_bounds(max_end, planning_zone())
 
         overlapping = list(
             (
@@ -544,8 +550,8 @@ async def _load_suggestion_data(
                                 Assignment.end_date >= min_start,
                             ),
                             and_(
-                                cast(Assignment.start_at, SADate) <= max_end,
-                                cast(Assignment.end_at, SADate) >= min_start,
+                                Assignment.start_at < range_end,
+                                Assignment.end_at > range_start,
                             ),
                         ),
                     )

@@ -399,8 +399,8 @@ describe('AssignmentsPanel', () => {
         resource_id: 'res-2',
         resource_type: 'infrastructure',
         work_package_id: 'wp-2',
-        start_at: '2025-03-24T08:30',
-        end_at: '2025-03-24T16:45',
+        start_at: '2025-03-24T07:30:00.000Z',
+        end_at: '2025-03-24T15:45:00.000Z',
       })
     })
   })

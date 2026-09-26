@@ -164,7 +164,7 @@ class AbsenceService:
                 field="end_date",
             )
 
-        absence.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        absence.updated_at = datetime.now(UTC)
         self.session.add(absence)
         await self.session.flush()
         return absence

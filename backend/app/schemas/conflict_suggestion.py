@@ -17,3 +17,4 @@ class ConflictSuggestionResponse(BaseModel):
     target_resource_id: UUID | None = None
     target_resource_name: str | None = None
     new_start_at: datetime | None = None
+    new_end_at: datetime | None = None

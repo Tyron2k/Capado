@@ -33,8 +33,8 @@ def setup_database():
     yield
 
 
-def _naive_utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 def _request_with_cookie(raw_token: str | None) -> SimpleNamespace:
@@ -72,7 +72,7 @@ def _stored_token(raw: str, *, revoked_at=None, replaced_by_id=None, user_id=Non
         id=uuid4(),
         user_id=user_id or uuid4(),
         token_hash=hashlib.sha256(raw.encode()).hexdigest(),
-        expires_at=_naive_utcnow() + timedelta(days=7),
+        expires_at=_utcnow() + timedelta(days=7),
         revoked_at=revoked_at,
         replaced_by_id=replaced_by_id,
     )
@@ -140,7 +140,7 @@ class TestRefreshFlow:
         user = _active_user()
         stored = _stored_token(
             raw,
-            revoked_at=_naive_utcnow() - timedelta(seconds=2),
+            revoked_at=_utcnow() - timedelta(seconds=2),
             replaced_by_id=uuid4(),
             user_id=user.id,
         )
@@ -171,7 +171,7 @@ class TestRefreshFlow:
         user_id = uuid4()
         stored = _stored_token(
             raw,
-            revoked_at=_naive_utcnow()
+            revoked_at=_utcnow()
             - timedelta(seconds=settings.refresh_reuse_grace_seconds + 60),
             replaced_by_id=uuid4(),
             user_id=user_id,
@@ -206,7 +206,7 @@ class TestRefreshFlow:
         raw, _, _ = create_refresh_token()
         stored = _stored_token(
             raw,
-            revoked_at=_naive_utcnow(),  # revoked now, but never rotated
+            revoked_at=_utcnow(),  # revoked now, but never rotated
             replaced_by_id=None,
             user_id=uuid4(),
         )

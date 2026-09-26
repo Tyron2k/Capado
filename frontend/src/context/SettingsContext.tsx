@@ -50,6 +50,7 @@ interface AppSettings {
   companySubtitle: string
   logoUrl: string
   primaryColor: string
+  timeZone: string
   colorScheme: MantineColorScheme
   locale: Locale
   navCollapsed: boolean
@@ -70,6 +71,7 @@ const DEFAULT_BRANDING: TenantSettings = {
   company_subtitle: '',
   logo_url: '',
   primary_color: 'blue',
+  time_zone: 'Europe/Berlin',
   has_uploaded_logo: false,
   audit_retention_months: 24,
   // No freeze by default: switching one on for an existing installation would start
@@ -104,6 +106,7 @@ const SettingsContext = createContext<SettingsContextValue>({
     companySubtitle: DEFAULT_BRANDING.company_subtitle,
     logoUrl: DEFAULT_BRANDING.logo_url,
     primaryColor: DEFAULT_BRANDING.primary_color,
+    timeZone: DEFAULT_BRANDING.time_zone,
     ...DEFAULT_PREFS,
   },
   updatePreferences: () => {},
@@ -197,6 +200,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       companySubtitle: branding.company_subtitle,
       logoUrl: branding.logo_url,
       primaryColor: branding.primary_color,
+      timeZone: branding.time_zone,
       colorScheme: prefs.colorScheme,
       locale: prefs.locale,
       navCollapsed: prefs.navCollapsed,

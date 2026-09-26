@@ -7,7 +7,7 @@ labels that were off by one.
 
 | Shape | Type | Used for |
 |-------|------|----------|
-| ISO string | `string` (`YYYY-MM-DD`, `YYYY-MM-DDTHH:mm`) | API payloads, display |
+| ISO string | `string` (`YYYY-MM-DD`, offset-bearing timestamp) | API payloads, display |
 | Form value | `DateFormValue` (`Date \| string \| null`) | what date inputs hold |
 | Day anchor | `DayAnchor` (branded `Date` at UTC midnight) | calendar-day arithmetic |
 
@@ -43,6 +43,7 @@ Their `onChange` never returns a `Date`:
 | `DateField` / `DateInput` | `YYYY-MM-DD` |
 | `DatePickerInput` | `YYYY-MM-DD` |
 | `DateTimeField` / `DateTimePicker` | `YYYY-MM-DD HH:mm:ss` |
+| `ZonedDateTimeField` (bookings) | UTC instant when resolved; local string while invalid/ambiguous |
 
 Consequences:
 
@@ -50,9 +51,11 @@ Consequences:
   catch this on its own, because `form.getInputProps()` is loosely typed.
 - Never compare two values with `<` / `>`. Mixing a string and a `Date` coerces
   to `NaN`, so the comparison is always `false` and validation silently passes.
-  Use `compareDates` / `compareDateTimes`.
-- Convert to payloads with `toIsoDate` / `toIsoDateTime`. Both accept `Date`
-  objects and Mantine strings, and return `''` for unparseable input.
+  Use `compareDates` for calendar dates. Compare booking instants after UTC
+  conversion: local clock readings can run backwards during an autumn transition.
+- Convert calendar-only values with `toIsoDate`. `toIsoDateTime` normalizes a
+  *local form value*; it is not an API timestamp. Infrastructure bookings must
+  use `localDateTimeToUtc(value, settings.timeZone)` before sending them.
 
 ```tsx
 const form = useForm<{ start_date: DateFormValue; end_date: DateFormValue }>({
@@ -104,18 +107,28 @@ isoWeekNumber(week.week_start)                               // CW label
 labels, `formatIsoDate`, `isCurrentSlot`, and `computeBarGeometry` — shared by every
 Gantt perspective and by the projects overview — all work on anchors.
 
-## 4. Display formatting takes strings only
+## 4. Calendar dates remain literal; booking instants use the configured zone
 
-`formatDate` and `formatDateTime` accept `string | null`. They read the ISO parts
-textually and never construct a `Date`, so no timezone can shift the output —
-and a `DayAnchor` cannot be passed in and rendered as the wrong day. Convert
-first when needed: `formatDate(dayAnchorToIso(anchor))` or
-`formatDate(toIsoDate(localDate))`.
+`formatDate` reads only the literal `YYYY-MM-DD` calendar date; a time-zone
+change must never move a project deadline or a person's date-only assignment.
+`formatDateTime` instead converts an offset-bearing UTC booking instant into the
+globally configured IANA zone. Pass `settings.timeZone` explicitly at rendering
+sites. `ZonedDateTimeField` renders the instant locally but retains it in form
+state, preserving which occurrence of a repeated autumn time it represents.
+`localDateTimeToUtc` uses `@js-temporal/polyfill` to resolve new wall-clock input;
+it rejects spring gaps and unresolved autumn folds. The field offers both UTC
+offsets for a fold, requiring an explicit choice. Existing resolved values are
+not reinterpreted. Open booking forms pin their input zone and display its name,
+so a settings refresh cannot reinterpret an unfinished draft.
 
-Both take an optional `locale`, and the ordering is done by REARRANGING the parts
-already extracted textually. Not `Intl.DateTimeFormat`: that needs a `Date`, and
-constructing one is the bug class this whole module exists to prevent — so the
-locale-aware path is deliberately not the idiomatic one.
+Planning rules remain in `Europe/Berlin`, independently of this display setting.
+Calendar dates and recurring local availability windows are not UTC instants.
+Infrastructure conflict suggestions are calculated in the backend and carry
+both `new_start_at` and `new_end_at` as UTC instants. The client applies these
+exact values without repeating calendar arithmetic in its display zone.
+
+Display ordering is still textual; the instant-to-local-clock conversion uses
+`Intl.DateTimeFormat` with an explicit IANA zone, never the browser's default.
 
 `locale` defaults to `'de'`, so a caller that does not pass one keeps rendering German
 dates. Which callers pass it, and why the migration stops where it does, is recorded in
@@ -134,9 +147,11 @@ misread the way `2:00` can.
 | Function | Purpose |
 |----------|---------|
 | `formatDate(iso, locale?)` | Display as `DD.MM.YYYY`, or ISO for `'en'`; `—` when empty |
-| `formatDateTime(iso, locale?)` | Same plus ` HH:mm` (24-hour in both); `—` when empty |
+| `formatDateTime(instant, locale?, timeZone?)` | Render a UTC instant in the chosen zone |
 | `toIsoDate(value)` | Payload `YYYY-MM-DD` (local time for `Date` input) |
-| `toIsoDateTime(value)` | Payload `YYYY-MM-DDTHH:mm` |
+| `toIsoDateTime(value)` | Normalize local form value `YYYY-MM-DDTHH:mm` |
+| `instantToLocalDateTime(instant, zone)` | Seed a date-time form from UTC API data |
+| `localDateTimeToUtc(value, zone)` | Entered local time to UTC, or `null` at a DST gap/fold |
 | `compareDates(a, b)` | Order by calendar day, ignoring any time part |
 | `compareDateTimes(a, b)` | Order with minute precision |
 | `parseDisplayDate(text)` | Parse typed `DD.MM.YYYY` into `YYYY-MM-DD` |

@@ -53,6 +53,7 @@ from app.models.calendar import (
 )
 from app.models.resource import InfrastructureResource, PersonalResource
 from app.models.resource_group import ResourceGroup
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 
 # A share of this is what allocation_percent means. Kept as a module constant
 # rather than a settings field for now: changing it retroactively reinterprets
@@ -461,7 +462,8 @@ class WorkingTimeService:
         start_minute = spans[0][0]
         end_minute = spans[-1][1]
         day_start = datetime.combine(day, time.min)
+        zone = planning_zone()
         return (
-            day_start + timedelta(minutes=start_minute),
-            day_start + timedelta(minutes=end_minute),
+            local_wall_time_to_utc(day_start + timedelta(minutes=start_minute), zone),
+            local_wall_time_to_utc(day_start + timedelta(minutes=end_minute), zone),
         )

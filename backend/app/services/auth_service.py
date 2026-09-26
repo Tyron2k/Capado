@@ -199,9 +199,7 @@ def create_refresh_token() -> tuple[str, str, datetime]:
     """
     raw_token = secrets.token_urlsafe(64)
     token_hash = _hash_refresh_token(raw_token)
-    expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(
-        days=REFRESH_TOKEN_EXPIRE_DAYS
-    )
+    expires_at = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     return raw_token, token_hash, expires_at
 
 
@@ -226,7 +224,7 @@ def validate_refresh_token(
     if revoked_at is not None:
         return False
 
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     if now >= expires_at:
         return False
 

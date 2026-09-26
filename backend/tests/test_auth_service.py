@@ -212,7 +212,7 @@ class TestRefreshToken:
         assert isinstance(token_hash, str)
         assert len(token_hash) == 64  # SHA-256 hex
         assert isinstance(expires_at, datetime)
-        assert expires_at > datetime.now(UTC).replace(tzinfo=None)
+        assert expires_at > datetime.now(UTC)
 
     def test_validate_valid_token(self):
         """A fresh token validates successfully."""
@@ -229,13 +229,13 @@ class TestRefreshToken:
     def test_validate_expired_token(self):
         """An expired token does not validate."""
         raw, token_hash, _ = create_refresh_token()
-        expired_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1)
+        expired_at = datetime.now(UTC) - timedelta(hours=1)
         assert validate_refresh_token(raw, token_hash, expired_at, None) is False
 
     def test_validate_revoked_token(self):
         """A revoked token does not validate."""
         raw, token_hash, expires_at = create_refresh_token()
-        revoked_at = datetime.now(UTC).replace(tzinfo=None)
+        revoked_at = datetime.now(UTC)
         assert validate_refresh_token(raw, token_hash, expires_at, revoked_at) is False
 
     def test_hash_is_deterministic(self):
@@ -257,7 +257,5 @@ class TestRefreshToken:
     def test_expired_token_never_validates_property(self, days_expired: int):
         """An expired refresh token never validates."""
         raw, token_hash, _ = create_refresh_token()
-        expired_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(
-            days=days_expired
-        )
+        expired_at = datetime.now(UTC) - timedelta(days=days_expired)
         assert validate_refresh_token(raw, token_hash, expired_at, None) is False

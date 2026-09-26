@@ -12,6 +12,7 @@ from app.models.assignment import Assignment
 from app.models.conflict import ConflictAssignment
 from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource
+from app.services.time_zone import local_date, planning_zone
 
 
 @dataclass
@@ -371,9 +372,10 @@ def _assignment_display_percent(assignment: Assignment) -> float:
 def _assignment_dates(assignment: Assignment) -> tuple[date, date]:
     """Calendar days occupied by the booking; midnight ends are exclusive."""
     if assignment.start_at is not None and assignment.end_at is not None:
-        return assignment.start_at.date(), (
-            assignment.end_at - timedelta(microseconds=1)
-        ).date()
+        zone = planning_zone()
+        return local_date(assignment.start_at, zone), local_date(
+            assignment.end_at - timedelta(microseconds=1), zone
+        )
     if assignment.start_date is not None and assignment.end_date is not None:
         return assignment.start_date, assignment.end_date
     raise ValueError(f"Assignment {assignment.id} has no complete booking interval")

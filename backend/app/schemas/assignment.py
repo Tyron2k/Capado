@@ -12,7 +12,7 @@ that exactly the fields matching ``resource_type`` are supplied.
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 from app.models.conflict import ConflictCause
 from app.models.resource import ResourceType
@@ -36,8 +36,8 @@ class AssignmentCreate(BaseModel):
     allocation_percent: float | None = Field(default=None, gt=0)
 
     # Infrastructure assignment fields
-    start_at: datetime | None = None
-    end_at: datetime | None = None
+    start_at: AwareDatetime | None = None
+    end_at: AwareDatetime | None = None
 
 
 class AssignmentUpdate(BaseModel):
@@ -51,8 +51,8 @@ class AssignmentUpdate(BaseModel):
     end_date: date | None = None
     allocation_percent: float | None = Field(default=None, gt=0)
 
-    start_at: datetime | None = None
-    end_at: datetime | None = None
+    start_at: AwareDatetime | None = None
+    end_at: AwareDatetime | None = None
 
 
 class AssignmentPreviewRequest(AssignmentCreate):

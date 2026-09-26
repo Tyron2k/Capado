@@ -49,6 +49,7 @@ from app.services.permissions import (
 )
 from app.services.planning_freeze import Span
 from app.services.skill_mismatch import detect_mismatches
+from app.services.time_zone import local_date, planning_zone
 from app.services.unmet_requirements_service import get_unmet_requirements
 
 router = APIRouter(prefix="/assignments", tags=["Assignments"])
@@ -376,8 +377,10 @@ async def preview_assignment(
         current_user,
         before=span_of(existing) if existing is not None else None,
         after=Span(
-            start=data.start_date or (data.start_at.date() if data.start_at else None),
-            end=data.end_date or (data.end_at.date() if data.end_at else None),
+            start=data.start_date
+            or (local_date(data.start_at, planning_zone()) if data.start_at else None),
+            end=data.end_date
+            or (local_date(data.end_at, planning_zone()) if data.end_at else None),
         ),
     )
     return await AssignmentPreviewService(session).preview(data)
@@ -414,8 +417,10 @@ async def create_assignment(
         current_user,
         before=None,
         after=Span(
-            start=data.start_date or (data.start_at.date() if data.start_at else None),
-            end=data.end_date or (data.end_at.date() if data.end_at else None),
+            start=data.start_date
+            or (local_date(data.start_at, planning_zone()) if data.start_at else None),
+            end=data.end_date
+            or (local_date(data.end_at, planning_zone()) if data.end_at else None),
         ),
     )
     service = AssignmentService(session)
@@ -626,10 +631,10 @@ async def update_assignment(
         before=before,
         after=Span(
             start=data.start_date
-            or (data.start_at.date() if data.start_at else None)
+            or (local_date(data.start_at, planning_zone()) if data.start_at else None)
             or before.start,
             end=data.end_date
-            or (data.end_at.date() if data.end_at else None)
+            or (local_date(data.end_at, planning_zone()) if data.end_at else None)
             or before.end,
         ),
     )

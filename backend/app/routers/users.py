@@ -238,7 +238,7 @@ async def update_user(
             )
         user.resource_id = body.resource_id
 
-    user.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    user.updated_at = datetime.now(UTC)
 
     session.add(user)
     await session.commit()
@@ -286,11 +286,11 @@ async def delete_user(
 
     # Soft-delete: deactivate user
     user.is_active = False
-    user.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    user.updated_at = datetime.now(UTC)
     session.add(user)
 
     # Revoke all active refresh tokens for this user
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     token_statement = select(RefreshToken).where(
         RefreshToken.user_id == user_id,
         RefreshToken.revoked_at.is_(None),

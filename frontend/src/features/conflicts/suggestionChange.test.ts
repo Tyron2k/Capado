@@ -21,8 +21,8 @@ const infrastructure = {
   start_date: null,
   end_date: null,
   allocation_percent: null,
-  start_at: '2026-03-28T22:00:00',
-  end_at: '2026-03-29T02:00:00',
+  start_at: '2026-03-28T21:00:00Z', // 22:00 in Berlin
+  end_at: '2026-03-29T02:00:00Z', // 04:00 after the DST jump
 } as Assignment
 
 function suggestion(type: ConflictSuggestion['type'], extras: Partial<ConflictSuggestion>) {
@@ -42,24 +42,49 @@ describe('conflict suggestion preview and apply payloads', () => {
     })
   })
 
-  it('preserves local clock time on an infrastructure day shift', () => {
+  it('uses the exact server interval for infrastructure day shifts', () => {
     expect(
-      patchForSuggestion(suggestion('shift_backward', { shift_days: -2 }), infrastructure),
+      patchForSuggestion(
+        suggestion('shift_backward', {
+          shift_days: -2,
+          new_start_at: '2026-03-26T21:00:00.000Z',
+          new_end_at: '2026-03-27T03:00:00.000Z',
+        }),
+        infrastructure,
+      ),
     ).toEqual({
-      start_at: '2026-03-26T22:00:00',
-      end_at: '2026-03-27T02:00:00',
+      start_at: '2026-03-26T21:00:00.000Z',
+      end_at: '2026-03-27T03:00:00.000Z',
     })
   })
 
   it('moves a booking into an operating window while preserving its elapsed duration', () => {
     const patch = patchForSuggestion(
-      suggestion('shift_into_window', { new_start_at: '2026-03-29T08:00:00' }),
+      suggestion('shift_into_window', {
+        new_start_at: '2026-03-29T06:00:00Z',
+        new_end_at: '2026-03-29T11:00:00.000Z',
+      }),
       infrastructure,
     )
     expect(patch).toEqual({
-      start_at: '2026-03-29T08:00:00',
-      end_at: '2026-03-29T12:00:00.000',
+      start_at: '2026-03-29T06:00:00Z',
+      end_at: '2026-03-29T11:00:00.000Z',
     })
+  })
+
+  it('never falls back to client-side calendar arithmetic for incomplete infrastructure suggestions', () => {
+    expect(() =>
+      patchForSuggestion(suggestion('shift_forward', { shift_days: 1 }), infrastructure),
+    ).toThrow()
+    expect(() =>
+      patchForSuggestion(
+        suggestion('shift_into_window', {
+          new_start_at: '2026-03-29T06:00:00Z',
+          new_end_at: '2026-03-29T05:00:00Z',
+        }),
+        infrastructure,
+      ),
+    ).toThrow()
   })
 
   it('previews both sides of a resource swap using the same patch sent by Apply', () => {

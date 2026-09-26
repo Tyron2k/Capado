@@ -81,6 +81,7 @@ export interface ConflictSuggestion {
   target_resource_id?: string | null
   target_resource_name?: string | null
   new_start_at?: string | null
+  new_end_at?: string | null
 }
 
 /** Fetch resolution suggestions for a conflict. */

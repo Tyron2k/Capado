@@ -15,7 +15,7 @@ from app.models.resource import ResourceType
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 class AbsenceReason(StrEnum):

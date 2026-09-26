@@ -54,7 +54,7 @@ async def _revoke_all_user_tokens(session: AsyncSession, user_id: UUID) -> None:
         user_id: The user whose tokens should be revoked.
 
     """
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     statement = select(RefreshToken).where(
         RefreshToken.user_id == user_id,
         RefreshToken.revoked_at.is_(None),
@@ -75,7 +75,7 @@ async def _delete_expired_tokens(session: AsyncSession) -> None:
         session: Database session (not committed here).
 
     """
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     await session.execute(delete(RefreshToken).where(RefreshToken.expires_at < now))
 
 
@@ -229,7 +229,7 @@ async def refresh(
             detail="Invalid refresh token",
         )
 
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
 
     if stored_token.revoked_at is not None:
         # The token was already revoked — either rotated out (replaced_by_id
@@ -363,7 +363,7 @@ async def change_password(
         hash_password, body.new_password
     )
     current_user.must_change_password = False
-    current_user.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    current_user.updated_at = datetime.now(UTC)
 
     session.add(current_user)
     await session.commit()
@@ -399,7 +399,7 @@ async def logout(
         stored_token = result.scalar_one_or_none()
 
         if stored_token is not None and stored_token.revoked_at is None:
-            stored_token.revoked_at = datetime.now(UTC).replace(tzinfo=None)
+            stored_token.revoked_at = datetime.now(UTC)
             session.add(stored_token)
             await session.commit()
 

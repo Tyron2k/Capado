@@ -29,8 +29,11 @@ import {
   differenceInDays,
   formatDate,
   formatDateTime,
+  instantToLocalDateTime,
   isValidAnchor,
   isoWeekNumber,
+  localDateTimeToUtc,
+  localTimeChoices,
   parseDisplayDate,
   startOfDayUtc,
   startOfIsoWeekUtc,
@@ -39,6 +42,61 @@ import {
   toIsoDateTime,
   todayUtc,
 } from './date'
+
+describe('UTC instants and configured IANA zones', () => {
+  it('renders the same instant in different zones', () => {
+    expect(formatDateTime('2026-07-01T12:00:00Z', 'de', 'Europe/Berlin')).toBe('01.07.2026 14:00')
+    expect(formatDateTime('2026-07-01T12:00:00Z', 'en', 'America/New_York')).toBe(
+      '2026-07-01 08:00',
+    )
+    expect(formatDateTime('2026-07-01T12:00:42Z', 'de', 'Europe/Berlin', true)).toBe(
+      '01.07.2026 14:00:42',
+    )
+  })
+
+  it('converts normal local input to UTC regardless of browser zone', () => {
+    inEveryTimezone(() => {
+      expect(localDateTimeToUtc('2026-07-01T14:00', 'Europe/Berlin')).toBe(
+        '2026-07-01T12:00:00.000Z',
+      )
+      expect(instantToLocalDateTime('2026-07-01T12:00:00Z', 'Europe/Berlin')).toBe(
+        '2026-07-01T14:00',
+      )
+    })
+  })
+
+  it('rejects DST gaps and repeated local times', () => {
+    expect(localDateTimeToUtc('2026-03-29T02:30', 'Europe/Berlin')).toBeNull()
+    expect(localDateTimeToUtc('2026-10-25T02:30', 'Europe/Berlin')).toBeNull()
+  })
+
+  it('offers both autumn offsets but no choices for a missing spring time', () => {
+    expect(localTimeChoices('2026-10-25T02:30', 'Europe/Berlin')).toEqual([
+      { value: '2026-10-25T00:30:00.000Z', label: 'UTC+02:00' },
+      { value: '2026-10-25T01:30:00.000Z', label: 'UTC+01:00' },
+    ])
+    expect(localTimeChoices('2026-03-29T02:30', 'Europe/Berlin')).toEqual([])
+  })
+
+  it('preserves resolved autumn instants even when the display zone changes', () => {
+    for (const instant of [
+      '2026-10-25T00:30:42.123Z',
+      '2026-10-25T01:30:42.123Z',
+      '2026-10-25T01:30:42.123456Z',
+    ]) {
+      for (const zone of ['Europe/Berlin', 'America/New_York', 'UTC']) {
+        expect(localDateTimeToUtc(instant, zone)).toBe(instant)
+      }
+    }
+  })
+
+  it('handles half-hour DST and quarter-hour standard offsets', () => {
+    expect(localTimeChoices('2026-04-05T01:45', 'Australia/Lord_Howe')).toHaveLength(2)
+    expect(localDateTimeToUtc('2026-07-01T08:00', 'Asia/Kathmandu')).toBe(
+      '2026-07-01T02:15:00.000Z',
+    )
+  })
+})
 
 // --- Generators ---
 

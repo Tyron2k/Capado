@@ -24,17 +24,13 @@ import {
   IconSwitchHorizontal,
 } from '@tabler/icons-react'
 import { deleteAssignment, updateAssignment } from '../../api/assignments'
-import { DateField, DateTimeField } from '../../components/DateField'
+import { DateField } from '../../components/DateField'
+import { ZonedDateTimeField } from '../../components/ZonedDateTimeField'
 import type { ConflictAssignmentInfo } from '../../types/assignment'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
-import {
-  compareDateTimes,
-  compareDates,
-  toIsoDate,
-  toIsoDateTime,
-  type DateFormValue,
-} from '../../utils/date'
+import { useSettings } from '../../context/SettingsContext'
+import { compareDates, localDateTimeToUtc, toIsoDate, type DateFormValue } from '../../utils/date'
 import { AutocompleteField } from '../../components/AutocompleteField'
 
 interface ConflictResolutionActionsProps {
@@ -47,6 +43,8 @@ export function ConflictResolutionActions({
   onChanged,
 }: ConflictResolutionActionsProps) {
   const { t } = useTranslation()
+  const { settings } = useSettings()
+  const [bookingTimeZone] = useState(settings.timeZone)
   const queryClient = useQueryClient()
   const isPersonal =
     assignment.allocation_percent !== null && assignment.allocation_percent !== undefined
@@ -64,12 +62,8 @@ export function ConflictResolutionActions({
     assignment.end_date ? toIsoDate(assignment.end_date) : null,
   )
 
-  const [startAtValue, setStartAtValue] = useState<DateFormValue>(
-    assignment.start_at ? toIsoDateTime(assignment.start_at) : null,
-  )
-  const [endAtValue, setEndAtValue] = useState<DateFormValue>(
-    assignment.end_at ? toIsoDateTime(assignment.end_at) : null,
-  )
+  const [startAtValue, setStartAtValue] = useState<DateFormValue>(assignment.start_at ?? null)
+  const [endAtValue, setEndAtValue] = useState<DateFormValue>(assignment.end_at ?? null)
 
   const [swapResourceId, setSwapResourceId] = useState<string | null>(null)
 
@@ -170,13 +164,16 @@ export function ConflictResolutionActions({
 
   const handleMoveTimestamps = () => {
     if (!startAtValue || !endAtValue) return invalid(t('conflicts.startEndTimestampRequired'))
-    if (compareDateTimes(endAtValue, startAtValue) <= 0) {
+    const startAt = localDateTimeToUtc(startAtValue, bookingTimeZone)
+    const endAt = localDateTimeToUtc(endAtValue, bookingTimeZone)
+    if (!startAt || !endAt) return invalid(t('assignmentForm.validation.ambiguousTime'))
+    if (Date.parse(endAt) <= Date.parse(startAt)) {
       return invalid(t('conflicts.endBeforeStartTimestamp'))
     }
     resolveMutation.mutate({
       patch: {
-        start_at: toIsoDateTime(startAtValue),
-        end_at: toIsoDateTime(endAtValue),
+        start_at: startAt,
+        end_at: endAt,
       },
       success: t('conflicts.periodMoved'),
       failure: t('conflicts.periodMoveFailed'),
@@ -354,13 +351,15 @@ export function ConflictResolutionActions({
             <Text size="xs" c="dimmed">
               {t('conflicts.newPeriodMinutes')}
             </Text>
-            <DateTimeField
+            <ZonedDateTimeField
+              timeZone={bookingTimeZone}
               label={t('common.start')}
               value={startAtValue}
               onChange={setStartAtValue}
               size="xs"
             />
-            <DateTimeField
+            <ZonedDateTimeField
+              timeZone={bookingTimeZone}
               label={t('common.end')}
               value={endAtValue}
               onChange={setEndAtValue}

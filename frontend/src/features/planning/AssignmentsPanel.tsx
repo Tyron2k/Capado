@@ -36,34 +36,36 @@ import {
   updateAssignment,
   deleteAssignment,
 } from '../../api/assignments'
-import { useTranslation } from '../../i18n'
+import { useTranslation, type Locale } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentForm, type AssignmentFormValues } from './AssignmentForm'
 import { formatDate, formatDateTime } from '../../utils/date'
+import { useSettings } from '../../context/SettingsContext'
 import { formatWarning, groupByProjectAndWorkPackage, toAssignmentPayload } from './assignmentUtils'
 
-function formatAssignmentStart(assignment: Assignment): string {
+function formatAssignmentStart(assignment: Assignment, locale: Locale, timeZone: string): string {
   if (assignment.resource_type === 'personal' && assignment.start_date) {
     return formatDate(assignment.start_date)
   }
   if (assignment.start_at) {
-    return formatDateTime(assignment.start_at)
+    return formatDateTime(assignment.start_at, locale, timeZone)
   }
   return '—'
 }
 
-function formatAssignmentEnd(assignment: Assignment): string {
+function formatAssignmentEnd(assignment: Assignment, locale: Locale, timeZone: string): string {
   if (assignment.resource_type === 'personal' && assignment.end_date) {
     return formatDate(assignment.end_date)
   }
   if (assignment.end_at) {
-    return formatDateTime(assignment.end_at)
+    return formatDateTime(assignment.end_at, locale, timeZone)
   }
   return '—'
 }
 
 export function AssignmentsPanel() {
   const { t } = useTranslation()
+  const { settings } = useSettings()
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null)
@@ -190,7 +192,7 @@ export function AssignmentsPanel() {
 
   const handleSubmit = (values: AssignmentFormValues) => {
     setWarnings([])
-    saveMutation.mutate(toAssignmentPayload(values))
+    saveMutation.mutate(toAssignmentPayload(values, settings.timeZone))
   }
 
   // Filter assignments based on search, type filter, and project filter
@@ -347,8 +349,12 @@ export function AssignmentsPanel() {
                               )}
                             </Group>
                           </Table.Td>
-                          <Table.Td>{formatAssignmentStart(assignment)}</Table.Td>
-                          <Table.Td>{formatAssignmentEnd(assignment)}</Table.Td>
+                          <Table.Td>
+                            {formatAssignmentStart(assignment, settings.locale, settings.timeZone)}
+                          </Table.Td>
+                          <Table.Td>
+                            {formatAssignmentEnd(assignment, settings.locale, settings.timeZone)}
+                          </Table.Td>
                           <Table.Td>{formatAssignmentSize(assignment)}</Table.Td>
                           <Table.Td>
                             <Group gap="xs">

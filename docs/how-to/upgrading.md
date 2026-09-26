@@ -38,6 +38,32 @@ This tells you how many migrations will run, and it is the number to quote if yo
 down before starting — after the upgrade it is gone, and reconstructing it from the schema is
 guesswork.
 
+For the UTC migration (revision `002`), pre-existing infrastructure booking times
+are interpreted as `Europe/Berlin` local clock readings. If an installation used
+a different local zone, set `CAPADO_LEGACY_BOOKING_TIME_ZONE` on the backend
+*before its first start with the new image*. The migration refuses bookings in
+the skipped or repeated hour of a daylight-saving change and lists their IDs;
+resolve those timestamps deliberately before retrying. Existing technical
+timestamps, such as audit and creation times, are interpreted as UTC.
+
+The same conversion applies to known timestamp fields in baseline snapshots
+and audit `from`/`to` values. It changes their representation, not the recorded
+plan or decision; date-only fields remain unchanged. Ambiguous historical values
+also stop the upgrade, identifying the table and row. Resolve these from reliable
+source records (historical JSON can carry an explicit offset), never guess which
+occurrence was intended. All changes run in one PostgreSQL transaction: any error
+rolls back both schema and data, including previously converted history.
+
+The legacy-source override controls interpretation of old values only, not future
+planning rules. Those continue to use `Europe/Berlin`; the global setting controls
+display/input. Test the upgrade on a restored backup before deploying.
+
+Regression tests run migrations against real PostgreSQL with a non-UTC session
+zone, baseline comparisons, audit history, and rollback cases. Locally, set
+`TEST_POSTGRES_URL` to a **test server** with CREATE DATABASE permission and run
+`uv run pytest tests/test_utc_migration_postgres.py`. Each test creates and drops
+its own disposable database; the supplied database is not migrated.
+
 ## 3. Get the new images
 
 A published release builds and pushes both images automatically, tagged with the full version plus the
@@ -130,7 +156,10 @@ docker compose -f docker-compose.prod.yml logs backend | grep -i alembic
 
 ## 6. Rolling back
 
-`alembic downgrade <revision>` runs and is tested, but it is not a time machine:
+Migration `002` intentionally cannot be downgraded: once booking instants and
+their configured display zone have changed, converting back would lose their
+meaning. Restore the pre-upgrade database dump and previous images instead.
+Other migrations may also be lossy:
 
 - deleted absence causes do not come back (see step 1)
 - audit entries and baselines deleted by a pruning run do not come back

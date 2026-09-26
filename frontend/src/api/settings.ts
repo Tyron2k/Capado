@@ -13,6 +13,8 @@ export interface TenantSettings {
   company_subtitle: string
   logo_url: string
   primary_color: string
+  /** IANA zone used to display and enter infrastructure booking times. */
+  time_zone: string
   has_uploaded_logo: boolean
   /**
    * Months of audit history to keep. 0 keeps everything.

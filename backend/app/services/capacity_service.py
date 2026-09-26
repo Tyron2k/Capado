@@ -17,7 +17,7 @@ in-memory rather than issuing per-day database queries.
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,7 @@ from sqlmodel import select
 
 from app.models.assignment import Assignment
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.services.time_zone import local_day_bounds, planning_zone
 from app.services.working_time_service import (
     NORMATIVE_DAY_MINUTES,
     WorkingTimeService,
@@ -157,8 +158,7 @@ class CapacityService:
         no demand on a non-working day — is applied by the callers below, not
         here, so this stays a pure function over its arguments.
         """
-        day_start = datetime.combine(day, time.min)
-        day_end = datetime.combine(day + timedelta(days=1), time.min)
+        day_start, day_end = local_day_bounds(day, planning_zone())
 
         total = 0.0
         for a in assignments:

@@ -16,6 +16,7 @@ from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.services.import_export import import_assignments
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -192,8 +193,12 @@ class TestImport5ColInfra:
         added = session.add.call_args_list[-1][0][0]
         assert isinstance(added, Assignment)
         assert added.resource_type == "infrastructure"
-        assert added.start_at == datetime(2026, 7, 12, 6, 0, 0)
-        assert added.end_at == datetime(2026, 7, 15, 18, 0, 0)
+        assert added.start_at == local_wall_time_to_utc(
+            datetime(2026, 7, 12, 6), planning_zone()
+        )
+        assert added.end_at == local_wall_time_to_utc(
+            datetime(2026, 7, 15, 18), planning_zone()
+        )
         assert added.start_date is None
         assert added.allocation_percent is None
 

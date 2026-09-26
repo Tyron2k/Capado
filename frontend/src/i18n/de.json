@@ -79,6 +79,9 @@
   "settings": {
     "title": "Einstellungen",
     "branding": "Firmen-Branding",
+    "timeSettings": "Zeit und Planung",
+    "timeZone": "Zeitzone",
+    "timeZoneDesc": "Globale Zeitzone für die Anzeige und Eingabe von Infrastruktur-Buchungen. Gespeichert wird in UTC.",
     "companyName": "Firmenname",
     "companyNameDesc": "Wird im Header der Anwendung angezeigt.",
     "subtitle": "Untertitel",
@@ -728,6 +731,7 @@
     "occupiedFromPlaceholder": "Datum und Uhrzeit wählen",
     "occupiedUntil": "Belegt bis",
     "occupiedUntilPlaceholder": "Datum und Uhrzeit wählen",
+    "repeatedTime": "Diese Uhrzeit kommt zweimal vor – UTC-Offset wählen",
     "validation": {
       "resourceRequired": "Ressource ist erforderlich",
       "workPackageRequired": "Arbeitspaket ist erforderlich",
@@ -735,6 +739,7 @@
       "endDateRequired": "Enddatum ist erforderlich",
       "endDateAfterStart": "Enddatum muss nach dem Startdatum liegen",
       "startTimeRequired": "Startzeit ist erforderlich",
+      "ambiguousTime": "Diese Uhrzeit ist durch die Zeitumstellung nicht eindeutig oder existiert nicht.",
       "endTimeRequired": "Endzeit ist erforderlich",
       "endTimeAfterStart": "Endzeit muss nach der Startzeit liegen",
       "allocationMin": "Auslastung muss mindestens 1% betragen",

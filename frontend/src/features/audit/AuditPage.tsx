@@ -43,6 +43,8 @@ import {
 import { getTenantSettings } from '../../api/settings'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
+import { useSettings } from '../../context/SettingsContext'
+import { formatDateTime } from '../../utils/date'
 
 /** Fixed page size. Not user-configurable: a larger page is a disclosure decision. */
 const PAGE_SIZE = 50
@@ -72,6 +74,7 @@ function formatChange(value: unknown): string {
 
 export function AuditPage() {
   const { t } = useTranslation()
+  const { settings } = useSettings()
   const [offset, setOffset] = useState(0)
   const [entityType, setEntityType] = useState('')
   const [action, setAction] = useState<AuditAction | null>(null)
@@ -224,7 +227,9 @@ export function AuditPage() {
           {entries.map((entry) => (
             <Table.Tr key={entry.id}>
               <Table.Td>
-                <Text size="sm">{new Date(entry.recorded_at).toLocaleString()}</Text>
+                <Text size="sm">
+                  {formatDateTime(entry.recorded_at, settings.locale, settings.timeZone, true)}
+                </Text>
               </Table.Td>
               <Table.Td>
                 <Stack gap={0}>

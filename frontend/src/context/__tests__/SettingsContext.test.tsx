@@ -25,6 +25,7 @@ vi.mock('../../api/settings', () => ({
     company_subtitle: 'Capacity Planning',
     logo_url: '',
     primary_color: '#1a73e8',
+    time_zone: 'America/New_York',
     has_uploaded_logo: false,
     audit_retention_months: 24,
     planning_freeze_before: null,
@@ -95,6 +96,7 @@ describe('SettingsContext', () => {
     })
     expect(result.current.settings.primaryColor).toBe('#1a73e8')
     expect(result.current.settings.companySubtitle).toBe('Capacity Planning')
+    expect(result.current.settings.timeZone).toBe('America/New_York')
   })
 
   it('sets hasUploadedLogo from backend response', async () => {
@@ -104,6 +106,7 @@ describe('SettingsContext', () => {
       company_subtitle: '',
       logo_url: '',
       primary_color: 'blue',
+      time_zone: 'Europe/Berlin',
       has_uploaded_logo: true,
       audit_retention_months: 24,
       planning_freeze_before: null,

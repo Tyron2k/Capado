@@ -45,7 +45,7 @@ HEADER = ("Name", "Group", "Skill", "Attribute", "Site")
 
 
 def _now() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 async def _count(session: AsyncSession, model, **filters) -> int:

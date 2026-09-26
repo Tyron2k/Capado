@@ -40,8 +40,15 @@ deliberately — an unbounded query over the change log would be an analysis too
 Every list endpoint has a total ordering. That is not cosmetic: paginating without one lets Postgres
 return the same row on two pages and skip another, so a client walking pages could miss records.
 
-**Dates** are ISO `YYYY-MM-DD`, timestamps ISO 8601. No other format is accepted or returned; see
+**Dates** are ISO `YYYY-MM-DD`; assignment timestamps require an ISO 8601 UTC
+offset (`Z` or `+HH:MM`) and are returned as UTC instants. A local timestamp
+without an offset is rejected, including in assignment previews. See
 [date handling](date-handling.md) for the reasoning and the traps.
+
+Infrastructure conflict suggestions that move bookings include both `new_start_at`
+and `new_end_at` as concrete UTC instants. Apply those exact values; `shift_days`
+is descriptive for infrastructure, not an instruction for client-side arithmetic.
+Personal assignments remain calendar dates and use `shift_days` as before.
 
 **Authentication** is a bearer access token in `Authorization`. The refresh token is an httpOnly
 cookie rather than a response field ([ADR-002](../decisions/002-refresh-token-cookie.md)), so a
@@ -155,7 +162,7 @@ so "not working" and "nothing planned" stay distinguishable.
 
 ### Settings are server-side; two things are not
 
-Branding, retention, the planning freeze, the maintenance hour, SMTP and the digest thresholds live in
+Branding, the display time zone, retention, the planning freeze, the maintenance hour, SMTP and the digest thresholds live in
 `organization_settings` and are organisation-wide. **Colour scheme and language are not there** — those
 are browser-local preferences, set from the header, and no administrator can set them for somebody else.
 

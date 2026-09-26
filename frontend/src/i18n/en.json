@@ -79,6 +79,9 @@
   "settings": {
     "title": "Settings",
     "branding": "Company Branding",
+    "timeSettings": "Time and planning",
+    "timeZone": "Time zone",
+    "timeZoneDesc": "Global time zone for displaying and entering infrastructure bookings. Stored in UTC.",
     "companyName": "Company Name",
     "companyNameDesc": "Displayed in the application header.",
     "subtitle": "Subtitle",
@@ -728,6 +731,7 @@
     "occupiedFromPlaceholder": "Select date and time",
     "occupiedUntil": "Occupied Until",
     "occupiedUntilPlaceholder": "Select date and time",
+    "repeatedTime": "This time occurs twice — choose a UTC offset",
     "validation": {
       "resourceRequired": "Resource is required",
       "workPackageRequired": "Work package is required",
@@ -735,6 +739,7 @@
       "endDateRequired": "End date is required",
       "endDateAfterStart": "End date must be after start date",
       "startTimeRequired": "Start time is required",
+      "ambiguousTime": "This local time is ambiguous or does not exist because of a daylight saving transition.",
       "endTimeRequired": "End time is required",
       "endTimeAfterStart": "End time must be after start time",
       "allocationMin": "Allocation must be at least 1%",

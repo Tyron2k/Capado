@@ -14,6 +14,7 @@ from app.models.resource import InfrastructureResource, PersonalResource, Resour
 from app.models.resource_group import ResourceGroup
 from app.schemas.assignment import AssignmentPreviewRequest
 from app.services.assignment_preview import AssignmentPreviewService
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 
 
 @pytest.mark.asyncio
@@ -106,15 +107,15 @@ async def test_infrastructure_preview_reassigns_without_writing(
         resource_id=old.id,
         resource_type=ResourceType.infrastructure,
         work_package_id=wp.id,
-        start_at=datetime(2026, 6, 1, 8),
-        end_at=datetime(2026, 6, 1, 10),
+        start_at=local_wall_time_to_utc(datetime(2026, 6, 1, 8), planning_zone()),
+        end_at=local_wall_time_to_utc(datetime(2026, 6, 1, 10), planning_zone()),
     )
     occupied = Assignment(
         resource_id=new.id,
         resource_type=ResourceType.infrastructure,
         work_package_id=occupied_wp.id,
-        start_at=datetime(2026, 6, 1, 9),
-        end_at=datetime(2026, 6, 1, 11),
+        start_at=local_wall_time_to_utc(datetime(2026, 6, 1, 9), planning_zone()),
+        end_at=local_wall_time_to_utc(datetime(2026, 6, 1, 11), planning_zone()),
     )
     db_session.add_all([group, project])
     await db_session.flush()

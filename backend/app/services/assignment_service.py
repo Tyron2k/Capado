@@ -24,11 +24,12 @@ from app.models.assignment import Assignment
 from app.models.project import WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.services.capacity_service import CapacityService
+from app.services.time_zone import local_day_bounds, planning_zone
 
 
 def _utcnow() -> datetime:
-    """Return current UTC time without timezone info (for DB storage)."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    """Return current timezone-aware UTC time."""
+    return datetime.now(UTC)
 
 
 def _validate_personal_fields(
@@ -278,8 +279,7 @@ class AssignmentService:
             Tuple of (paginated list of assignments, total count).
 
         """
-        from sqlalchemy import Date as SADate
-        from sqlalchemy import cast, func, or_
+        from sqlalchemy import func, or_
 
         statement = select(Assignment)
 
@@ -290,21 +290,23 @@ class AssignmentService:
 
         # Push date filters into SQL for both assignment shapes
         if start_date is not None:
+            day_start, _ = local_day_bounds(start_date, planning_zone())
             statement = statement.where(
                 or_(
                     # Personal shape: end_date >= filter start
                     Assignment.end_date >= start_date,
-                    # Infrastructure shape: end_at date >= filter start
-                    cast(Assignment.end_at, SADate) >= start_date,
+                    # Infrastructure shape: interval reaches this local day
+                    Assignment.end_at > day_start,
                 )
             )
         if end_date is not None:
+            _, next_day = local_day_bounds(end_date, planning_zone())
             statement = statement.where(
                 or_(
                     # Personal shape: start_date <= filter end
                     Assignment.start_date <= end_date,
-                    # Infrastructure shape: start_at date <= filter end
-                    cast(Assignment.start_at, SADate) <= end_date,
+                    # Infrastructure shape: interval starts before next local day
+                    Assignment.start_at < next_day,
                 )
             )
 

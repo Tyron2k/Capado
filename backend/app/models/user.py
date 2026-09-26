@@ -12,8 +12,8 @@ from app.utils.pg_types import UUIDArray
 
 
 def _utcnow() -> datetime:
-    """UTC timestamp as naive datetime (for TIMESTAMP WITHOUT TIME ZONE)."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    """Current timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class UserRole(StrEnum):

@@ -17,6 +17,7 @@ import {
   Image,
   Paper,
   NumberInput,
+  Select,
   Stack,
   Switch,
   Text,
@@ -50,6 +51,16 @@ export function SettingsPage() {
   const [companySubtitle, setCompanySubtitle] = useState(settings.companySubtitle)
   const [logoUrl, setLogoUrl] = useState(settings.logoUrl)
   const [primaryColor, setPrimaryColor] = useState(settings.primaryColor)
+  const [timeZone, setTimeZone] = useState(settings.timeZone)
+  const timeZoneOptions = Array.from(
+    new Set([
+      'UTC',
+      timeZone,
+      ...(typeof Intl.supportedValuesOf === 'function'
+        ? Intl.supportedValuesOf('timeZone')
+        : ['Europe/Berlin']),
+    ]),
+  ).sort()
   // Retention is not branding, so it does not come from the branding context (which
   // exists to feed the header and logo). It is read straight from the API instead.
   const [retentionMonths, setRetentionMonths] = useState<number | ''>(24)
@@ -84,6 +95,7 @@ export function SettingsPage() {
     const data = settingsQuery.data
     if (!data) return
     setRetentionMonths(data.audit_retention_months)
+    setTimeZone(data.time_zone)
     setBaselineRetentionMonths(data.baseline_retention_months)
     setFreezeBefore(data.planning_freeze_before)
     setSchedulerEnabled(data.scheduler_enabled)
@@ -167,6 +179,7 @@ export function SettingsPage() {
         company_subtitle: companySubtitle.trim(),
         logo_url: logoUrl.trim(),
         primary_color: primaryColor || 'blue',
+        time_zone: timeZone,
         audit_retention_months: typeof retentionMonths === 'number' ? retentionMonths : 24,
         baseline_retention_months:
           typeof baselineRetentionMonths === 'number' ? baselineRetentionMonths : 0,
@@ -317,6 +330,18 @@ export function SettingsPage() {
               onChange={(e) => setLogoUrl(e.currentTarget.value)}
             />
           </Stack>
+        </Paper>
+
+        <Paper withBorder p="md">
+          <SectionHeader title={t('settings.timeSettings')} />
+          <Select
+            label={t('settings.timeZone')}
+            description={t('settings.timeZoneDesc')}
+            data={timeZoneOptions}
+            searchable
+            value={timeZone}
+            onChange={(value) => value && setTimeZone(value)}
+          />
         </Paper>
 
         <Paper withBorder p="md">

@@ -81,9 +81,10 @@ for them, so a downgrade of a schema carrying night shifts loses them.
 - Callers ask `covered_spans` / `covered_minutes_within` rather than reading
   windows directly, because a wrapping window is not answerable from its own row
   alone — the previous day's rows matter too.
-- Time zones are deliberately out of scope: windows are local clock times and
-  the deployment is one company, so a single local timezone is assumed. A
-  multi-site operator spanning timezones would need this revisited.
+- Windows remain local clock rules in the single planning zone `Europe/Berlin`.
+  The UTC migration makes booking instants timezone-aware and adds a separate
+  global display/input zone; changing that setting does not change these rules.
+  Per-site planning zones remain out of scope. See [date handling](../reference/date-handling.md).
 - Suggestions gain a `shift_into_window` strategy. Until it exists, a window
   violation is reported without an automatic fix. **It exists now — see
   [Resolved since](#resolved-since).**

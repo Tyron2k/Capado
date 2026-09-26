@@ -44,6 +44,8 @@ import {
 import { usePermissions } from '../../hooks/usePermissions'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
+import { useSettings } from '../../context/SettingsContext'
+import { formatDateTime } from '../../utils/date'
 
 /** Render one field's before/after pair compactly. */
 function formatChange(change: { before?: unknown; after?: unknown }): string {
@@ -100,6 +102,7 @@ function DiffSection({
 
 export function BaselinesPage() {
   const { t } = useTranslation()
+  const { settings } = useSettings()
   const { isAdmin } = usePermissions()
   const queryClient = useQueryClient()
   const [diffFor, setDiffFor] = useState<Baseline | null>(null)
@@ -247,7 +250,9 @@ export function BaselinesPage() {
                 </Group>
               </Table.Td>
               <Table.Td>
-                <Text size="sm">{new Date(baseline.created_at).toLocaleString()}</Text>
+                <Text size="sm">
+                  {formatDateTime(baseline.created_at, settings.locale, settings.timeZone, true)}
+                </Text>
               </Table.Td>
               <Table.Td>
                 <Text size="sm" c={baseline.note ? undefined : 'dimmed'}>

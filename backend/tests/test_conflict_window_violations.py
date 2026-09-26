@@ -19,6 +19,7 @@ from app.models.calendar import InfrastructureAvailabilityWindow
 from app.models.conflict import ConflictCause
 from app.models.resource import ResourceType
 from app.services.conflict_service import ConflictService
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 from app.services.working_time_service import WorkingTimeService
 
 # 2026-06-01 is a Monday, 2026-06-06 a Saturday.
@@ -57,8 +58,8 @@ def _booking(
         resource_id=RESOURCE_ID,
         resource_type=ResourceType.infrastructure,
         work_package_id=uuid4(),
-        start_at=start,
-        end_at=end,
+        start_at=local_wall_time_to_utc(start, planning_zone()),
+        end_at=local_wall_time_to_utc(end, planning_zone()),
     )
 
 
@@ -84,6 +85,30 @@ class TestUnrestrictedByDefault:
             [booking], RESOURCE_ID, _working_time()
         )
         assert periods == []
+
+
+class TestDaylightSavingWindows:
+    """Recurring wall-clock windows remain meaningful on 23/25-hour days."""
+
+    def test_spring_gap_does_not_invent_booked_minutes(self):
+        booking = _booking(datetime(2026, 3, 29, 1, 30), datetime(2026, 3, 29, 3, 30))
+        windows = [_window(6, (1, 0), (4, 0))]
+        assert (
+            _service()._detect_window_violations(
+                [booking], RESOURCE_ID, _working_time(windows)
+            )
+            == []
+        )
+
+    def test_autumn_repeated_hour_is_covered_twice(self):
+        booking = _booking(datetime(2026, 10, 25, 1, 30), datetime(2026, 10, 25, 3, 30))
+        windows = [_window(6, (1, 0), (4, 0))]
+        assert (
+            _service()._detect_window_violations(
+                [booking], RESOURCE_ID, _working_time(windows)
+            )
+            == []
+        )
 
 
 class TestWithinWindows:

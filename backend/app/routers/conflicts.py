@@ -72,7 +72,7 @@ async def get_conflict_check_status(
         (await session.execute(select(OrganizationSettings).limit(1))).scalars().first()
     )
     last_checked = success.finished_at if success else None
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     # Allow one polling cycle of scheduling jitter; a crashed running row must
     # eventually show as overdue rather than claiming a check is still healthy.
     stale = last_checked is None or now - last_checked > timedelta(
@@ -123,6 +123,7 @@ async def get_conflict_suggestions(
             target_resource_id=s.target_resource_id,
             target_resource_name=s.target_resource_name,
             new_start_at=s.new_start_at,
+            new_end_at=s.new_end_at,
         )
         for s in suggestions
     ]

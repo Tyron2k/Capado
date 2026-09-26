@@ -304,7 +304,7 @@ def _clear_password_change_flag(session: AsyncSession, user: User) -> None:
     """
     if user.must_change_password:
         user.must_change_password = False
-        user.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        user.updated_at = datetime.now(UTC)
         session.add(user)
 
 
@@ -365,7 +365,7 @@ async def _find_or_create_user(
     if user:
         # Link the OIDC subject to the existing account
         user.external_id = userinfo.sub
-        user.updated_at = datetime.now(UTC).replace(tzinfo=None)
+        user.updated_at = datetime.now(UTC)
         # Clear any pending forced password change: the account is now
         # authenticated via SSO, so the local password-change flow (which
         # requires the old password) neither applies nor is reachable.

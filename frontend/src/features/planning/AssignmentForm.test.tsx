@@ -23,7 +23,7 @@ import { createTestQueryClient } from '../../testUtils/queryClient'
 import { I18nProvider } from '../../i18n'
 import type { Assignment } from '../../types/assignment'
 import type { AssignmentFormValues } from './AssignmentForm'
-import { toIsoDateTime } from '../../utils/date'
+import { toAssignmentPayload } from './assignmentUtils'
 
 vi.mock('../../api/projects', () => ({ getProjects: vi.fn() }))
 vi.mock('../../api/workPackages', () => ({ getWorkPackages: vi.fn() }))
@@ -107,11 +107,12 @@ const infraAssignment: Assignment = {
   start_date: null,
   end_date: null,
   allocation_percent: null,
-  start_at: '2026-03-05T08:30:00',
-  end_at: '2026-03-05T16:45:00',
+  start_at: '2026-03-05T07:30:00Z',
+  end_at: '2026-03-05T15:45:00Z',
 }
 
 beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn()
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
@@ -281,15 +282,50 @@ describe('AssignmentForm — infrastructure timestamps', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
     const values = onSubmit.mock.calls[0][0]
     expect(values.resource_type).toBe('infrastructure')
-    // Mantine canonicalises to `YYYY-MM-DD HH:mm:ss`; either shape must convert
-    // to the same minute-precise payload.
-    expect(values.start_at).not.toBeNull()
-    expect(values.end_at).not.toBeNull()
-    expect(String(values.start_at)).toMatch(/^2026-03-05[T ]08:30/)
-    expect(String(values.end_at)).toMatch(/^2026-03-05[T ]16:45/)
-    // What the panel then sends to the API.
-    expect(toIsoDateTime(values.start_at as string)).toBe('2026-03-05T08:30')
-    expect(toIsoDateTime(values.end_at as string)).toBe('2026-03-05T16:45')
+    expect(toAssignmentPayload(values)).toMatchObject({
+      start_at: '2026-03-05T07:30:00.000Z',
+      end_at: '2026-03-05T15:45:00.000Z',
+    })
+  })
+
+  it('round-trips an existing fold interval and lets the user choose the other offset', async () => {
+    const { onSubmit } = renderForm({
+      ...infraAssignment,
+      start_at: '2026-10-25T00:30:00Z',
+      end_at: '2026-10-25T02:30:00Z',
+    })
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^Occupied From/)).toHaveTextContent('25.10.2026 02:30'),
+    )
+    submitForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(toAssignmentPayload(onSubmit.mock.calls[0][0])).toMatchObject({
+      start_at: '2026-10-25T00:30:00.000Z',
+    })
+    fireEvent.click(screen.getByRole('combobox', { name: /^This time occurs twice/ }))
+    fireEvent.click(await screen.findByRole('option', { name: 'UTC+01:00' }))
+    submitForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2))
+    expect(toAssignmentPayload(onSubmit.mock.calls[1][0])).toMatchObject({
+      start_at: '2026-10-25T01:30:00.000Z',
+    })
+  })
+
+  it('compares resolved instants rather than the clock readings during a fold', async () => {
+    const { onSubmit } = renderForm({
+      ...infraAssignment,
+      start_at: '2026-10-25T00:45:00Z',
+      end_at: '2026-10-25T01:15:00Z',
+    })
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^Occupied From/)).toHaveTextContent('25.10.2026 02:45'),
+    )
+    submitForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(toAssignmentPayload(onSubmit.mock.calls[0][0])).toMatchObject({
+      start_at: '2026-10-25T00:45:00.000Z',
+      end_at: '2026-10-25T01:15:00.000Z',
+    })
   })
 
   it('does not render the personal date fields', async () => {

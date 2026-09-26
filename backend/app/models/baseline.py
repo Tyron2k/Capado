@@ -25,8 +25,8 @@ BASELINE_ENTITY_TYPES: tuple[str, ...] = (
 
 
 def _utcnow() -> datetime:
-    """UTC timestamp as naive datetime (for TIMESTAMP WITHOUT TIME ZONE)."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    """Current timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class Baseline(SQLModel, table=True):
