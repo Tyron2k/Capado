@@ -18,6 +18,12 @@ from sqlmodel import select
 from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment, ConflictCause
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.services.time_zone import (
+    local_date,
+    local_time,
+    local_wall_time_to_utc,
+    planning_zone,
+)
 from app.services.working_time_service import (
     WorkingTimeService,
     minutes_to_percent,
@@ -41,11 +47,32 @@ class ResolutionSuggestion:
     target_resource_id: UUID | None = None
     target_resource_name: str | None = None
     new_start_at: datetime | None = None
-    """For shift_into_window: an explicit timestamp rather than an offset.
+    new_end_at: datetime | None = None
+    """Every infrastructure time shift carries the exact UTC interval to apply."""
 
-    A window violation is fixed by landing at a specific clock time, and "shift by
-    N minutes" would leave the caller to recompute whether the result actually fits.
+
+def _shift_booking(
+    assignment: Assignment, days: int
+) -> tuple[datetime, datetime] | None:
+    """Shift calendar days in the planning zone, never in a viewer's display zone.
+
+    Keep both local clock readings. If either target is missing or ambiguous,
+    do not offer a suggestion that would require guessing an offset.
     """
+    if assignment.start_at is None or assignment.end_at is None:
+        return None
+    zone = planning_zone()
+    try:
+        start, end = (
+            local_wall_time_to_utc(
+                local_time(value, zone).replace(tzinfo=None) + timedelta(days=days),
+                zone,
+            )
+            for value in (assignment.start_at, assignment.end_at)
+        )
+    except ValueError:
+        return None
+    return (start, end) if end > start else None
 
 
 class ConflictSuggestionService:
@@ -440,30 +467,41 @@ class ConflictSuggestionService:
         # 1. Shift forward past conflict
         if assignment.start_at and assignment.end_at:
             new_start = conflict.end_date + timedelta(days=1)
-            shift = (new_start - assignment.start_at.date()).days
-            if 0 < shift <= 30:
+            shift = (new_start - local_date(assignment.start_at, planning_zone())).days
+            target = _shift_booking(assignment, shift) if 0 < shift <= 30 else None
+            if target:
                 suggestions.append(
                     ResolutionSuggestion(
                         type="shift_forward",
                         assignment_id=assignment.id,
                         description=f"Shift '{wp_name}' {shift} days forward",
                         shift_days=shift,
+                        new_start_at=target[0],
+                        new_end_at=target[1],
                     )
                 )
 
         # 2. Shift backward before conflict
         if assignment.start_at and assignment.end_at:
             new_end_date = conflict.start_date - timedelta(days=1)
-            duration = (assignment.end_at.date() - assignment.start_at.date()).days
+            duration = (
+                local_date(assignment.end_at, planning_zone())
+                - local_date(assignment.start_at, planning_zone())
+            ).days
             new_start_date = new_end_date - timedelta(days=duration)
-            shift = (assignment.start_at.date() - new_start_date).days
-            if 0 < shift <= 30:
+            shift = (
+                local_date(assignment.start_at, planning_zone()) - new_start_date
+            ).days
+            target = _shift_booking(assignment, -shift) if 0 < shift <= 30 else None
+            if target:
                 suggestions.append(
                     ResolutionSuggestion(
                         type="shift_backward",
                         assignment_id=assignment.id,
                         description=f"Shift '{wp_name}' {shift} days backward",
                         shift_days=-shift,
+                        new_start_at=target[0],
+                        new_end_at=target[1],
                     )
                 )
 
@@ -490,16 +528,27 @@ class ConflictSuggestionService:
         if assignment.start_at is None or assignment.end_at is None:
             return []
 
+        zone = planning_zone()
+        local_start = local_time(assignment.start_at, zone)
+        local_end = local_time(assignment.end_at, zone)
+        # Across a DST offset change, a wall-clock shift can change elapsed
+        # duration. Do not offer a misleading one-span suggestion.
+        if local_start.utcoffset() != local_end.utcoffset():
+            return []
         working_time = await self._prepared_working_time(
             [assignment.resource_id],
-            assignment.start_at.date(),
-            assignment.end_at.date(),
+            local_start.date(),
+            local_end.date(),
         )
-        spans = working_time.covered_spans(
-            assignment.resource_id, assignment.start_at.date()
+        spans = working_time.covered_spans(assignment.resource_id, local_start.date())
+        new_local_start = shift_into_span(
+            local_start.replace(tzinfo=None), local_end.replace(tzinfo=None), spans
         )
-        new_start = shift_into_span(assignment.start_at, assignment.end_at, spans)
-        if new_start is None:
+        if new_local_start is None:
+            return []
+        try:
+            new_start = local_wall_time_to_utc(new_local_start, zone)
+        except ValueError:
             return []
 
         wp_name = await self._get_work_package_name(assignment.work_package_id)
@@ -508,10 +557,11 @@ class ConflictSuggestionService:
                 type="shift_into_window",
                 assignment_id=assignment.id,
                 description=(
-                    f"Move '{wp_name}' to {new_start.strftime('%H:%M')}, "
+                    f"Move '{wp_name}' to {new_local_start.strftime('%H:%M')}, "
                     "inside the operating hours"
                 ),
                 new_start_at=new_start,
+                new_end_at=new_start + (assignment.end_at - assignment.start_at),
             )
         ]
 

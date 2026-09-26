@@ -67,8 +67,8 @@ const infraAssignment: ConflictAssignmentInfo = {
   start_date: null,
   end_date: null,
   allocation_percent: null,
-  start_at: '2026-03-05T08:30:00',
-  end_at: '2026-03-05T16:45:00',
+  start_at: '2026-03-05T07:30:00Z',
+  end_at: '2026-03-05T15:45:00Z',
 }
 
 beforeAll(() => {
@@ -206,9 +206,34 @@ describe('ConflictResolutionActions — move time range (infrastructure)', () =>
 
     await waitFor(() => expect(mockedUpdateAssignment).toHaveBeenCalledTimes(1))
     expect(mockedUpdateAssignment).toHaveBeenCalledWith('assignment-2', {
-      start_at: '2026-03-05T08:30',
-      end_at: '2026-03-05T16:45',
+      start_at: '2026-03-05T07:30:00.000Z',
+      end_at: '2026-03-05T15:45:00.000Z',
     })
+  })
+})
+
+describe('ConflictResolutionActions — autumn fold', () => {
+  it('saves an unchanged interval whose local end precedes its local start', async () => {
+    vi.clearAllMocks()
+    mockedUpdateAssignment.mockResolvedValue({
+      assignment: { id: 'assignment-2' } as never,
+      warnings: [],
+    })
+    renderActions({
+      ...infraAssignment,
+      start_at: '2026-10-25T00:45:00Z',
+      end_at: '2026-10-25T01:15:00Z',
+    })
+    await openAction(/Move Time Range/i)
+    expect(screen.getByLabelText('Start')).toHaveTextContent('25.10.2026 02:45')
+    expect(screen.getByLabelText('End')).toHaveTextContent('25.10.2026 02:15')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(mockedUpdateAssignment).toHaveBeenCalledWith('assignment-2', {
+        start_at: '2026-10-25T00:45:00.000Z',
+        end_at: '2026-10-25T01:15:00.000Z',
+      }),
+    )
   })
 })
 

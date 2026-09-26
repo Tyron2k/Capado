@@ -28,7 +28,7 @@ class ProjectPriority(StrEnum):
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 if TYPE_CHECKING:

@@ -1,8 +1,9 @@
 """Pydantic request/response schemas for tenant settings."""
 
 from datetime import date
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class OrganizationSettingsResponse(BaseModel):
@@ -16,6 +17,7 @@ class OrganizationSettingsResponse(BaseModel):
     company_subtitle: str
     logo_url: str
     primary_color: str
+    time_zone: str
     has_uploaded_logo: bool
     # Exposed on read so an admin can see the current period without guessing, and
     # so the value is visible to anyone auditing the deployment.
@@ -54,6 +56,20 @@ class OrganizationSettingsUpdate(BaseModel):
     company_subtitle: str | None = Field(default=None, max_length=255)
     logo_url: str | None = Field(default=None, max_length=1024)
     primary_color: str | None = Field(default=None, max_length=50)
+    time_zone: str | None = Field(default=None, max_length=64)
+
+    @field_validator("time_zone")
+    @classmethod
+    def _validate_time_zone(cls, value: str | None) -> str | None:
+        if value is not None:
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, ValueError) as exc:
+                raise ValueError(
+                    "Use a valid IANA time zone, e.g. Europe/Berlin"
+                ) from exc
+        return value
+
     # 0 disables pruning entirely. Kept as an explicit value rather than null so
     # that "keep forever" is something an admin chooses, not something that happens
     # by omission.

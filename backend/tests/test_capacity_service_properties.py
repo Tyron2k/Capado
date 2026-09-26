@@ -24,6 +24,7 @@ from app.services.capacity_service import (
     CapacityService,
     get_utilization_color,
 )
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 
 _DAY = date(2026, 6, 15)
 
@@ -50,8 +51,8 @@ def _infra(start_at: datetime, end_at: datetime) -> SimpleNamespace:
         start_date=None,
         end_date=None,
         allocation_percent=None,
-        start_at=start_at,
-        end_at=end_at,
+        start_at=local_wall_time_to_utc(start_at, planning_zone()),
+        end_at=local_wall_time_to_utc(end_at, planning_zone()),
     )
 
 

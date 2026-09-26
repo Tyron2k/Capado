@@ -135,7 +135,7 @@ async def _record_end(
 ) -> None:
     """Close out the run row."""
     run.status = status
-    run.finished_at = datetime.now(UTC).replace(tzinfo=None)
+    run.finished_at = datetime.now(UTC)
     run.items_affected = items
     # Truncated to the column width: a repeating failure must not grow the table, and a stack
     # trace belongs in the process log.
@@ -267,7 +267,7 @@ async def run_due_jobs(
 
     Each job is independent: one raising is recorded as a failure and the rest still run.
     """
-    moment = now or datetime.now(UTC).replace(tzinfo=None)
+    moment = now or datetime.now(UTC)
     settings = (
         (await session.execute(select(OrganizationSettings).limit(1))).scalars().first()
     )

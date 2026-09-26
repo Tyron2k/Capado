@@ -40,6 +40,7 @@ from app.services.conflict_suggestion_service import (
     ResolutionSuggestion,
     _min_headroom_percent,
 )
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 from app.services.working_time_service import (
     NORMATIVE_DAY_MINUTES,
     WorkingTimeService,
@@ -142,8 +143,10 @@ def _infra_assignment(
         resource_id=resource_id,
         resource_type=ResourceType.infrastructure,
         work_package_id=wp_id or uuid4(),
-        start_at=start or datetime(2026, 6, 1, 8, 0),
-        end_at=end or datetime(2026, 6, 5, 17, 0),
+        start_at=local_wall_time_to_utc(
+            start or datetime(2026, 6, 1, 8), planning_zone()
+        ),
+        end_at=local_wall_time_to_utc(end or datetime(2026, 6, 5, 17), planning_zone()),
     )
 
 

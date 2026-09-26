@@ -28,6 +28,7 @@ from app.models.resource import (
     ResourceType,
 )
 from app.services.conflict_service import ConflictService
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 from app.services.working_time_service import (
     NORMATIVE_DAY_MINUTES,
     WorkingTimeService,
@@ -419,16 +420,16 @@ class TestCauseDiscriminator:
             resource_id=infra_id,
             resource_type=ResourceType.infrastructure,
             work_package_id=uuid4(),
-            start_at=datetime(2026, 6, 1, 8, 0),
-            end_at=datetime(2026, 6, 1, 16, 0),
+            start_at=local_wall_time_to_utc(datetime(2026, 6, 1, 8), planning_zone()),
+            end_at=local_wall_time_to_utc(datetime(2026, 6, 1, 16), planning_zone()),
         )
         a2 = Assignment(
             id=uuid4(),
             resource_id=infra_id,
             resource_type=ResourceType.infrastructure,
             work_package_id=uuid4(),
-            start_at=datetime(2026, 6, 1, 8, 0),
-            end_at=datetime(2026, 6, 1, 16, 0),
+            start_at=local_wall_time_to_utc(datetime(2026, 6, 1, 8), planning_zone()),
+            end_at=local_wall_time_to_utc(datetime(2026, 6, 1, 16), planning_zone()),
         )
         wt = WorkingTimeService.from_data(
             default_profile=_full_time_profile(),

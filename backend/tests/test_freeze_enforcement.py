@@ -27,6 +27,7 @@ from app.models.organization_settings import OrganizationSettings
 from app.models.user import UserRole
 from app.services.freeze_enforcement import enforce_freeze, freeze_date, span_of
 from app.services.planning_freeze import Span
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 
 FREEZE = date(2026, 8, 1)
 
@@ -68,8 +69,8 @@ class TestSpanOf:
             resource_id=MagicMock(),
             resource_type=ResourceType.infrastructure,
             work_package_id=MagicMock(),
-            start_at=datetime(2026, 7, 1, 6, 0),
-            end_at=datetime(2026, 7, 10, 14, 0),
+            start_at=local_wall_time_to_utc(datetime(2026, 7, 1, 6), planning_zone()),
+            end_at=local_wall_time_to_utc(datetime(2026, 7, 10, 14), planning_zone()),
         )
         assert span_of(assignment) == Span(
             start=date(2026, 7, 1), end=date(2026, 7, 10)

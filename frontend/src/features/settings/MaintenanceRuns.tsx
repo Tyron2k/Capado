@@ -16,6 +16,8 @@ import { IconAlertTriangle } from '@tabler/icons-react'
 import { getMaintenanceRuns, type JobRunStatus } from '../../api/maintenance'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
+import { useSettings } from '../../context/SettingsContext'
+import { formatDateTime } from '../../utils/date'
 
 const STATUS_COLOR: Record<JobRunStatus, string> = {
   succeeded: 'green',
@@ -26,12 +28,9 @@ const STATUS_COLOR: Record<JobRunStatus, string> = {
   skipped: 'gray',
 }
 
-function formatMoment(iso: string): string {
-  return new Date(iso).toLocaleString()
-}
-
 export function MaintenanceRuns() {
   const { t } = useTranslation()
+  const { settings } = useSettings()
 
   const runsQuery = useQuery({
     queryKey: queryKeys.maintenance.runs(10),
@@ -81,7 +80,9 @@ export function MaintenanceRuns() {
                 <Text size="xs">{run.job_name}</Text>
               </Table.Td>
               <Table.Td>
-                <Text size="xs">{formatMoment(run.started_at)}</Text>
+                <Text size="xs">
+                  {formatDateTime(run.started_at, settings.locale, settings.timeZone, true)}
+                </Text>
               </Table.Td>
               <Table.Td>
                 <Group gap={4} wrap="nowrap">

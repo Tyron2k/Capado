@@ -12,6 +12,7 @@ import { formatDate, formatDateTime } from '../../utils/date'
 import { useTranslation } from '../../i18n'
 import { usePermissions } from '../../hooks/usePermissions'
 import { ConflictResolutionActions } from './ConflictResolutionActions'
+import { useSettings } from '../../context/SettingsContext'
 
 interface Props {
   assignments: ConflictAssignmentInfo[]
@@ -21,6 +22,7 @@ interface Props {
 
 export function ConflictAssignmentList({ assignments, onChanged, focusedWorkPackageId }: Props) {
   const { t } = useTranslation()
+  const { settings } = useSettings()
   const navigate = useNavigate()
   const { canWrite } = usePermissions()
   const grouped = useMemo(() => {
@@ -96,7 +98,11 @@ export function ConflictAssignmentList({ assignments, onChanged, focusedWorkPack
                 }
                 const period =
                   a.start_at && a.end_at
-                    ? `${formatDateTime(a.start_at)} – ${formatDateTime(a.end_at)}`
+                    ? `${formatDateTime(a.start_at, settings.locale, settings.timeZone)} – ${formatDateTime(
+                        a.end_at,
+                        settings.locale,
+                        settings.timeZone,
+                      )}`
                     : `${formatDate(a.start_date)} – ${formatDate(a.end_date)}`
                 return (
                   <Table.Tr

@@ -177,7 +177,7 @@ async def update_customer(
         customer.note = data.note
     if data.is_active is not None:
         customer.is_active = data.is_active
-    customer.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    customer.updated_at = datetime.now(UTC)
 
     session.add(customer)
     try:

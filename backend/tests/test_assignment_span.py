@@ -17,6 +17,7 @@ from uuid import uuid4
 
 from app.models.assignment import Assignment
 from app.models.resource import ResourceType
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 from app.services.unmet_requirements_service import assignment_span
 
 
@@ -43,8 +44,8 @@ def _infrastructure(start: datetime, end: datetime) -> Assignment:
         resource_id=uuid4(),
         resource_type=ResourceType.infrastructure,
         work_package_id=uuid4(),
-        start_at=start,
-        end_at=end,
+        start_at=local_wall_time_to_utc(start, planning_zone()),
+        end_at=local_wall_time_to_utc(end, planning_zone()),
     )
 
 

@@ -13,7 +13,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Button, Group, NumberInput, SegmentedControl, Select, Stack } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { DateField, DateTimeField } from '../../components/DateField'
+import { DateField } from '../../components/DateField'
+import { ZonedDateTimeField } from '../../components/ZonedDateTimeField'
 import type { WorkPackage } from '../../types/workPackage'
 import type { Project } from '../../types/project'
 import type { Assignment, AssignmentPreview, ResourceType } from '../../types/assignment'
@@ -27,13 +28,8 @@ import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { showErrorNotification } from '../../utils/errorHandling'
 import { toAssignmentPayload } from './assignmentUtils'
-import {
-  compareDateTimes,
-  compareDates,
-  toIsoDate,
-  toIsoDateTime,
-  type DateFormValue,
-} from '../../utils/date'
+import { useSettings } from '../../context/SettingsContext'
+import { compareDates, localDateTimeToUtc, toIsoDate, type DateFormValue } from '../../utils/date'
 
 export interface AssignmentFormValues {
   resource_id: string
@@ -46,6 +42,7 @@ export interface AssignmentFormValues {
   // Infrastructure fields — `DateTimePicker` emits `YYYY-MM-DD HH:mm:ss` strings.
   start_at: DateFormValue
   end_at: DateFormValue
+  booking_time_zone?: string
 }
 
 interface AssignmentFormProps {
@@ -57,6 +54,9 @@ interface AssignmentFormProps {
 
 export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: AssignmentFormProps) {
   const { t } = useTranslation()
+  const { settings } = useSettings()
+  // Pin the draft's interpretation while open, even if global settings refresh.
+  const [bookingTimeZone] = useState(settings.timeZone)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [resourceType, setResourceType] = useState<ResourceType>('personal')
   const [preview, setPreview] = useState<{ signature: string; result: AssignmentPreview } | null>(
@@ -73,6 +73,7 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
       allocation_percent: 100,
       start_at: null,
       end_at: null,
+      booking_time_zone: bookingTimeZone,
     },
     validate: {
       resource_id: (value) => (value ? null : t('assignmentForm.validation.resourceRequired')),
@@ -100,12 +101,20 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
       start_at: (value, values) => {
         if (values.resource_type !== 'infrastructure') return null
         if (!value) return t('assignmentForm.validation.startTimeRequired')
+        if (!localDateTimeToUtc(value, bookingTimeZone)) {
+          return t('assignmentForm.validation.ambiguousTime')
+        }
         return null
       },
       end_at: (value, values) => {
         if (values.resource_type !== 'infrastructure') return null
         if (!value) return t('assignmentForm.validation.endTimeRequired')
-        if (values.start_at && compareDateTimes(value, values.start_at) <= 0) {
+        const end = localDateTimeToUtc(value, bookingTimeZone)
+        if (!end) {
+          return t('assignmentForm.validation.ambiguousTime')
+        }
+        const start = values.start_at && localDateTimeToUtc(values.start_at, bookingTimeZone)
+        if (start && Date.parse(end) <= Date.parse(start)) {
           return t('assignmentForm.validation.endTimeAfterStart')
         }
         return null
@@ -148,8 +157,8 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
         start_date: assignment.start_date ? toIsoDate(assignment.start_date) : null,
         end_date: assignment.end_date ? toIsoDate(assignment.end_date) : null,
         allocation_percent: assignment.allocation_percent ?? 100,
-        start_at: assignment.start_at ? toIsoDateTime(assignment.start_at) : null,
-        end_at: assignment.end_at ? toIsoDateTime(assignment.end_at) : null,
+        start_at: assignment.start_at ?? null,
+        end_at: assignment.end_at ?? null,
       })
       setResourceType(assignment.resource_type)
     }
@@ -214,7 +223,10 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
   const visiblePreview = preview?.signature === currentSignature ? preview.result : null
   const previewMutation = useMutation({
     mutationFn: (values: AssignmentFormValues) =>
-      previewAssignment({ ...toAssignmentPayload(values), assignment_id: assignment?.id }),
+      previewAssignment({
+        ...toAssignmentPayload(values, settings.timeZone),
+        assignment_id: assignment?.id,
+      }),
     onError: (error) =>
       showErrorNotification(error, t('common.error'), t('common.unexpectedError')),
   })
@@ -309,13 +321,15 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
           </>
         ) : (
           <>
-            <DateTimeField
+            <ZonedDateTimeField
+              timeZone={bookingTimeZone}
               label={t('assignmentForm.occupiedFrom')}
               placeholder={t('assignmentForm.occupiedFromPlaceholder')}
               required
               {...form.getInputProps('start_at')}
             />
-            <DateTimeField
+            <ZonedDateTimeField
+              timeZone={bookingTimeZone}
               label={t('assignmentForm.occupiedUntil')}
               placeholder={t('assignmentForm.occupiedUntilPlaceholder')}
               required

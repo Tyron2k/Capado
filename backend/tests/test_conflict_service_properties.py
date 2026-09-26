@@ -20,6 +20,7 @@ from hypothesis import strategies as st
 
 from app.models.resource import ResourceType
 from app.services.conflict_service import ConflictDay, ConflictService
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 
 _ORIGIN = date(2026, 1, 1)
 
@@ -162,7 +163,10 @@ class TestGrouping:
 
 def _dt(day_offset: int, hour: int) -> datetime:
     """Build a fake timestamp at a given day offset and hour."""
-    return datetime.combine(_ORIGIN + timedelta(days=day_offset), time(hour, 0))
+    return local_wall_time_to_utc(
+        datetime.combine(_ORIGIN + timedelta(days=day_offset), time(hour)),
+        planning_zone(),
+    )
 
 
 class TestInfrastructureSweep:

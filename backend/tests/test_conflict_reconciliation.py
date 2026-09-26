@@ -18,6 +18,11 @@ from app.services.conflict_refresh import refresh_resources
 from app.services.conflict_service import ConflictService
 from app.services.gantt_resource_service import GanttResourceService, _assignment_dates
 from app.services.import_export.assignments import import_assignments
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
+
+
+def _local(value: datetime) -> datetime:
+    return local_wall_time_to_utc(value, planning_zone())
 
 
 @pytest.fixture
@@ -111,7 +116,7 @@ async def test_failed_replacement_retains_previous_results(
 
     monkeypatch.setattr(service, "_save_conflict_periods", fail)
     # Force a changed result to exercise DELETE followed by failure.
-    assignment.start_at = datetime(2026, 8, 18, 6)
+    assignment.start_at = _local(datetime(2026, 8, 18, 6))
     db_session.add(assignment)
     await db_session.commit()
     with pytest.raises(RuntimeError):
@@ -140,8 +145,16 @@ async def test_import_reports_check_failure_without_claiming_import_failed(
 async def test_back_to_back_bookings_and_midnight_end(db_session, bookings):
     _, track, packages = bookings
     for package, start, end in [
-        (packages[0], datetime(2026, 8, 17, 6), datetime(2026, 8, 17, 12)),
-        (packages[1], datetime(2026, 8, 17, 12), datetime(2026, 8, 18, 0)),
+        (
+            packages[0],
+            _local(datetime(2026, 8, 17, 6)),
+            _local(datetime(2026, 8, 17, 12)),
+        ),
+        (
+            packages[1],
+            _local(datetime(2026, 8, 17, 12)),
+            _local(datetime(2026, 8, 18, 0)),
+        ),
     ]:
         a = Assignment(
             resource_id=track.id,
@@ -164,22 +177,22 @@ async def test_unrelated_booking_does_not_inherit_overlap(db_session, bookings):
         resource_id=track.id,
         resource_type="infrastructure",
         work_package_id=packages[0].id,
-        start_at=datetime(2026, 8, 17, 6),
-        end_at=datetime(2026, 8, 17, 10),
+        start_at=_local(datetime(2026, 8, 17, 6)),
+        end_at=_local(datetime(2026, 8, 17, 10)),
     )
     b = Assignment(
         resource_id=track.id,
         resource_type="infrastructure",
         work_package_id=packages[1].id,
-        start_at=datetime(2026, 8, 17, 8),
-        end_at=datetime(2026, 8, 17, 12),
+        start_at=_local(datetime(2026, 8, 17, 8)),
+        end_at=_local(datetime(2026, 8, 17, 12)),
     )
     c = Assignment(
         resource_id=track.id,
         resource_type="infrastructure",
         work_package_id=packages[0].id,
-        start_at=datetime(2026, 8, 17, 12),
-        end_at=datetime(2026, 8, 17, 14),
+        start_at=_local(datetime(2026, 8, 17, 12)),
+        end_at=_local(datetime(2026, 8, 17, 14)),
     )
     db_session.add_all([a, b, c])
     await db_session.commit()

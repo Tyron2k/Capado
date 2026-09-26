@@ -9,10 +9,11 @@ No database. All data is inline and clearly fictional.
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from uuid import UUID, uuid4
 
 from app.models.calendar import InfrastructureAvailabilityWindow
+from app.services.time_zone import local_wall_time_to_utc, planning_zone
 from app.services.working_time_service import WorkingTimeService
 
 MONDAY = date(2026, 6, 1)
@@ -20,6 +21,10 @@ SATURDAY = date(2026, 6, 6)
 
 RESOURCE = UUID("55555555-5555-5555-5555-555555555555")
 SITE = UUID("66666666-6666-6666-6666-666666666666")
+
+
+def _local(value: datetime) -> datetime:
+    return local_wall_time_to_utc(value, planning_zone())
 
 
 def _window(
@@ -54,8 +59,8 @@ class TestDayBookingBounds:
         """No windows means around the clock, so a day is midnight to midnight."""
         bounds = _service().day_booking_bounds(RESOURCE, MONDAY)
         assert bounds == (
-            datetime(2026, 6, 1, 0, 0),
-            datetime(2026, 6, 2, 0, 0),
+            _local(datetime(2026, 6, 1)),
+            _local(datetime(2026, 6, 2)),
         )
 
     def test_single_shift_maps_onto_that_shift(self):
@@ -64,8 +69,8 @@ class TestDayBookingBounds:
             RESOURCE, MONDAY
         )
         assert bounds == (
-            datetime(2026, 6, 1, 6, 0),
-            datetime(2026, 6, 1, 15, 0),
+            _local(datetime(2026, 6, 1, 6)),
+            _local(datetime(2026, 6, 1, 15)),
         )
 
     def test_two_shifts_span_the_whole_operating_day(self):
@@ -73,8 +78,8 @@ class TestDayBookingBounds:
         windows = [_window(0, (6, 0), (14, 0)), _window(0, (14, 0), (22, 0))]
         bounds = _service(windows).day_booking_bounds(RESOURCE, MONDAY)
         assert bounds == (
-            datetime(2026, 6, 1, 6, 0),
-            datetime(2026, 6, 1, 22, 0),
+            _local(datetime(2026, 6, 1, 6)),
+            _local(datetime(2026, 6, 1, 22)),
         )
 
     def test_gap_between_shifts_is_included(self):
@@ -87,8 +92,8 @@ class TestDayBookingBounds:
         windows = [_window(0, (6, 0), (10, 0)), _window(0, (14, 0), (18, 0))]
         bounds = _service(windows).day_booking_bounds(RESOURCE, MONDAY)
         assert bounds == (
-            datetime(2026, 6, 1, 6, 0),
-            datetime(2026, 6, 1, 18, 0),
+            _local(datetime(2026, 6, 1, 6)),
+            _local(datetime(2026, 6, 1, 18)),
         )
 
     def test_night_shift_reaches_into_the_next_day(self):
@@ -97,8 +102,8 @@ class TestDayBookingBounds:
             RESOURCE, MONDAY
         )
         assert bounds == (
-            datetime(2026, 6, 1, 22, 0),
-            datetime(2026, 6, 2, 0, 0),
+            _local(datetime(2026, 6, 1, 22)),
+            _local(datetime(2026, 6, 2)),
         )
 
     def test_closed_weekday_returns_nothing(self):
@@ -123,3 +128,10 @@ class TestDayBookingBounds:
         assert bounds is not None
         start, end = bounds
         assert start < end
+
+    def test_unrestricted_dst_days_have_real_elapsed_length(self):
+        """A local full day is 23 or 25 elapsed hours at the DST boundaries."""
+        spring = _service().day_booking_bounds(RESOURCE, date(2026, 3, 29))
+        autumn = _service().day_booking_bounds(RESOURCE, date(2026, 10, 25))
+        assert spring is not None and spring[1] - spring[0] == timedelta(hours=23)
+        assert autumn is not None and autumn[1] - autumn[0] == timedelta(hours=25)

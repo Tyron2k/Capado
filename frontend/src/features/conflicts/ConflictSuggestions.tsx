@@ -28,6 +28,8 @@ import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
 import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
+import { useSettings } from '../../context/SettingsContext'
+import { formatDateTime } from '../../utils/date'
 
 interface Props {
   conflictId: string
@@ -53,6 +55,7 @@ const COLOR_MAP = {
 function buildDescription(
   s: ConflictSuggestion,
   t: (key: string, params?: Record<string, string | number>) => string,
+  timeZone: string,
 ): string {
   switch (s.type) {
     case 'shift_forward':
@@ -60,7 +63,9 @@ function buildDescription(
     case 'shift_backward':
       return t('suggestions.descShiftBackward', { days: Math.abs(s.shift_days ?? 0) })
     case 'shift_into_window':
-      return t('suggestions.descShiftIntoWindow', { time: s.new_start_at?.slice(11, 16) ?? '—' })
+      return t('suggestions.descShiftIntoWindow', {
+        time: s.new_start_at ? formatDateTime(s.new_start_at, 'de', timeZone).slice(-5) : '—',
+      })
     case 'reduce_allocation':
       return t('suggestions.descReduce', { percent: s.new_allocation_percent ?? 0 })
     case 'swap_resource':
@@ -72,6 +77,7 @@ function buildDescription(
 
 export function ConflictSuggestions({ conflictId, onApplied }: Props) {
   const { t } = useTranslation()
+  const { settings } = useSettings()
   const queryClient = useQueryClient()
   const [active, setActive] = useState<{
     suggestion: ConflictSuggestion
@@ -129,7 +135,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
     onSuccess: async (_result, { suggestion }) => {
       notifications.show({
         title: t('common.saved'),
-        message: buildDescription(suggestion, t),
+        message: buildDescription(suggestion, t, settings.timeZone),
         color: 'green',
       })
       setActive(null)
@@ -160,7 +166,9 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
         }}
         title={
           active
-            ? t('suggestions.previewAction', { action: buildDescription(active.suggestion, t) })
+            ? t('suggestions.previewAction', {
+                action: buildDescription(active.suggestion, t, settings.timeZone),
+              })
             : ''
         }
         size="lg"
@@ -204,7 +212,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
         const color = COLOR_MAP[s.type] ?? 'gray'
         const key = `${s.assignment_id}-${s.type}-${idx}`
         const label = t(`suggestions.type_${s.type}`)
-        const desc = buildDescription(s, t)
+        const desc = buildDescription(s, t, settings.timeZone)
         return (
           <Group key={key} gap="xs" wrap="nowrap">
             <Badge size="xs" color={color} variant="light" leftSection={<Icon size={10} />}>

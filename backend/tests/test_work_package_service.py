@@ -14,7 +14,7 @@ and clearly fictional.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -61,8 +61,8 @@ def _work_package(project: Project) -> WorkPackage:
         start_date=date(2026, 3, 2),
         end_date=date(2026, 3, 20),
         # A fixed past timestamp so the bump on update is observable.
-        created_at=datetime(2026, 1, 1),
-        updated_at=datetime(2026, 1, 1),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        updated_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
 

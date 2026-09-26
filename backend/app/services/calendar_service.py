@@ -35,8 +35,8 @@ from app.services.conflict_refresh import refresh_resources
 
 
 def _utcnow() -> datetime:
-    """UTC timestamp as naive datetime (for TIMESTAMP WITHOUT TIME ZONE)."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    """Current timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 def weekly_minutes(profile: WorkWeekProfile) -> int:

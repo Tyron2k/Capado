@@ -4,10 +4,20 @@
  */
 
 import type { Assignment, AssignmentCreate } from '../../types/assignment'
-import { formatDate, toIsoDate, toIsoDateTime } from '../../utils/date'
+import { formatDate, localDateTimeToUtc, toIsoDate } from '../../utils/date'
 import type { AssignmentFormValues } from './AssignmentForm'
 
-export function toAssignmentPayload(values: AssignmentFormValues): AssignmentCreate {
+function requireUtc(value: Date | string, timeZone: string): string {
+  const instant = localDateTimeToUtc(value, timeZone)
+  if (!instant) throw new Error('Local booking time is ambiguous or nonexistent')
+  return instant
+}
+
+export function toAssignmentPayload(
+  values: AssignmentFormValues,
+  timeZone = 'Europe/Berlin',
+): AssignmentCreate {
+  timeZone = values.booking_time_zone ?? timeZone
   return values.resource_type === 'personal'
     ? {
         resource_id: values.resource_id,
@@ -21,8 +31,8 @@ export function toAssignmentPayload(values: AssignmentFormValues): AssignmentCre
         resource_id: values.resource_id,
         resource_type: values.resource_type,
         work_package_id: values.work_package_id,
-        start_at: toIsoDateTime(values.start_at!),
-        end_at: toIsoDateTime(values.end_at!),
+        start_at: requireUtc(values.start_at!, timeZone),
+        end_at: requireUtc(values.end_at!, timeZone),
       }
 }
 

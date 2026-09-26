@@ -2,15 +2,13 @@
  * Central date utilities. Three groups, each with its own value shape — mixing
  * them is what caused the date bugs this module now guards against:
  *
- * 1. **Display formatting** takes ISO strings (`YYYY-MM-DD`,
- *    `YYYY-MM-DDTHH:mm`) and renders display text for a locale, German by
- *    default. It never constructs a `Date`, so no timezone can shift the
- *    result — which is also why the locale only ever reorders parts that were
- *    already extracted textually.
+ * 1. **Display formatting** keeps calendar-only dates literal, while UTC
+ *    timestamps are rendered in the configured IANA time zone.
  * 2. **Form values** (`DateFormValue`) are what Mantine's date inputs emit:
  *    `YYYY-MM-DD` strings, or `YYYY-MM-DD HH:mm:ss` with a time part. Convert
- *    them for the API with `toIsoDate` / `toIsoDateTime` and compare them with
- *    `compareDates` / `compareDateTimes`.
+ *    calendar dates for the API with `toIsoDate`, and local booking times with
+ *    `localDateTimeToUtc`. Compare form values with `compareDates` /
+ *    `compareDateTimes`.
  * 3. **Calendar-day anchors** (`DayAnchor`) are for day arithmetic: UTC
  *    midnight instants carrying a brand, so a plain `Date` cannot be passed in
  *    by accident. See the section further down for why.
@@ -19,6 +17,7 @@
 // Type-only import: erased at compile time, so this adds no runtime dependency from the
 // date utilities onto the i18n module (which pulls in React and both dictionaries).
 import type { Locale } from '../i18n'
+import { Temporal } from '@js-temporal/polyfill'
 
 /** Milliseconds in a calendar day (exact, because anchors are UTC-based). */
 export const MS_PER_DAY = 86_400_000
@@ -36,6 +35,83 @@ const ISO_PREFIX = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/
 
 /** Matches a typed date such as `24.04.2026`, `24-4-2026` or `24/04/2026`. */
 const TYPED_DATE = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/
+const HAS_OFFSET = /(?:Z|[+-]\d{2}:\d{2})$/i
+const ZONE_FORMATTERS = new Map<string, Intl.DateTimeFormat>()
+
+/** Calendar and clock parts of an instant in an IANA time zone. */
+function zonedParts(instant: Date, timeZone: string): string {
+  let formatter = ZONE_FORMATTERS.get(timeZone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+    ZONE_FORMATTERS.set(timeZone, formatter)
+  }
+  const parts = formatter.formatToParts(instant)
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
+}
+
+/** Render an API instant as a date-time form value in the selected zone. */
+export function instantToLocalDateTime(value: string, timeZone: string): string {
+  if (!HAS_OFFSET.test(value)) return toIsoDateTime(value)
+  const instant = new Date(value)
+  return Number.isNaN(instant.getTime()) ? '' : zonedParts(instant, timeZone)
+}
+
+/**
+ * Convert an entered wall-clock time to an unambiguous UTC instant.
+ *
+ * DST gaps have no matching instant; repeated autumn times have two. Both are
+ * rejected rather than silently moving or choosing an arbitrary offset.
+ */
+export function localDateTimeToUtc(value: Date | string, timeZone: string): string | null {
+  try {
+    // Preserve an already resolved instant, including its fold and sub-minute precision.
+    if (typeof value === 'string' && HAS_OFFSET.test(value)) {
+      const instant = Temporal.Instant.from(value)
+      return instant.toString({
+        fractionalSecondDigits: instant.epochNanoseconds % 1_000_000n === 0n ? 3 : 'auto',
+      })
+    }
+    return Temporal.PlainDateTime.from(toIsoDateTime(value))
+      .toZonedDateTime(timeZone, { disambiguation: 'reject' })
+      .toInstant()
+      .toString({ fractionalSecondDigits: 3 })
+  } catch {
+    return null
+  }
+}
+
+/** Explicit choices for an autumn fold; spring gaps have no valid choices. */
+export function localTimeChoices(
+  value: string,
+  timeZone: string,
+): { value: string; label: string }[] {
+  try {
+    const local = Temporal.PlainDateTime.from(instantToLocalDateTime(value, timeZone))
+    const candidates = (['earlier', 'later'] as const)
+      .map((disambiguation) => local.toZonedDateTime(timeZone, { disambiguation }))
+      .filter((candidate) => candidate.toPlainDateTime().equals(local))
+    if (
+      candidates.length !== 2 ||
+      candidates[0].epochNanoseconds === candidates[1].epochNanoseconds
+    )
+      return []
+    return candidates.map((candidate) => ({
+      value: candidate.toInstant().toString({ fractionalSecondDigits: 3 }),
+      label: `UTC${candidate.offset}`,
+    }))
+  } catch {
+    return []
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 1. Display formatting
@@ -74,19 +150,28 @@ export function formatDate(value?: string | null, locale: Locale = 'de'): string
 /**
  * Format an ISO date-time string for display.
  *
- * The timestamp is read literally (the backend stores naive local timestamps),
- * so no timezone conversion happens. A date-only value renders as `00:00`.
+ * Offset-bearing API timestamps are converted into the configured IANA zone.
+ * A date-only value renders as `00:00` without conversion.
  * Returns `—` for empty input and the input itself if it is not ISO-shaped.
  *
  * The time part stays 24-hour in both locales: a planning tool reads shift
  * boundaries off these, and 14:00 cannot be misread the way 2:00 can.
  */
-export function formatDateTime(value?: string | null, locale: Locale = 'de'): string {
+export function formatDateTime(
+  value?: string | null,
+  locale: Locale = 'de',
+  timeZone = 'Europe/Berlin',
+  showSeconds = false,
+): string {
   if (!value) return EMPTY
-  const match = ISO_PREFIX.exec(value)
+  const local = instantToLocalDateTime(value, timeZone)
+  const match = ISO_PREFIX.exec(local)
   if (!match) return value
   const [, y, m, d, hh, mm] = match
-  const time = `${hh ?? '00'}:${mm ?? '00'}`
+  const seconds = HAS_OFFSET.test(value)
+    ? String(new Date(value).getUTCSeconds()).padStart(2, '0')
+    : (value.match(/:\d{2}:(\d{2})/)?.[1] ?? '00')
+  const time = `${hh ?? '00'}:${mm ?? '00'}${showSeconds ? `:${seconds}` : ''}`
   return locale === 'en' ? `${y}-${m}-${d} ${time}` : `${d}.${m}.${y} ${time}`
 }
 

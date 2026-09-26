@@ -22,6 +22,7 @@ from app.schemas.capacity import (
     compute_severity,
 )
 from app.services.skill_mismatch import detect_mismatches
+from app.services.time_zone import local_date, planning_zone
 
 
 async def enrich_conflicts_batch(
@@ -149,7 +150,10 @@ async def enrich_conflicts_batch(
             if a.start_date is not None:
                 return (a.start_date, (a.project_name or "").lower())
             if a.start_at is not None:
-                return (a.start_at.date(), (a.project_name or "").lower())
+                return (
+                    local_date(a.start_at, planning_zone()),
+                    (a.project_name or "").lower(),
+                )
             return (date.max, (a.project_name or "").lower())
 
         assignment_infos.sort(key=_sort_key)

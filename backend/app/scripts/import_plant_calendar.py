@@ -155,7 +155,7 @@ async def import_entries(
         (await session.execute(existing_statement)).scalars().all()
     )
 
-    now = datetime.now(UTC).replace(tzinfo=None)
+    now = datetime.now(UTC)
     inserted = 0
     skipped = 0
     for entry in entries:

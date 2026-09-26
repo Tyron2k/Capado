@@ -94,6 +94,7 @@ async def update_organization_settings(
     company_subtitle: str | None = None,
     logo_url: str | None = None,
     primary_color: str | None = None,
+    time_zone: str | None = None,
     audit_retention_months: int | None = None,
     baseline_retention_months: int | None = None,
     digest_horizon_days: int | None = None,
@@ -135,6 +136,7 @@ async def update_organization_settings(
         digest_warning_days: Inside this many days a finding is a warning (optional).
         digest_max_findings: Cap on digest length (optional). The excess is counted and
             reported rather than silently dropped.
+        time_zone: IANA zone used for booking display and input (optional).
         planning_freeze_before: New freeze date, or None to LIFT the freeze. Only applied
             when set_planning_freeze is True.
         set_planning_freeze: Whether the caller mentioned the freeze at all. Needed because
@@ -169,6 +171,8 @@ async def update_organization_settings(
         settings.logo_url = logo_url
     if primary_color is not None:
         settings.primary_color = primary_color
+    if time_zone is not None:
+        settings.time_zone = time_zone
     if audit_retention_months is not None:
         settings.audit_retention_months = audit_retention_months
     if baseline_retention_months is not None:
@@ -204,7 +208,7 @@ async def update_organization_settings(
     if digest_recipients is not None:
         settings.digest_recipients = digest_recipients
 
-    settings.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    settings.updated_at = datetime.now(UTC)
     session.add(settings)
     await session.commit()
     await session.refresh(settings)
@@ -229,7 +233,7 @@ async def save_logo(
     settings = await get_organization_settings(session)
     settings.logo_data = data
     settings.logo_mime_type = mime_type
-    settings.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    settings.updated_at = datetime.now(UTC)
     session.add(settings)
     await session.commit()
     await session.refresh(settings)
@@ -248,7 +252,7 @@ async def delete_logo(session: AsyncSession) -> OrganizationSettings:
     settings = await get_organization_settings(session)
     settings.logo_data = None
     settings.logo_mime_type = None
-    settings.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    settings.updated_at = datetime.now(UTC)
     session.add(settings)
     await session.commit()
     await session.refresh(settings)

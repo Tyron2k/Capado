@@ -8,12 +8,13 @@ Tests pure domain logic functions without database access:
 
 from datetime import date, datetime, time, timedelta
 
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from app.models.assignment import Assignment
 from app.models.resource import ResourceType
 from app.services.capacity_service import CapacityService, get_utilization_color
+from app.services.time_zone import local_date, local_wall_time_to_utc, planning_zone
 
 # --- Strategies ---
 
@@ -52,12 +53,17 @@ def infrastructure_assignment(draw):
     duration_hours = draw(st.integers(min_value=1, max_value=23 - start_hour))
     start_at = datetime.combine(start_date, time(start_hour, 0))
     end_at = start_at + timedelta(hours=duration_hours)
+    try:
+        start_instant = local_wall_time_to_utc(start_at, planning_zone())
+        end_instant = local_wall_time_to_utc(end_at, planning_zone())
+    except ValueError:
+        assume(False)  # A skipped/repeated DST clock reading has no unique instant.
     return Assignment(
         resource_id="00000000-0000-0000-0000-000000000001",
         resource_type=ResourceType.infrastructure,
         work_package_id="00000000-0000-0000-0000-000000000002",
-        start_at=start_at,
-        end_at=end_at,
+        start_at=start_instant,
+        end_at=end_instant,
     )
 
 
@@ -200,7 +206,7 @@ class TestInfrastructureAssignmentOverlapProperties:
     @settings(max_examples=100)
     def test_infrastructure_is_100_percent_on_overlap_day(self, assignment: Assignment):
         """Infrastructure assignment is 100% on the day it overlaps."""
-        day = assignment.start_at.date()
+        day = local_date(assignment.start_at, planning_zone())
         service = CapacityService.__new__(CapacityService)
         result = service._assigned_percent_for_day(
             [assignment], ResourceType.infrastructure, day
@@ -212,7 +218,9 @@ class TestInfrastructureAssignmentOverlapProperties:
     def test_infrastructure_zero_on_non_overlap_day(self, assignment: Assignment):
         """Infrastructure assignment is 0% on a day it doesn't overlap."""
         # Pick a day well before the assignment
-        non_overlap_day = assignment.start_at.date() - timedelta(days=10)
+        non_overlap_day = local_date(assignment.start_at, planning_zone()) - timedelta(
+            days=10
+        )
         service = CapacityService.__new__(CapacityService)
         result = service._assigned_percent_for_day(
             [assignment], ResourceType.infrastructure, non_overlap_day

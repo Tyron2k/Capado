@@ -4,6 +4,8 @@ import { Text } from '@mantine/core'
 import apiClient from '../../api/client'
 import { queryKeys } from '../../api/queryClient'
 import { useTranslation } from '../../i18n'
+import { useSettings } from '../../context/SettingsContext'
+import { formatDateTime } from '../../utils/date'
 
 interface CheckStatus {
   last_checked_at: string | null
@@ -15,6 +17,7 @@ interface CheckStatus {
 /** Poll while visible, and refresh derived views after a completed full check. */
 export function ConflictCheckStatus() {
   const { t } = useTranslation()
+  const { settings } = useSettings()
   const client = useQueryClient()
   const previous = useRef<string | null | undefined>(undefined)
   const { data, isError } = useQuery({
@@ -39,7 +42,9 @@ export function ConflictCheckStatus() {
   }, [data, client])
 
   const checked = data?.last_checked_at
-    ? t('conflictCheck.lastChecked', { time: new Date(data.last_checked_at).toLocaleString() })
+    ? t('conflictCheck.lastChecked', {
+        time: formatDateTime(data.last_checked_at, settings.locale, settings.timeZone, true),
+      })
     : t('conflictCheck.never')
   const warning = isError
     ? t('conflictCheck.unavailable')

@@ -3,8 +3,8 @@
  * Corresponds to the backend schemas in app/schemas/assignment.py and app/schemas/capacity.py.
  *
  * Personal assignments carry ``start_date`` / ``end_date`` / ``allocation_percent``.
- * Infrastructure assignments carry ``start_at`` / ``end_at`` (timestamps,
- * minute precision). The respective other fields remain ``null``.
+ * Infrastructure assignments carry ``start_at`` / ``end_at`` as offset-bearing
+ * UTC instants (minute precision). The respective other fields remain ``null``.
  */
 
 export type ResourceType = 'personal' | 'infrastructure'

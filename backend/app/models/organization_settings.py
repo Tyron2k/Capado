@@ -13,8 +13,8 @@ from sqlmodel import Column, Field, SQLModel, UniqueConstraint
 
 
 def _utcnow() -> datetime:
-    """UTC timestamp as naive datetime (for TIMESTAMP WITHOUT TIME ZONE)."""
-    return datetime.now(UTC).replace(tzinfo=None)
+    """Current timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class OrganizationSettings(SQLModel, table=True):
@@ -84,6 +84,10 @@ class OrganizationSettings(SQLModel, table=True):
     company_subtitle: str = Field(default="", max_length=255, nullable=False)
     logo_url: str = Field(default="", max_length=1024, nullable=False)
     primary_color: str = Field(default="blue", max_length=50, nullable=False)
+    # Organization-wide IANA zone for displayed and entered timestamps. The
+    # historic availability calendars remain Europe/Berlin local-clock rules.
+    # Instants in the database are stored in UTC independently of this setting.
+    time_zone: str = Field(default="Europe/Berlin", max_length=64, nullable=False)
     # 24 months as the default: long enough to settle a dispute about who promised
     # what, short enough not to accumulate behavioural data indefinitely. Capped at
     # 600 to keep "effectively forever" expressed as 0 rather than as a huge number.

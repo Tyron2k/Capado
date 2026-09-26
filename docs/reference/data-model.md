@@ -116,8 +116,8 @@
 | `start_date` | DATE | NOT NULL | Project start |
 | `end_date` | DATE | NOT NULL | What is PLANNED |
 | `committed_delivery_date` | DATE | INDEX, NULLABLE | What was PROMISED, or `NULL` when nothing was. Deliberately separate from `end_date`: one field cannot hold both a commitment and a plan, because the moment they differ is the moment that matters |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -132,8 +132,8 @@
 | `end_date` | DATE | NOT NULL | End date |
 | `completed_at` | DATETIME | INDEX, NULLABLE | When the package was finished. A timestamp on the PACKAGE, not an assessment of a person — the distinction matters, because this is the only completion signal in the system and it must not be read as performance data |
 | `lead_time_working_days` | INTEGER | NULLABLE | Working days the package needs. Used to test whether a promised date is reachable; the plan warns instead of silently shifting the date. `NULL` means untested |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -149,7 +149,7 @@
 | `requirement_mode` | VARCHAR(10) | INDEX, NOT NULL | How `quantity` is read: as a **headcount** (this many bodies) or as **effort in FTE** (this much capacity, however distributed). The two invert each other's arithmetic, which is why the mode is stored rather than inferred |
 | `min_allocation_percent` | FLOAT | NOT NULL | Smallest share of a normative day an assignment against this requirement may carry |
 | `min_level` | INTEGER | NULLABLE | Minimum proficiency 1–5. `NULL` means the requirement does not grade — a resource whose level is unassessed still matches |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
 ---
 
@@ -164,10 +164,10 @@
 | `start_date` | DATE | INDEX, NULLABLE | Start (personal only) |
 | `end_date` | DATE | INDEX, NULLABLE | End (personal only) |
 | `allocation_percent` | FLOAT | NULLABLE, > 0, ≤ 100 | Allocation (personal only) |
-| `start_at` | TIMESTAMP | NULLABLE | Start (infrastructure only) |
-| `end_at` | TIMESTAMP | NULLABLE | End (infrastructure only) |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `start_at` | TIMESTAMPTZ | NULLABLE | Start (infrastructure only) |
+| `end_at` | TIMESTAMPTZ | NULLABLE | End (infrastructure only) |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -184,8 +184,8 @@
 | `end_date` | DATE | INDEX | Absence end |
 | `allocation_percent` | FLOAT | NOT NULL, > 0, ≤ 100 | Capacity reduction (default 100) |
 | `note` | VARCHAR(500) | NULLABLE | Optional note |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -198,8 +198,8 @@
 | `group_id` | UUID | FK → `resource_groups.id`, INDEX | Organizational group |
 | `site_id` | UUID | FK → `sites.id`, INDEX, NULLABLE | Owning site — determines which holiday calendar applies |
 | `is_active` | BOOLEAN | INDEX, default TRUE | Soft-delete flag |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -212,8 +212,8 @@
 | `group_id` | UUID | FK → `resource_groups.id`, INDEX | Organizational group |
 | `site_id` | UUID | FK → `sites.id`, INDEX, NULLABLE | Owning site |
 | `is_active` | BOOLEAN | INDEX, default TRUE | Soft-delete flag |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -225,8 +225,8 @@
 | `name` | VARCHAR(255) | NOT NULL | Group name |
 | `resource_type` | VARCHAR(20) | NOT NULL, INDEX | `personal` or `infrastructure` |
 | `parent_id` | UUID | FK → `resource_groups.id`, INDEX, NULLABLE | Parent group. Read by `WorkingTimeService` to inherit a work-profile binding: the parent's binding applies unless this group carries its own. No depth limit is enforced in code; cycles are guarded where the chain is walked |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -244,8 +244,8 @@ arithmetic rather than just a label.
 | `region_code` | VARCHAR(16) | NULLABLE | Region hint for the holiday seed script, e.g. `DE-BY`. Never read at runtime |
 | `is_default` | BOOLEAN | INDEX, default FALSE | Fallback site for resources without one |
 | `is_active` | BOOLEAN | INDEX, default TRUE | Soft-delete flag |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -261,8 +261,8 @@ boolean so half days and designated working Saturdays are ordinary cases.
 | `day` | DATE | INDEX | The date this exception applies to |
 | `name` | VARCHAR(255) | NOT NULL | Label, e.g. "Rosenmontag" |
 | `working_minutes` | INTEGER | NOT NULL, 0–1440, default 0 | 0 = non-working; below the profile = half day; above 0 on a free day = working Saturday |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 **Unique constraint:** `uq_holidays_site_day` on `(site_id, day)`
 
@@ -282,8 +282,8 @@ where part-time and shift patterns live.
 | `monday_minutes` … `friday_minutes` | INTEGER | NOT NULL, 0–1440, default 480 | Available minutes per weekday |
 | `saturday_minutes`, `sunday_minutes` | INTEGER | NOT NULL, 0–1440, default 0 | Weekend, free by default |
 | `is_default` | BOOLEAN | INDEX, default FALSE | Fallback for resources without a binding |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 **Unique constraint:** `uq_work_week_profiles_name` on `(name)`
 
@@ -303,8 +303,8 @@ capacity of a past period stays reproducible.
 | `group_id` | UUID | FK → `resource_groups.id`, INDEX, NULLABLE | Binds the profile to a whole group rather than one resource. `NULL` means the binding is for the single resource named above |
 | `valid_from` | DATE | INDEX | First day the binding applies |
 | `valid_until` | DATE | INDEX, NULLABLE | Last day, or NULL for open-ended |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 **Check constraint:** `valid_until IS NULL OR valid_until >= valid_from`
 
@@ -325,8 +325,8 @@ windows.
 | `weekday` | INTEGER | INDEX, 0–6 | Monday = 0 through Sunday = 6 |
 | `start_time` | TIME | NOT NULL | Window start, local clock time |
 | `end_time` | TIME | NOT NULL, <> `start_time` | Window end; before `start_time` means the window runs past midnight |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -358,6 +358,7 @@ columns hides which ones belong together.
 | `audit_retention_months` | INTEGER | NOT NULL | How long audit entries are kept. `0` means unlimited, which is a deliberate choice rather than a state reached by omission. Enforced by a scheduled job — without that job nothing is deleted, whatever this says |
 | `baseline_retention_months` | INTEGER | NOT NULL | How long baselines are kept |
 | `planning_freeze_before` | DATE | NULLABLE | Plans before this date may not be changed. `NULL` means no freeze |
+| `time_zone` | VARCHAR(64) | NOT NULL, default `Europe/Berlin` | IANA zone for displaying and entering infrastructure booking times; instants are stored in UTC |
 
 **Maintenance scheduler**
 
@@ -393,7 +394,7 @@ columns hides which ones belong together.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `singleton_key` | VARCHAR(10) | UNIQUE, NOT NULL, default `default` | Singleton sentinel |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update instant in UTC |
 
 **Unique constraint:** `uq_organization_settings_singleton` on `(singleton_key)`
 
@@ -411,7 +412,7 @@ columns hides which ones belong together.
 | `end_date` | DATE | INDEX | Conflict period end |
 | `total_assigned_percent` | FLOAT | NOT NULL | Peak demand during the period, derived from minutes |
 | `available_percent` | FLOAT | NOT NULL | Availability on the day with the largest shortfall, derived from minutes — no longer always 100 |
-| `detected_at` | TIMESTAMP | NOT NULL | Detection timestamp |
+| `detected_at` | TIMESTAMPTZ | NOT NULL | Detection timestamp |
 
 ---
 
@@ -431,7 +432,7 @@ columns hides which ones belong together.
 | `id` | UUID | PK | Primary key |
 | `name` | VARCHAR(100) | UNIQUE, NOT NULL | Skill name |
 | `resource_type` | VARCHAR(20) | NOT NULL, default `personal` | Scoped to personal or infrastructure |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
 ---
 
@@ -442,7 +443,7 @@ columns hides which ones belong together.
 | `id` | UUID | PK | Primary key |
 | `skill_id` | UUID | FK → `skills.id`, INDEX | Parent skill |
 | `name` | VARCHAR(100) | NOT NULL | Attribute name |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
 **Unique constraint:** `uq_skill_attributes_skill_name` on `(skill_id, name)`
 
@@ -458,7 +459,7 @@ columns hides which ones belong together.
 | `valid_from` | DATE | NULLABLE | Qualification holds from this date. `NULL` means no start bound |
 | `valid_until` | DATE | INDEX, NULLABLE | Qualification expires after this date. `NULL` means no expiry. Matching tests the qualification against the date the WORK happens, not against today — a certificate expiring mid-order is a conflict, not a surprise |
 | `level` | INTEGER | NULLABLE | Proficiency 1–5. `NULL` means **nobody has assessed it**, which is not the same as level 1 |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
 **Unique constraint:** `uq_personal_resource_skills_resource_attribute` on `(resource_id, skill_attribute_id)`
 
@@ -474,7 +475,7 @@ columns hides which ones belong together.
 | `valid_from` | DATE | NULLABLE | Capability holds from this date. `NULL` means no start bound |
 | `valid_until` | DATE | INDEX, NULLABLE | Capability expires after this date — an inspection interval on a machine behaves like a certificate on a person. `NULL` means no expiry |
 | `level` | INTEGER | NULLABLE | Grading 1–5. `NULL` means nobody assessed it |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
 **Unique constraint:** `uq_infrastructure_resource_skills_resource_attribute` on `(resource_id, skill_attribute_id)`
 
@@ -495,8 +496,8 @@ columns hides which ones belong together.
 | `must_change_password` | BOOLEAN | NOT NULL, default TRUE | Force password change |
 | `external_id` | VARCHAR(255) | NULLABLE | External system identifier |
 | `resource_id` | UUID | FK → `personal_resources.id`, NULLABLE, UNIQUE, ON DELETE SET NULL | The scheduled person this account belongs to. What lets that person read their own plan |
-| `created_at` | TIMESTAMP | INDEX, NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | INDEX, NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -507,10 +508,10 @@ columns hides which ones belong together.
 | `id` | UUID | PK | Primary key |
 | `user_id` | UUID | FK → `users.id`, INDEX | Token owner |
 | `token_hash` | VARCHAR(255) | INDEX, NOT NULL | SHA-256 hash of token |
-| `expires_at` | TIMESTAMP | NOT NULL | Expiration time |
-| `revoked_at` | TIMESTAMP | NULLABLE | Revocation time (null = active) |
+| `expires_at` | TIMESTAMPTZ | NOT NULL | Expiration time |
+| `revoked_at` | TIMESTAMPTZ | NULLABLE | Revocation time (null = active) |
 | `replaced_by_id` | UUID | NULLABLE | The token this one was rotated into. Makes the rotation chain walkable, which is what turns "an old token was presented" into "this family is compromised" — see ADR-002 |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
 ---
 
@@ -522,8 +523,8 @@ columns hides which ones belong together.
 | `name` | VARCHAR(255) | NOT NULL | Template name |
 | `description` | VARCHAR(1000) | NULLABLE | Optional description |
 | `lead_time_working_days` | INTEGER | NULLABLE | Default lead time copied onto work packages created from this template |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 ---
 
@@ -539,7 +540,7 @@ columns hides which ones belong together.
 | `requirement_mode` | VARCHAR(10) | NOT NULL | Headcount or effort in FTE, copied onto the work package requirement when the template is applied |
 | `min_allocation_percent` | FLOAT | NOT NULL | Copied onto the requirement |
 | `min_level` | INTEGER | NULLABLE | Copied onto the requirement. `NULL` means no grading |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
 ---
 
@@ -556,8 +557,8 @@ project, not the folder — a folder is the order, and the projects inside it ar
 | `position` | INTEGER | NOT NULL, INDEX, default 0 | Order among siblings |
 | `external_ref` | VARCHAR(128) | NULLABLE, INDEX | The folder's own identifier — typically an order number |
 | `customer_id` | UUID | FK → `customers.id`, NULLABLE, INDEX | Customer; inherited downward by projects that name none |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 Deleting a folder does not delete its projects: they survive, unfiled.
 
@@ -575,8 +576,8 @@ were one.
 | `reference` | VARCHAR(128) | NOT NULL, default `''` | The operator's own customer number |
 | `note` | VARCHAR(1000) | NOT NULL, default `''` | Free note |
 | `is_active` | BOOLEAN | NOT NULL, default true | Soft-delete flag, consistent with resources |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 Uniqueness is enforced case-insensitively rather than by a plain unique index, which would happily
 accept "Acme" beside "acme" and reintroduce exactly the duplication this table exists to prevent.
@@ -597,8 +598,8 @@ One relationship type: **finish to start**, with an optional lag in working days
 | `predecessor_id` | UUID | FK → `work_packages.id`, NOT NULL, INDEX | Must finish first |
 | `successor_id` | UUID | FK → `work_packages.id`, NOT NULL, INDEX | Starts after the predecessor plus the lag |
 | `lag_working_days` | INTEGER | NOT NULL, default 0 | Waiting time — curing, drying — in working days, not calendar days |
-| `created_at` | TIMESTAMP | NOT NULL | Creation timestamp |
-| `updated_at` | TIMESTAMP | NOT NULL | Last update timestamp |
+| `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
 **Unique constraint:** `uq_work_package_dependencies_pair` on `(predecessor_id, successor_id)`
 
@@ -620,7 +621,7 @@ itself (ADR-007).
 | `note` | VARCHAR(1000) | NULLABLE | Free note |
 | `created_by` | UUID | FK → `users.id`, NULLABLE, INDEX | Who froze it; NULL once that user is deleted |
 | `is_current` | BOOLEAN | NOT NULL, INDEX, default false | The reference baseline — never pruned, however old |
-| `created_at` | TIMESTAMP | NOT NULL, INDEX | When it was frozen |
+| `created_at` | TIMESTAMPTZ | NOT NULL, INDEX | When it was frozen |
 
 Retention defaults to **0, meaning keep everything** — deliberately the opposite of the audit log's 24
 months. An audit entry accumulates as a side effect of working; a baseline is a state somebody
@@ -658,7 +659,7 @@ Who changed what, and why where a reason was given (ADR-006).
 | `actor_id` | UUID | FK → `users.id`, NULLABLE, INDEX | Who; NULL for system actions and deleted users |
 | `reason` | VARCHAR(500) | NULLABLE | Supplied where the UI asks for one, e.g. a freeze override |
 | `changes` | JSON | NOT NULL | The changed fields, JSON-encoded — a date arrives back as a string |
-| `recorded_at` | TIMESTAMP | NOT NULL, INDEX | When it happened |
+| `recorded_at` | TIMESTAMPTZ | NOT NULL, INDEX | When it happened |
 
 Retention defaults to **24 months** and is applied by the maintenance job, not an external timer. An
 empty `scheduled_job_runs` log means nothing has been deleted, so the configured period is an intention
@@ -675,8 +676,8 @@ deleting nothing.
 |--------|------|-------------|-------------|
 | `id` | UUID | PK | Primary key |
 | `job_name` | VARCHAR(100) | NOT NULL, INDEX | Which job |
-| `started_at` | TIMESTAMP | NOT NULL, INDEX | Start |
-| `finished_at` | TIMESTAMP | NULLABLE | End; NULL while running or after a crash |
+| `started_at` | TIMESTAMPTZ | NOT NULL, INDEX | Start |
+| `finished_at` | TIMESTAMPTZ | NULLABLE | End; NULL while running or after a crash |
 | `status` | VARCHAR(20) | NOT NULL, default `running` | running, succeeded or failed |
 | `items_affected` | INTEGER | NULLABLE | Rows deleted — the number that proves retention applied |
 | `detail` | VARCHAR(1000) | NOT NULL, default `''` | Failure reason, or a note that a batch limit was hit |

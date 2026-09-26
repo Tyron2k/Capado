@@ -14,7 +14,7 @@ from app.models.work_package_requirement import RequirementMode
 
 
 def _utcnow() -> datetime:
-    return datetime.now(UTC).replace(tzinfo=None)
+    return datetime.now(UTC)
 
 
 class WorkPackageTemplate(SQLModel, table=True):

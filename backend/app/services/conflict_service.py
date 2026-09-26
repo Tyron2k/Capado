@@ -38,6 +38,12 @@ from sqlmodel import select
 from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment, ConflictCause
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.services.time_zone import (
+    local_date,
+    local_day_bounds,
+    local_time,
+    planning_zone,
+)
 from app.services.working_time_service import (
     WorkingTimeService,
     minutes_to_percent,
@@ -239,8 +245,8 @@ class ConflictService:
                             resource_id=resource_id,
                             resource_type=ResourceType.infrastructure,
                             cause=ConflictCause.booking_overlap,
-                            start_date=conflict_start.date(),
-                            end_date=event_time.date(),
+                            start_date=local_date(conflict_start, planning_zone()),
+                            end_date=local_date(event_time, planning_zone()),
                             total_assigned_percent=max_concurrent * 100.0,
                             available_percent=100.0,
                             assignment_ids=list(assignment_ids),
@@ -266,8 +272,8 @@ class ConflictService:
                     resource_id=resource_id,
                     resource_type=ResourceType.infrastructure,
                     cause=ConflictCause.booking_overlap,
-                    start_date=conflict_start.date(),
-                    end_date=end_time.date(),
+                    start_date=local_date(conflict_start, planning_zone()),
+                    end_date=local_date(end_time, planning_zone()),
                     total_assigned_percent=max_concurrent * 100.0,
                     available_percent=100.0,
                     assignment_ids=list(assignment_ids),
@@ -291,9 +297,9 @@ class ConflictService:
                     dates.append(a.end_date)
             else:
                 if a.start_at is not None:
-                    dates.append(a.start_at.date())
+                    dates.append(local_date(a.start_at, planning_zone()))
                 if a.end_at is not None:
-                    dates.append(a.end_at.date())
+                    dates.append(local_date(a.end_at, planning_zone()))
         if not dates:
             return None
         return min(dates), max(dates)
@@ -569,8 +575,10 @@ class ConflictService:
                         resource_id=resource_id,
                         resource_type=ResourceType.infrastructure,
                         cause=ConflictCause.booking_overlap,
-                        start_date=previous.date(),
-                        end_date=(moment - timedelta(microseconds=1)).date(),
+                        start_date=local_date(previous, planning_zone()),
+                        end_date=local_date(
+                            moment - timedelta(microseconds=1), planning_zone()
+                        ),
                         total_assigned_percent=len(active) * 100.0,
                         available_percent=100.0,
                         assignment_ids=sorted(active),
@@ -611,25 +619,45 @@ class ConflictService:
             booked_minutes = 0
             allowed_minutes = 0
 
-            day = assignment.start_at.date()
-            last_day = assignment.end_at.date()
+            zone = planning_zone()
+            day = local_date(assignment.start_at, zone)
+            last_day = local_date(assignment.end_at, zone)
             while day <= last_day:
-                day_start = datetime.combine(day, datetime.min.time())
+                day_start, day_end = local_day_bounds(day, zone)
                 overlap_start = max(assignment.start_at, day_start)
-                overlap_end = min(assignment.end_at, day_start + timedelta(days=1))
+                overlap_end = min(assignment.end_at, day_end)
                 if overlap_end <= overlap_start:
                     day += timedelta(days=1)
                     continue
 
-                start_minute = overlap_start.hour * 60 + overlap_start.minute
+                local_start = local_time(overlap_start, zone)
+                start_minute = local_start.hour * 60 + local_start.minute
                 end_minute = start_minute + int(
                     (overlap_end - overlap_start).total_seconds() // 60
                 )
                 booked_minutes += end_minute - start_minute
 
-                covered = working_time.covered_minutes_within(
-                    resource_id, day, start_minute, end_minute
-                )
+                if day_end - day_start == timedelta(days=1):
+                    covered = working_time.covered_minutes_within(
+                        resource_id, day, start_minute, end_minute
+                    )
+                else:
+                    # On a DST transition day, elapsed minutes and wall-clock
+                    # minutes differ. Test each actual minute against the
+                    # recurring local windows so the skipped/repeated hour is
+                    # neither invented nor silently discarded.
+                    spans = working_time.covered_spans(resource_id, day)
+                    covered = 0
+                    for offset in range(end_minute - start_minute):
+                        clock = local_time(
+                            overlap_start + timedelta(minutes=offset), zone
+                        )
+                        minute_of_day = clock.hour * 60 + clock.minute
+                        if any(
+                            span_start <= minute_of_day < span_end
+                            for span_start, span_end in spans
+                        ):
+                            covered += 1
                 allowed_minutes += covered
 
                 if covered < end_minute - start_minute:

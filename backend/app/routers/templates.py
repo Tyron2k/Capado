@@ -197,7 +197,7 @@ async def update_template(
         template.name = data.name.strip()
     if data.description is not None:
         template.description = data.description
-    template.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    template.updated_at = datetime.now(UTC)
     session.add(template)
     await session.commit()
     return await _build_template_response(session, template)
