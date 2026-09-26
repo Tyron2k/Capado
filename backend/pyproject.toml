@@ -12,7 +12,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.141.1",
     "uvicorn[standard]==0.53.0",  # CLI entry point: uv run uvicorn app.main:app
-    "sqlmodel==0.0.45",
+    "sqlmodel==0.0.46",
     "asyncpg==0.31.0",  # Engine driver loaded via postgresql+asyncpg:// URI
     "sqlalchemy[asyncio]==2.0.54",
     "alembic==1.20.0",
