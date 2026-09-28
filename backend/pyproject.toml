@@ -11,7 +11,7 @@ license = "GPL-3.0-only"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.141.1",
-    "uvicorn[standard]==0.53.0",  # CLI entry point: uv run uvicorn app.main:app
+    "uvicorn[standard]==0.54.0",  # CLI entry point: uv run uvicorn app.main:app
     "sqlmodel==0.0.47",
     "asyncpg==0.31.0",  # Engine driver loaded via postgresql+asyncpg:// URI
     "sqlalchemy[asyncio]==2.0.54",
