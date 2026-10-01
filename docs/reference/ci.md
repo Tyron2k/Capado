@@ -5,8 +5,8 @@ crowded out what the README is for; it is maintainer detail, not a first impress
 
 ## Pull request checks
 
-`.github/workflows/ci.yml` runs on **pull requests only** — not on pushes to `main`. The fast lint
-gate runs first; Python type checks, frontend build and tests, backend tests on Python 3.12 and
+The full checks in `.github/workflows/ci.yml` run on **pull requests only**. The fast lint gate
+runs first; Python type checks, frontend build and tests, backend tests on Python 3.12 and
 3.14, dependency audits and a real PostgreSQL migration smoke test follow. Dockerfiles are checked
 with hadolint and the production container configuration is scanned for misconfigurations.
 
@@ -65,10 +65,12 @@ a page other pages link to. Read the build output when changing `exclude_docs`.
 
 ## Code scanning
 
-CI calls `codeql.yml` to analyze Python and JavaScript/TypeScript on every pull request. The same
-workflow runs on relevant pushes to `main` and weekly. It uses CodeQL's `security-extended` queries
-and waits for GitHub to process the results before completing. Including it in CI means the
-Dependabot merge workflow starts after the analysis, rather than racing a separate PR workflow.
+CI calls `codeql.yml` to analyze Python and JavaScript/TypeScript on every pull request. On relevant
+pushes to `main` and weekly, CI runs **only CodeQL**; lint, builds, tests, audits and the final PR
+gate are skipped. This keeps the main baseline and PR scans under the same analysis identity, which
+GitHub uses when comparing findings. It uses CodeQL's `security-extended` queries and waits for GitHub
+to process the results before completing. Including it in CI means the Dependabot merge workflow
+starts after the analysis, rather than racing a separate PR workflow.
 
 The `main` ruleset requires CodeQL results and blocks code-scanning errors and HIGH/CRITICAL security
 alerts. PRs have no path filter because a required scan must report results even for configuration-only
