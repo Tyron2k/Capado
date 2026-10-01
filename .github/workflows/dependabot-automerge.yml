@@ -54,7 +54,7 @@ jobs:
             # Accept a single stable-version bump; ambiguous updates stay manual.
             if [[ "$HEAD_BRANCH" == dependabot/pre_commit/* ]]; then
               update_types=$(printf '%s\n' "$messages" | jq -Rrs '
-                [scan("^Bumps [^\\n]+ from v?([0-9]+\\.[0-9]+\\.[0-9]+) to v?([0-9]+\\.[0-9]+\\.[0-9]+)\\.(?: |$)"; "m")]
+                [split("\n")[] | scan("^Bumps .+ from v?([0-9]+\\.[0-9]+\\.[0-9]+) to v?([0-9]+\\.[0-9]+\\.[0-9]+)\\.(?: |$)")]
                 | select(length == 1) | .[0] | map(split(".") | map(tonumber))
                 | select(.[1] > .[0])
                 | if .[1][0] != .[0][0] then "version-update:semver-major"
