@@ -27,7 +27,6 @@ jobs:
           REPO: ${{ github.repository }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
-          AUTOMATION_SHA: ${{ github.workflow_sha }}
         run: |
           set -euo pipefail
 
@@ -51,16 +50,17 @@ jobs:
           update_types=$(printf '%s\n' "$messages" | sed -n 's/^[[:space:]]*update-type: //p' | sort -u)
 
           if [ -z "$update_types" ]; then
-            # Pre-commit updates omit update-type. Inspect only rev changes, using
-            # the classifier from this trusted workflow revision, never PR code.
+            # Pre-commit omits update-type, but its commit states both versions.
+            # Accept a single stable-version bump; ambiguous updates stay manual.
             if [[ "$HEAD_BRANCH" == dependabot/pre_commit/* ]]; then
-              classifier=$(mktemp)
-              trap 'rm -f "$classifier"' EXIT
-              gh api "repos/$REPO/contents/.github/scripts/classify_pre_commit.py" \
-                --method GET -f ref="$AUTOMATION_SHA" --jq '.content' \
-                | base64 --decode > "$classifier"
-              update_types=$(gh api --paginate --slurp "repos/$REPO/pulls/$pr/files" \
-                | python3 "$classifier")
+              update_types=$(printf '%s\n' "$messages" | jq -Rrs '
+                [scan("^Bumps [^\\n]+ from v?([0-9]+\\.[0-9]+\\.[0-9]+) to v?([0-9]+\\.[0-9]+\\.[0-9]+)\\.(?: |$)"; "m")]
+                | select(length == 1) | .[0] | map(split(".") | map(tonumber))
+                | select(.[1] > .[0])
+                | if .[1][0] != .[0][0] then "version-update:semver-major"
+                  elif .[1][1] != .[0][1] then "version-update:semver-minor"
+                  else "version-update:semver-patch" end
+              ')
             fi
 
             if [ -z "$update_types" ]; then
