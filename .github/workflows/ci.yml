@@ -1,11 +1,20 @@
 name: CI
 
-# Pull requests only. A squash-merge of a green PR produces the same tree the PR just
-# verified, so re-running every gate on main adds latency without testing a different tree.
-# Edge images are handled separately by the conditional nightly build in build-images.yml.
+# Full checks run only on PRs. Pushes and the weekly schedule run CodeQL alone
+# to keep its main-branch baseline under the same workflow identity as PR scans.
+# Edge images are handled by the conditional nightly build in build-images.yml.
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/codeql.yml"
+  schedule:
+    - cron: "0 6 * * 1" # Weekly Monday 06:00 UTC; CodeQL only.
 
 permissions:
   contents: read
@@ -18,6 +27,7 @@ jobs:
   # --- Stage 1: Lint (fast gate, always runs) ---
   lint:
     name: Lint & Format
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     # Every job caps its runtime. Without a cap GitHub only stops a job after six
     # hours, wasting runner capacity and delaying useful feedback. The limits are
@@ -90,6 +100,9 @@ jobs:
   codeql:
     name: CodeQL
     needs: lint
+    if: >-
+      always() &&
+      (github.event_name != 'pull_request' || needs.lint.result == 'success')
     uses: $/.github/workflows/codeql.yml
     permissions:
       contents: read
@@ -333,6 +346,7 @@ jobs:
   # writable mount — fails a pull request instead of shipping.
   dockerfile-lint:
     name: Dockerfile & config lint
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -418,7 +432,7 @@ jobs:
 
   ci-passed:
     name: CI passed
-    if: ${{ always() }}
+    if: ${{ always() && github.event_name == 'pull_request' }}
     needs:
       - lint
       - codeql
