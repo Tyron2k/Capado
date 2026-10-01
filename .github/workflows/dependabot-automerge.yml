@@ -27,6 +27,7 @@ jobs:
           REPO: ${{ github.repository }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           TESTED_SHA: ${{ github.event.workflow_run.head_sha }}
+          AUTOMATION_SHA: ${{ github.workflow_sha }}
         run: |
           set -euo pipefail
 
@@ -50,8 +51,22 @@ jobs:
           update_types=$(printf '%s\n' "$messages" | sed -n 's/^[[:space:]]*update-type: //p' | sort -u)
 
           if [ -z "$update_types" ]; then
-            echo "PR #$pr has no Dependabot update metadata; leaving it for manual review."
-            exit 0
+            # Pre-commit updates omit update-type. Inspect only rev changes, using
+            # the classifier from this trusted workflow revision, never PR code.
+            if [[ "$HEAD_BRANCH" == dependabot/pre_commit/* ]]; then
+              classifier=$(mktemp)
+              trap 'rm -f "$classifier"' EXIT
+              gh api "repos/$REPO/contents/.github/scripts/classify_pre_commit.py" \
+                --method GET -f ref="$AUTOMATION_SHA" --jq '.content' \
+                | base64 --decode > "$classifier"
+              update_types=$(gh api --paginate --slurp "repos/$REPO/pulls/$pr/files" \
+                | python3 "$classifier")
+            fi
+
+            if [ -z "$update_types" ]; then
+              echo "PR #$pr has no verifiable minor/patch update; leaving it for manual review."
+              exit 0
+            fi
           fi
 
           while IFS= read -r update_type; do

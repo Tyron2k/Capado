@@ -1,35 +1,46 @@
 name: Release Drafter
 
-on:
+on: # zizmor: ignore[dangerous-triggers] API-only; never checks out or executes PR code.
   push:
     branches: [main]
   pull_request:
     types: [opened, reopened, synchronize, edited]
+  # Merges made with GITHUB_TOKEN do not emit a push workflow. Update the draft
+  # after the merge workflow completes instead; always read the main branch.
+  workflow_run:
+    workflows: ["Dependabot Auto-Merge"]
+    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-drafter-${{ github.event.pull_request.number || github.ref }}
+  group: release-drafter-${{ github.event.pull_request.number || 'main' }}
   cancel-in-progress: true
 
 jobs:
-  label-pull-request:
-    name: Label pull request
+  preview-release-notes:
+    name: Preview release notes
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: read
     steps:
       - uses: release-drafter/release-drafter@34d80673e067bdc0c24568d3af899c216adcfaa9 # v7
+        with:
+          dry-run: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-release-draft:
     name: Update release draft
-    if: github.event_name == 'push'
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -37,5 +48,7 @@ jobs:
       pull-requests: read
     steps:
       - uses: release-drafter/release-drafter@34d80673e067bdc0c24568d3af899c216adcfaa9 # v7
+        with:
+          commitish: main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -70,6 +70,22 @@ chore(deps): bump fastapi to 0.116.0
 - Fill out the PR template
 - Ensure CI passes before requesting review
 
+### Dependency updates and release notes
+
+Dependabot minor/patch updates enter auto-merge only after CI succeeds. Pre-commit
+updates do not provide `update-type` metadata, so the workflow accepts only
+rev-only changes whose stable versions advance within the same major version.
+Major updates, unknown versions and additional file changes require review.
+
+Release Drafter groups merged PRs by their Conventional Commit titles, with
+labels as a fallback. Dependabot merges made with `GITHUB_TOKEN` do not trigger
+`push` workflows; the draft is refreshed after **Dependabot Auto-Merge** finishes.
+Use **Run workflow** on **Release Drafter** to refresh a stale draft manually.
+
+Keep merged commits on `main` intact. Rewording or rebasing them after merge
+changes their identities and can break GitHub's association with their PRs,
+causing those PRs to disappear from generated release notes.
+
 ## Licensing of contributions
 
 By submitting a contribution you agree that it is licensed under the **GPL-3.0**, the same terms as
