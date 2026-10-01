@@ -6,9 +6,22 @@ crowded out what the README is for; it is maintainer detail, not a first impress
 ## Pull request checks
 
 `.github/workflows/ci.yml` runs on **pull requests only** — not on pushes to `main`. The fast lint
-gate runs first; TypeScript and Python type checks, frontend tests, backend tests on Python 3.12 and
+gate runs first; Python type checks, frontend build and tests, backend tests on Python 3.12 and
 3.14, dependency audits and a real PostgreSQL migration smoke test follow. Dockerfiles are checked
 with hadolint and the production container configuration is scanned for misconfigurations.
+
+The frontend job installs dependencies once and runs `npm run build` (TypeScript build mode and
+Vite) before the coverage tests. CI skips the local `vite-build` pre-commit hook, avoiding a second
+build in the lint gate and a separate TypeScript job. The hook remains available locally.
+
+The final **CI passed** job runs even when an earlier job fails. It requires every CI dependency to
+succeed, including both backend and CodeQL matrix entries; failure, cancellation or an unexpected
+skip fails the gate. The `main` ruleset requires this single Actions check, with the branch up to
+date, plus CodeQL merge protection. Add any new required CI job to this gate's `needs` list.
+
+PRs do not build container images or run browser tests. Build and exercise the production targets
+locally on the feature branch for larger application or deployment changes. Routine Dependabot
+minor/patch updates rely on the PR checks; image builds and scans follow after merge.
 
 That is worth being precise about, because it decides where a mistake surfaces. A commit that reaches
 `main` any other way than through a checked pull request is unverified, and nothing downstream re-checks
@@ -52,9 +65,15 @@ a page other pages link to. Read the build output when changing `exclude_docs`.
 
 ## Code scanning
 
-`codeql.yml` analyzes Python and JavaScript/TypeScript on relevant pull requests and pushes, plus a
-weekly scheduled run. It uses CodeQL's `security-extended` queries. The repository is public, so the
-results appear in GitHub code scanning without a separate paid Advanced Security license.
+CI calls `codeql.yml` to analyze Python and JavaScript/TypeScript on every pull request. The same
+workflow runs on relevant pushes to `main` and weekly. It uses CodeQL's `security-extended` queries
+and waits for GitHub to process the results before completing. Including it in CI means the
+Dependabot merge workflow starts after the analysis, rather than racing a separate PR workflow.
+
+The `main` ruleset requires CodeQL results and blocks code-scanning errors and HIGH/CRITICAL security
+alerts. PRs have no path filter because a required scan must report results even for configuration-only
+changes. The repository is public, so the results appear in GitHub code scanning without a separate
+paid Advanced Security license.
 
 ## Dependabot merges itself
 
@@ -64,6 +83,6 @@ verifies that the tested commit is still the pull request head, then enables squ
 GitHub's expected-head guard.
 
 Major updates, updates without trustworthy Dependabot metadata and ordinary pull requests remain for
-manual review. Branch rules require every CI gate but do not require a human approval, which avoids
-making the only maintainer approve their own routine changes. Dependabot has no administrator bypass;
-auto-merge is still governed by the same required checks as any other pull request.
+manual review. Branch rules require **CI passed** and CodeQL but do not require a human approval,
+which avoids making the only maintainer approve their own routine changes. Dependabot has no
+administrator bypass; auto-merge is still governed by the same required checks as any other pull request.

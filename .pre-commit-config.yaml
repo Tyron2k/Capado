@@ -91,7 +91,7 @@ repos:
         # syntax. Ignore only that known parser gap; all other checks stay on.
         args:
           - -ignore
-          - 'reusable workflow call "\$/\.github/workflows/publish-images\.yml"'
+          - 'reusable workflow call "\$/\.github/workflows/(publish-images|codeql)\.yml"'
 
   - repo: local
     hooks:
