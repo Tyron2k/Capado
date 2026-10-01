@@ -1,59 +1,44 @@
 name-template: "v$RESOLVED_VERSION"
 tag-template: "v$RESOLVED_VERSION"
 
+# Classify by Conventional Commit titles as well as existing labels. The root
+# v7 action drafts releases; autolabeling is a separate action, and most of this
+# repository's PRs have no labels. Title matching also categorizes past PRs.
 categories:
   - title: "🚀 Features"
-    labels:
-      - "feature"
+    semver-increment: minor
+    when:
+      - conventional:
+          type: feat
+      - labels: [feature, enhancement]
   - title: "🐛 Bug Fixes"
-    labels:
-      - "fix"
+    when:
+      - conventional:
+          type: fix
+      - labels: [fix, bug]
   - title: "🧹 Maintenance"
-    labels:
-      - "dependencies"
-      - "ci"
-      - "refactor"
+    when:
+      - conventional:
+          types: [chore, ci, refactor, build, perf, test]
+      - labels: [dependencies, ci, refactor]
   - title: "📖 Documentation"
-    labels:
-      - "documentation"
+    when:
+      - conventional:
+          type: docs
+      - label: documentation
+  - title: "Other Changes"
 
-# Auto-label PRs based on Conventional Commit prefix in the title
-autolabeler:
-  - label: "feature"
-    title:
-      - '/^feat(\(.+\))?:/'
-  - label: "fix"
-    title:
-      - '/^fix(\(.+\))?:/'
-  - label: "refactor"
-    title:
-      - '/^refactor(\(.+\))?:/'
-  - label: "documentation"
-    title:
-      - '/^docs(\(.+\))?:/'
-  - label: "ci"
-    title:
-      - '/^ci(\(.+\))?:/'
-  - label: "dependencies"
-    title:
-      - '/^chore\(deps\)/'
+  - type: version-resolver
+    semver-increment: major
+    when:
+      - conventional:
+          breaking: true
+      - label: breaking
+  - type: version-resolver
+    semver-increment: patch
 
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
 change-title-escapes: '\<*_&'
-
-version-resolver:
-  major:
-    labels:
-      - "breaking"
-  minor:
-    labels:
-      - "feature"
-  patch:
-    labels:
-      - "fix"
-      - "refactor"
-      - "dependencies"
-  default: patch
 
 template: |
   ## What's Changed
