@@ -7,7 +7,7 @@
  */
 
 import { useState, type ReactNode } from 'react'
-import { Container, Tabs, Title } from '@mantine/core'
+import { Container, Group, Tabs, Title } from '@mantine/core'
 import type { Icon } from '@tabler/icons-react'
 
 export interface TabDefinition {
@@ -28,6 +28,8 @@ interface PageTabsProps {
   tabs: TabDefinition[]
   /** Which tab is active by default. Defaults to first tab. */
   defaultTab?: string
+  /** Page-level actions shared by all tabs. */
+  actions?: ReactNode
 }
 
 /**
@@ -35,14 +37,15 @@ interface PageTabsProps {
  * Prevents the active tab from resetting on parent re-renders or
  * notification-triggered context changes.
  */
-export function PageTabs({ title, tabs, defaultTab }: PageTabsProps) {
+export function PageTabs({ title, tabs, defaultTab, actions }: PageTabsProps) {
   const [activeTab, setActiveTab] = useState<string | null>(defaultTab ?? tabs[0]?.value ?? null)
 
   return (
     <Container size="xl">
-      <Title order={2} mb="md">
-        {title}
-      </Title>
+      <Group justify="space-between" mb="md">
+        <Title order={2}>{title}</Title>
+        {actions}
+      </Group>
       <Tabs value={activeTab} onChange={setActiveTab}>
         <Tabs.List mb="md">
           {tabs.map((tab) => (

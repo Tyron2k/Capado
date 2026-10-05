@@ -2,16 +2,16 @@
 
 Contains the :class:`ImportResult` summary object, the skill-matrix data
 loader and workbook builder, the flat resource workbook/CSV builders, the
-generic resource import routine, and the header-parsing helper. These pieces
+generic legacy resource import routine, complete resource CSV schemas and
+validation, and the header-parsing helper. These pieces
 are reused by the personnel and infrastructure domain modules (and, in the
 case of :class:`ImportResult` and :func:`_parse_header`, by every domain).
 """
 
-import csv
 import io
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from openpyxl import Workbook
@@ -19,6 +19,7 @@ from sqlalchemy import Result, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app.models.calendar import ResourceWorkProfile
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.site import Site
@@ -29,6 +30,11 @@ from app.models.skill import (
     SkillAttribute,
 )
 from app.services.conflict_refresh import refresh_resources
+
+from .csv_format import entity
+
+if TYPE_CHECKING:
+    from .csv_storage import ImportContext
 
 from .shape import SHAPE_REJECTION_MESSAGES, ImportShape, detect_import_shape
 
@@ -392,28 +398,6 @@ def _build_flat_resource_xlsx(rows: list[tuple], sheet_title: str) -> bytes:
     return output.getvalue()
 
 
-def _build_flat_resource_csv(rows: list[tuple]) -> str:
-    """Build a flat resource CSV (Name;Group;Skill;Attribute;Site).
-
-    Used for both personnel and infrastructure CSV exports.
-
-    Args:
-        rows: List of (name, group_name, skill_name, attr_name) tuples.
-
-    Returns:
-        CSV content as string.
-
-    """
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow(["Name", "Group", "Skill", "Attribute", "Site"])
-    for name, group_name, skill_name, attr_name, site_name in rows:
-        writer.writerow(
-            [name, group_name, skill_name or "", attr_name or "", site_name or ""]
-        )
-    return output.getvalue()
-
-
 async def _import_resources(
     session: AsyncSession,
     rows: list[tuple],
@@ -646,10 +630,10 @@ def resolve_site(
 
 
 async def check_import_conflicts(
-    session: AsyncSession, result: ImportResult, resource_ids: set[UUID]
+    session: AsyncSession, result: ImportResult, resource_ids: set[UUID] | None
 ) -> None:
     """Report checking independently from an already committed import."""
-    if not resource_ids:
+    if resource_ids is not None and not resource_ids:
         return
     try:
         result.conflicts_found = await refresh_resources(session, resource_ids)
@@ -657,3 +641,175 @@ async def check_import_conflicts(
         await session.rollback()
         logging.getLogger(__name__).exception("Conflict check after import failed")
         result.conflict_check_failed = True
+
+
+# Complete resource CSVs share these schemas; row ownership is split by type.
+
+RESOURCE_GROUP_CSV = entity(
+    ResourceGroup,
+    "id name resource_type parent_id created_at updated_at",
+    validation_dependents=("personal_resources", "infrastructure_resources"),
+)
+RESOURCE_WORK_PROFILE_CSV = entity(
+    ResourceWorkProfile,
+    "id resource_id group_id profile_id valid_from valid_until created_at updated_at",
+    reference_tables=("personal_resources", "infrastructure_resources"),
+)
+
+
+def binding_resource_type(row: dict, by_id: dict) -> str:
+    """Assign every week-profile binding to its resource/group's CSV area."""
+    if row["group_id"] is not None:
+        return (
+            by_id["resource_groups"]
+            .get(row["group_id"], {})
+            .get("resource_type", "personal")
+        )
+    resource_id = row["resource_id"]
+    personal = resource_id in by_id["personal_resources"]
+    infrastructure = resource_id in by_id["infrastructure_resources"]
+    if personal and infrastructure:
+        raise ValueError("Ambiguous resource work-profile reference.")
+    # Unknown references stay in the personnel file so validation rejects them;
+    # they must never be silently dropped from a source export.
+    return "infrastructure" if infrastructure else "personal"
+
+
+def resource_csv_data(data: dict[str, list[dict]], kind: str) -> dict[str, list[dict]]:
+    """Partition groups and work-profile bindings without changing their IDs."""
+    by_id = {
+        name: {row["id"]: row for row in data[name]}
+        for name in (
+            "resource_groups",
+            "personal_resources",
+            "infrastructure_resources",
+        )
+    }
+    return {
+        **data,
+        "resource_groups": [
+            row for row in data["resource_groups"] if row["resource_type"] == kind
+        ],
+        "resource_work_profiles": [
+            row
+            for row in data["resource_work_profiles"]
+            if binding_resource_type(row, by_id) == kind
+        ],
+    }
+
+
+def validate_resource_csv(context: "ImportContext", kind: str) -> None:
+    """Validate resource ownership, hierarchy and working-time references."""
+    from .csv_storage import _parent_order, validate_ranges
+
+    by_id = context.merged
+    groups = list(by_id["resource_groups"].values())
+    _parent_order(groups, context=context, table="resource_groups")
+    for row in groups:
+        if row["resource_type"] not in {"personal", "infrastructure"}:
+            context.fail(
+                "resource_groups", row, "resource_type", "Invalid resource type."
+            )
+        if row["parent_id"] is not None:
+            parent = by_id["resource_groups"][row["parent_id"]]
+            if (
+                parent["parent_id"] is not None
+                or parent["resource_type"] != row["resource_type"]
+            ):
+                context.fail(
+                    "resource_groups",
+                    row,
+                    "parent_id",
+                    "Invalid resource group hierarchy.",
+                )
+    table = "personal_resources" if kind == "personal" else "infrastructure_resources"
+    for row in by_id[table].values():
+        if by_id["resource_groups"][row["group_id"]]["resource_type"] != kind:
+            context.fail(table, row, "group_id", "Resource group/type mismatch.")
+    bindings = list(by_id["resource_work_profiles"].values())
+    validate_ranges(bindings, context=context, table="resource_work_profiles")
+    for row in bindings:
+        if (row["resource_id"] is None) == (row["group_id"] is None):
+            context.fail(
+                "resource_work_profiles",
+                row,
+                "resource_id/group_id",
+                "A work-profile binding needs exactly one resource or group.",
+            )
+        if (
+            row["resource_id"] is not None
+            and row["resource_id"] not in by_id["personal_resources"]
+            and row["resource_id"] not in by_id["infrastructure_resources"]
+        ):
+            context.fail(
+                "resource_work_profiles",
+                row,
+                "resource_id",
+                "Unknown resource work-profile reference.",
+            )
+        binding_resource_type(row, by_id)
+    skill_table = (
+        "personal_resource_skills"
+        if kind == "personal"
+        else "infrastructure_resource_skills"
+    )
+    validate_ranges(
+        list(by_id[skill_table].values()), context=context, table=skill_table
+    )
+
+
+def track_resource_csv(context: "ImportContext", kind: str) -> None:
+    """Refresh supplied resources plus old/new targets of calendar bindings."""
+    table = "personal_resources" if kind == "personal" else "infrastructure_resources"
+    context.track_resources(table, "id")
+    context.track_resources("resource_work_profiles")
+    supplied = context.data.get("resource_work_profiles", [])
+    ids = {row["id"] for row in supplied}
+    bindings = supplied + [
+        row for row in context.existing["resource_work_profiles"] if row["id"] in ids
+    ]
+    groups = {row["id"] for row in context.data.get("resource_groups", [])}
+    groups.update(row["group_id"] for row in bindings if row["group_id"] is not None)
+    groups.update(
+        row["id"]
+        for row in context.merged["resource_groups"].values()
+        if row["parent_id"] in groups
+    )
+    for resource_table in ("personal_resources", "infrastructure_resources"):
+        context.affected_resources.update(
+            row["id"]
+            for row in context.merged[resource_table].values()
+            if row["group_id"] in groups
+        )
+
+
+async def resource_ids_for_groups(
+    session: AsyncSession, group_ids: set[UUID]
+) -> set[UUID]:
+    """Find resources inheriting calendar bindings from the selected groups."""
+    from .csv_storage import id_batches
+
+    groups = set(group_ids)
+    for chunk in id_batches(group_ids):
+        groups.update(
+            (
+                await session.execute(
+                    select(ResourceGroup.id).where(ResourceGroup.parent_id.in_(chunk))
+                )
+            )
+            .scalars()
+            .all()
+        )
+    result: set[UUID] = set()
+    for model in (PersonalResource, InfrastructureResource):
+        for chunk in id_batches(groups):
+            result.update(
+                (
+                    await session.execute(
+                        select(model.id).where(model.group_id.in_(chunk))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+    return result

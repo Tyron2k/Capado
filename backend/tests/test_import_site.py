@@ -114,61 +114,40 @@ class TestResolvingASiteName:
 
 
 class TestTheExportSideOfTheRoundTrip:
-    """The exporter's header was untested, and it is the half that has to match the importer.
+    """The editable Excel export remains compatible with the legacy importer."""
 
-    The round trip is documented as the way to edit in bulk: export, edit in Excel, import. That only
-    holds if what the exporter WRITES is what the importer RECOGNISES. Nothing checked that, so a
-    column added on one side and misspelled on the other would have passed every test and failed on
-    the operator's first attempt.
-    """
+    def test_the_flat_excel_header_and_site_match_the_importer(self):
+        import io
 
-    def test_the_csv_header_is_recognised_by_the_importer(self):
-        from app.services.import_export.common import _build_flat_resource_csv
+        from openpyxl import load_workbook
 
-        csv_text = _build_flat_resource_csv(
-            [("Müller", "Lackierer", None, None, "Werk Ammendorf")]
-        )
-        header = tuple(csv_text.splitlines()[0].split(";"))
-        assert detect_import_shape([header, ()]) is ImportShape.FLAT
-
-    def test_the_csv_header_carries_a_site_column_the_importer_can_locate(self):
         from app.services.import_export.common import (
-            _build_flat_resource_csv,
+            _build_flat_resource_xlsx,
             _site_column_index,
         )
 
-        csv_text = _build_flat_resource_csv(
-            [("Müller", "Lackierer", None, None, "Werk Ammendorf")]
+        workbook = load_workbook(
+            io.BytesIO(
+                _build_flat_resource_xlsx(
+                    [
+                        ("Müller", "Lackierer", None, None, "Werk Ammendorf"),
+                        ("Schmidt", "Lackierer", None, None, None),
+                    ],
+                    "Personnel",
+                )
+            ),
+            read_only=True,
+            data_only=True,
         )
-        header = csv_text.splitlines()[0].split(";")
-        assert _site_column_index(header) is not None
-
-    def test_the_exported_site_name_lands_in_that_column(self):
-        from app.services.import_export.common import (
-            _build_flat_resource_csv,
-            _site_column_index,
-        )
-
-        csv_text = _build_flat_resource_csv(
-            [("Müller", "Lackierer", None, None, "Werk Ammendorf")]
-        )
-        lines = csv_text.splitlines()
-        index = _site_column_index(lines[0].split(";"))
-        assert index is not None
-        assert lines[1].split(";")[index] == "Werk Ammendorf"
-
-    def test_a_resource_without_a_site_exports_an_empty_cell(self):
-        """Not the string "None", which would then be imported as an unknown site and rejected."""
-        from app.services.import_export.common import (
-            _build_flat_resource_csv,
-            _site_column_index,
-        )
-
-        csv_text = _build_flat_resource_csv([("Müller", "Lackierer", None, None, None)])
-        lines = csv_text.splitlines()
-        index = _site_column_index(lines[0].split(";"))
-        assert index is not None
-        assert lines[1].split(";")[index] == ""
+        try:
+            rows = list(workbook.active.iter_rows(values_only=True))
+            assert detect_import_shape(rows) is ImportShape.FLAT
+            index = _site_column_index(rows[0])
+            assert index is not None
+            assert rows[1][index] == "Werk Ammendorf"
+            assert rows[2][index] is None
+        finally:
+            workbook.close()
 
 
 @pytest.mark.parametrize(

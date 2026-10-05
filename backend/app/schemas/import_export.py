@@ -11,5 +11,6 @@ class ImportResultResponse(BaseModel):
     skipped: int
     errors: list[str]
     success: bool
+    atomic: bool = False
     conflicts_found: int | None = None
     conflict_check_failed: bool = False

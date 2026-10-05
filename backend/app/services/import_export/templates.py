@@ -6,7 +6,6 @@ their optional requirements.
 """
 
 import asyncio
-import csv
 import io
 
 from openpyxl import Workbook
@@ -14,9 +13,16 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app import models as m
 from app.models.skill import Skill, SkillAttribute
 
 from .common import ImportResult, _parse_header
+from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
+from .csv_storage import (
+    ImportContext,
+    load_data,
+    write_area,
+)
 
 
 async def _load_templates_export_rows(session: AsyncSession) -> list[tuple]:
@@ -156,29 +162,10 @@ def _build_templates_xlsx(rows: list[tuple]) -> bytes:
 
 
 async def export_templates_csv(session: AsyncSession) -> str:
-    """Export templates and requirements as CSV."""
-    rows = await _load_templates_export_rows(session)
-    return await asyncio.to_thread(_build_templates_csv, rows)
+    """Export the complete area CSV also included verbatim in the all-data ZIP."""
+    from .csv_transfer import export_area
 
-
-def _build_templates_csv(rows: list[tuple]) -> str:
-    """Build templates CSV content."""
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow(["Template", "Description", "Skill", "Attribute", "Quantity"])
-
-    for tpl_name, description, skill_name, attr_name, quantity in rows:
-        writer.writerow(
-            [
-                tpl_name,
-                description or "",
-                skill_name or "",
-                attr_name or "",
-                quantity if quantity else "",
-            ]
-        )
-
-    return output.getvalue()
+    return (await export_area(session, "templates")).decode("utf-8-sig")
 
 
 async def import_templates(session: AsyncSession, rows: list[tuple]) -> ImportResult:
@@ -191,6 +178,12 @@ async def import_templates(session: AsyncSession, rows: list[tuple]) -> ImportRe
     Returns:
         Import result with counts.
     """
+    from .csv_format import is_area_csv
+    from .csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        return await import_area_rows(session, "templates", rows)
+
     from app.models.work_package_template import (
         WorkPackageTemplate,
         WorkPackageTemplateRequirement,
@@ -291,3 +284,57 @@ async def import_templates(session: AsyncSession, rows: list[tuple]) -> ImportRe
 
     await session.commit()
     return result
+
+
+CSV_AREA = CsvArea(
+    "templates",
+    (
+        entity(
+            m.WorkPackageTemplate,
+            "id name description lead_time_working_days created_at updated_at",
+        ),
+        entity(
+            m.WorkPackageTemplateRequirement,
+            "id template_id skill_id skill_attribute_id quantity requirement_mode min_allocation_percent min_level created_at",
+        ),
+    ),
+)
+
+
+async def load_export(session: AsyncSession) -> dict[str, list[dict]]:
+    """Read this area's approved data and the references needed by its exporter."""
+    return await load_data(session, CSV_AREA.entities)
+
+
+def export_csv(data: dict[str, list[dict]]) -> bytes:
+    """Produce the complete area CSV used by both downloads and ZIP exports."""
+    return dump_area(CSV_AREA, data)
+
+
+def parse_csv(rows: list[tuple] | list[list[str]]) -> CsvBatch:
+    """Decode and check the versioned CSV belonging to this domain."""
+    return parse_area_rows(CSV_AREA, rows)
+
+
+def validate_import(context: ImportContext) -> None:
+    """Check template requirement attributes against their skills."""
+    by_id = context.merged
+    for row in by_id["work_package_template_requirements"].values():
+        if (
+            row["skill_attribute_id"] is not None
+            and by_id["skill_attributes"][row["skill_attribute_id"]]["skill_id"]
+            != row["skill_id"]
+        ):
+            context.fail(
+                "work_package_template_requirements",
+                row,
+                "skill_attribute_id",
+                "Requirement skill/attribute mismatch.",
+            )
+
+
+async def write_import(
+    session: AsyncSession, batch: CsvBatch, context: ImportContext
+) -> ImportResult:
+    """Write this area's prepared records inside the caller's transaction."""
+    return await write_area(session, CSV_AREA.entities, batch.data, context)

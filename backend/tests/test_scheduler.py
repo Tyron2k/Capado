@@ -198,3 +198,19 @@ def test_conflict_check_is_due_at_startup_and_every_fifteen_minutes():
     assert due(NOW - timedelta(minutes=15))
     assert not due(NOW - timedelta(minutes=14, seconds=59))
     assert not sched._job_due(sched.CONFLICT_CHECK_JOB, NOW, None, False, 0)
+
+
+async def test_disabling_maintenance_while_waiting_for_lock_starts_nothing():
+    """A worker with stale settings must not prune newly imported CSV history."""
+    settings = OrganizationSettings(scheduler_enabled=True, maintenance_hour=2)
+    session = _session(settings)
+    original = session.execute.side_effect
+
+    def execute(statement, params=None):
+        if "pg_try_advisory_lock" in str(statement):
+            settings.scheduler_enabled = False
+        return original(statement, params)
+
+    session.execute = AsyncMock(side_effect=execute)
+    assert await sched.run_due_jobs(session, now=NOW) == []
+    session.add.assert_not_called()

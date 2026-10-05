@@ -72,10 +72,17 @@ describe('PlanningAdminPanel', () => {
 
   it('wires the ImportExportBar to the assignments endpoints', () => {
     renderWithProviders(<PlanningAdminPanel />)
-    const bar = screen.getByTestId('import-export-bar')
+    const bar = screen
+      .getAllByTestId('import-export-bar')
+      .find((element) => element.getAttribute('data-filename-base') === 'assignments')!
     expect(bar).toHaveAttribute('data-export-path', '/api/assignments/export')
     expect(bar).toHaveAttribute('data-import-path', '/api/assignments/import')
     expect(bar).toHaveAttribute('data-filename-base', 'assignments')
+    const absences = screen
+      .getAllByTestId('import-export-bar')
+      .find((element) => element.getAttribute('data-filename-base') === 'absences')!
+    expect(absences).toHaveAttribute('data-export-path', '/api/data/absences/export')
+    expect(absences).toHaveAttribute('data-import-path', '/api/data/absences/import')
   })
 
   it('renders the assignments CSV hint', () => {

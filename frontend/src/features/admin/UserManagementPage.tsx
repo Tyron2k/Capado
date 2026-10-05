@@ -24,6 +24,7 @@ import {
   type UserUpdateData,
 } from '../../api/users'
 import { UserFormModal } from './UserFormModal'
+import { CsvAreaBar } from '../resources/CsvAreaBar'
 
 const PAGE_SIZE = 50
 
@@ -225,9 +226,12 @@ export function UserManagementPage() {
     <PageLayout
       title={t('userManagement.title')}
       headerActions={
-        <Button leftSection={<IconPlus size={18} />} onClick={handleCreate}>
-          {t('userManagement.createUser')}
-        </Button>
+        <Group gap="xs">
+          <CsvAreaBar area="administration" />
+          <Button leftSection={<IconPlus size={18} />} onClick={handleCreate}>
+            {t('userManagement.createUser')}
+          </Button>
+        </Group>
       }
     >
       <DataTable

@@ -1,342 +1,381 @@
-"""Export and import routines for resource assignments.
+"""CSV transfers of assignments, preserving intervals and resource identity."""
 
-Provides a CSV export of personal and infrastructure assignments and an
-importer that resolves projects, work packages, and resources by name and
-creates the matching personal or infrastructure assignments.
-"""
-
-import asyncio
-import csv
-import io
+import math
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from app.services.time_zone import (
-    local_date,
-    local_wall_time_to_utc,
-    planning_zone,
-)
+from app import models as m
+from app.models.assignment import Assignment
+from app.models.project import Project, WorkPackage
+from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.models.resource_group import ResourceGroup
+from app.services.time_zone import local_date, local_wall_time_to_utc, planning_zone
 
 from .common import ImportResult, _parse_header, check_import_conflicts
+from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
+from .csv_storage import (
+    ImportContext,
+    load_data,
+    validate_ranges,
+    write_area,
+)
+
+_HEADERS = (
+    "Project",
+    "Work Package",
+    "Resource",
+    "Start",
+    "End",
+    "Allocation",
+    "Resource Type",
+    "Resource Group",
+)
 
 
-async def _load_assignments_export_rows(session: AsyncSession) -> list[tuple]:
-    """Load assignments with project, work package, and resource names for export.
+def _stored_utc(value: datetime | None) -> datetime | None:
+    """Normalize stored UTC values, including SQLite's offset-free test results.
 
-    Each assignment produces one row with the project name, work package name,
-    resource name, date range, and allocation.
+    Production timestamps are timestamptz (migration 002). SQLite drops offsets
+    on read; this fallback is only for stored values, never for CSV input.
     """
-    from app.models.assignment import Assignment
-    from app.models.project import Project, WorkPackage
-    from app.models.resource import InfrastructureResource, PersonalResource
-
-    # Personal assignments
-    personal_stmt = (
-        select(
-            Project.name.label("project_name"),
-            WorkPackage.name.label("wp_name"),
-            PersonalResource.name.label("resource_name"),
-            Assignment.start_date,
-            Assignment.end_date,
-            Assignment.allocation_percent,
-            Assignment.resource_type,
-        )
-        .join(WorkPackage, Assignment.work_package_id == WorkPackage.id)
-        .join(Project, WorkPackage.project_id == Project.id)
-        .join(PersonalResource, Assignment.resource_id == PersonalResource.id)
-        .where(Assignment.resource_type == "personal")
-        .order_by(Project.name, WorkPackage.name, PersonalResource.name)
+    if value is None:
+        return None
+    return (
+        value.replace(tzinfo=UTC)
+        if value.utcoffset() is None
+        else value.astimezone(UTC)
     )
-    personal_result = await session.execute(personal_stmt)
-    personal_rows = [
-        (
-            row.project_name,
-            row.wp_name,
-            row.resource_name,
-            row.start_date.isoformat() if row.start_date else "",
-            row.end_date.isoformat() if row.end_date else "",
-            str(int(row.allocation_percent)) if row.allocation_percent else "100",
-        )
-        for row in personal_result.all()
-    ]
-
-    # Infrastructure assignments
-    infra_stmt = (
-        select(
-            Project.name.label("project_name"),
-            WorkPackage.name.label("wp_name"),
-            InfrastructureResource.name.label("resource_name"),
-            Assignment.start_at,
-            Assignment.end_at,
-            Assignment.resource_type,
-        )
-        .join(WorkPackage, Assignment.work_package_id == WorkPackage.id)
-        .join(Project, WorkPackage.project_id == Project.id)
-        .join(
-            InfrastructureResource,
-            Assignment.resource_id == InfrastructureResource.id,
-        )
-        .where(Assignment.resource_type == "infrastructure")
-        .order_by(Project.name, WorkPackage.name, InfrastructureResource.name)
-    )
-    infra_result = await session.execute(infra_stmt)
-    infra_rows = [
-        (
-            row.project_name,
-            row.wp_name,
-            row.resource_name,
-            local_date(row.start_at, planning_zone()).isoformat()
-            if row.start_at
-            else "",
-            local_date(row.end_at, planning_zone()).isoformat() if row.end_at else "",
-            "100",
-        )
-        for row in infra_result.all()
-    ]
-
-    return personal_rows + infra_rows
 
 
 async def export_assignments_csv(session: AsyncSession) -> str:
-    """Export assignments as CSV (Project;Work Package;Resource;Start;End;Allocation)."""
-    rows = await _load_assignments_export_rows(session)
-    return await asyncio.to_thread(_build_assignments_csv, rows)
+    """Export the complete area CSV also included verbatim in the all-data ZIP."""
+    from .csv_transfer import export_area
+
+    return (await export_area(session, "assignments")).decode("utf-8-sig")
 
 
-def _build_assignments_csv(rows: list[tuple]) -> str:
-    """Build assignments CSV content (CPU-bound, runs in thread pool)."""
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow(
-        ["Project", "Work Package", "Resource", "Start", "End", "Allocation"]
+def _assignment_key(assignment: Assignment) -> tuple:
+    """Only an identical interval and allocation is a duplicate booking."""
+    return (
+        assignment.resource_type,
+        assignment.resource_id,
+        assignment.work_package_id,
+        assignment.start_date,
+        assignment.end_date,
+        assignment.allocation_percent,
+        _stored_utc(assignment.start_at),
+        _stored_utc(assignment.end_at),
     )
-    for project, wp, resource, start, end, alloc in rows:
-        writer.writerow([project, wp, resource, start, end, alloc])
-    return output.getvalue()
+
+
+def _infrastructure_time(value: str, *, hour: int) -> datetime:
+    """Accept offset-bearing timestamps, or the historical date-only format."""
+    try:
+        day = date.fromisoformat(value)
+    except ValueError:
+        instant = datetime.fromisoformat(value)
+        if instant.utcoffset() is None:
+            raise ValueError(
+                "Infrastructure timestamps must include a UTC offset."
+            ) from None
+        return instant.astimezone(UTC)
+    return local_wall_time_to_utc(
+        datetime.combine(day, datetime.min.time()).replace(hour=hour), planning_zone()
+    )
 
 
 async def import_assignments(session: AsyncSession, rows: list[tuple]) -> ImportResult:
-    """Import assignments from CSV.
+    """Import precise or legacy assignments, refusing ambiguous references.
 
-    Supports two CSV formats:
-    - 6 columns: Project; Work Package; Resource; Start; End; Allocation
-    - 5 columns: Project; Resource; Start; End; Allocation
-      (work package is auto-resolved by finding the first WP in the project
-      whose date range overlaps the assignment dates)
-
-    Resources are looked up by name. If found as infrastructure, an
-    infrastructure assignment (start_at/end_at) is created. If found as
-    personal, a personal assignment (start_date/end_date/allocation_percent)
-    is created. Duplicates (same resource + work package) are skipped.
-
-    Args:
-        session: Database session.
-        rows: Parsed rows including header.
-
-    Returns:
-        Import result with counts.
+    New exports append Resource Type and Resource Group to the six-column
+    format. Legacy five-column files omit Work Package; automatic resolution
+    succeeds only if one overlapping work package (or one total) is available.
+    Date-only infrastructure intervals retain the historical 06:00/18:00
+    planning-zone defaults. Explicit timestamps must include their UTC offset.
     """
-    from datetime import date as date_type
-    from datetime import datetime as datetime_type
+    from .csv_format import is_area_csv
+    from .csv_transfer import import_area_rows
 
-    from app.models.assignment import Assignment
-    from app.models.project import Project, WorkPackage
-    from app.models.resource import InfrastructureResource, PersonalResource
+    if is_area_csv(rows):
+        return await import_area_rows(session, "assignments", rows)
 
     result = ImportResult()
-
     if not rows:
         result.errors.append("File is empty.")
         return result
 
-    header = _parse_header(rows[0])
-    if len(header) < 5:
+    header = [cell.lower() for cell in _parse_header(rows[0])]
+    required = {"project", "resource", "start", "end", "allocation"}
+    if not required.issubset(header) or len(header) != len(set(header)):
         result.errors.append(
-            "Header must have at least: Project, Resource, Start, End, Allocation."
+            "Header must have unique columns including: Project, Resource, Start, End, Allocation."
         )
         return result
+    columns = {name: index for index, name in enumerate(header)}
 
-    # Detect format: 6 columns (with Work Package) or 5 columns (without)
-    has_wp_column = len(header) >= 6 and "work" in header[1].lower()
-
-    # Pre-load caches
-    project_stmt = select(Project)
-    project_result = await session.execute(project_stmt)
-    projects_by_name: dict[str, Project] = {
-        p.name.lower(): p for p in project_result.scalars().all()
-    }
-
-    infra_stmt = select(InfrastructureResource).where(
-        InfrastructureResource.is_active == True  # noqa: E712
+    projects = (await session.execute(select(Project))).scalars().all()
+    infra = (
+        (
+            await session.execute(
+                select(InfrastructureResource).where(
+                    InfrastructureResource.is_active.is_(True)
+                )
+            )
+        )
+        .scalars()
+        .all()
     )
-    infra_result = await session.execute(infra_stmt)
-    infra_by_name: dict[str, InfrastructureResource] = {
-        r.name.lower(): r for r in infra_result.scalars().all()
-    }
-
-    personal_stmt = select(PersonalResource).where(
-        PersonalResource.is_active == True  # noqa: E712
+    personal = (
+        (
+            await session.execute(
+                select(PersonalResource).where(PersonalResource.is_active.is_(True))
+            )
+        )
+        .scalars()
+        .all()
     )
-    personal_result = await session.execute(personal_stmt)
-    personal_by_name: dict[str, PersonalResource] = {
-        r.name.lower(): r for r in personal_result.scalars().all()
-    }
-
-    # Pre-load existing assignments for duplicate detection
-    existing_stmt = select(Assignment)
-    existing_result = await session.execute(existing_stmt)
-    existing_assignments: set[tuple[UUID, UUID]] = {
-        (a.resource_id, a.work_package_id) for a in existing_result.scalars().all()
-    }
+    existing = (await session.execute(select(Assignment))).scalars().all()
+    existing_keys = {_assignment_key(assignment) for assignment in existing}
+    projects_by_name: dict[str, list[Project]] = {}
+    for project in projects:
+        projects_by_name.setdefault(project.name.lower(), []).append(project)
+    resources_by_name: dict[
+        str, list[tuple[InfrastructureResource | PersonalResource, ResourceType]]
+    ] = {}
+    for resources, resource_type in (
+        (infra, ResourceType.infrastructure),
+        (personal, ResourceType.personal),
+    ):
+        for resource in resources:
+            resources_by_name.setdefault(resource.name.lower(), []).append(
+                (resource, resource_type)
+            )
+    groups: dict[UUID, str] = {}
+    if "resource group" in columns:
+        groups = {
+            g.id: g.name.lower()
+            for g in (await session.execute(select(ResourceGroup))).scalars().all()
+        }
 
     affected: set[UUID] = set()
     for row_idx, row in enumerate(rows[1:], start=2):
-        cells = [str(cell).strip() if cell else "" for cell in row]
+        cells = [str(cell).strip() if cell is not None else "" for cell in row]
 
-        if has_wp_column:
-            project_name = cells[0] if len(cells) > 0 else ""
-            wp_name = cells[1] if len(cells) > 1 else ""
-            resource_name = cells[2] if len(cells) > 2 else ""
-            start_str = cells[3] if len(cells) > 3 else ""
-            end_str = cells[4] if len(cells) > 4 else ""
-            alloc_str = cells[5] if len(cells) > 5 else "100"
-        else:
-            project_name = cells[0] if len(cells) > 0 else ""
-            wp_name = ""
-            resource_name = cells[1] if len(cells) > 1 else ""
-            start_str = cells[2] if len(cells) > 2 else ""
-            end_str = cells[3] if len(cells) > 3 else ""
-            alloc_str = cells[4] if len(cells) > 4 else "100"
+        def cell(name: str, cells: list[str] = cells) -> str:
+            index = columns.get(name)
+            return cells[index] if index is not None and index < len(cells) else ""
 
+        if not any(cells):
+            continue
+        project_name, resource_name = cell("project"), cell("resource")
         if not project_name or not resource_name:
+            result.errors.append(f"Row {row_idx}: Project and Resource are required.")
             continue
-
-        # Parse dates
-        try:
-            start_date = date_type.fromisoformat(start_str) if start_str else None
-            end_date = date_type.fromisoformat(end_str) if end_str else None
-        except ValueError:
-            result.errors.append(
-                f"Row {row_idx}: Invalid date format (use YYYY-MM-DD)."
-            )
-            continue
-
-        if not start_date or not end_date:
+        if not cell("start") or not cell("end"):
             result.errors.append(f"Row {row_idx}: Start and End dates are required.")
             continue
 
-        # Parse allocation
-        try:
-            allocation = float(alloc_str) if alloc_str else 100.0
-        except ValueError:
-            allocation = 100.0
-
-        # Resolve project
-        project = projects_by_name.get(project_name.lower())
-        if project is None:
-            result.errors.append(f"Row {row_idx}: Project '{project_name}' not found.")
+        matches = projects_by_name.get(project_name.lower(), [])
+        if len(matches) != 1:
+            reason = (
+                "not found" if not matches else "ambiguous; use a unique project name"
+            )
+            result.errors.append(f"Row {row_idx}: Project '{project_name}' {reason}.")
             continue
+        project = matches[0]
 
-        # Resolve work package
-        wp: WorkPackage | None = None
-        if wp_name:
-            wp_stmt = select(WorkPackage).where(
-                WorkPackage.project_id == project.id,
-                func.lower(WorkPackage.name) == wp_name.lower(),
-            )
-            wp_result_db = await session.execute(wp_stmt)
-            wp = wp_result_db.scalars().first()
-            if wp is None:
-                result.errors.append(
-                    f"Row {row_idx}: Work package '{wp_name}' not found "
-                    f"in project '{project_name}'."
-                )
-                continue
-        else:
-            # Auto-resolve: find the first work package whose dates overlap
-            wp_stmt = (
-                select(WorkPackage)
-                .where(
-                    WorkPackage.project_id == project.id,
-                    WorkPackage.start_date <= end_date,
-                    WorkPackage.end_date >= start_date,
-                )
-                .order_by(WorkPackage.start_date)
-            )
-            wp_result_db = await session.execute(wp_stmt)
-            wp = wp_result_db.scalars().first()
-            if wp is None:
-                # Fallback: just take the first WP in the project
-                wp_stmt = (
-                    select(WorkPackage)
-                    .where(WorkPackage.project_id == project.id)
-                    .order_by(WorkPackage.start_date)
-                )
-                wp_result_db = await session.execute(wp_stmt)
-                wp = wp_result_db.scalars().first()
-            if wp is None:
-                result.errors.append(
-                    f"Row {row_idx}: No work package found for project "
-                    f"'{project_name}'."
-                )
-                continue
-
-        # Resolve resource (infrastructure first, then personal)
-        infra_resource = infra_by_name.get(resource_name.lower())
-        personal_resource = personal_by_name.get(resource_name.lower())
-
-        if infra_resource:
-            resource_id = infra_resource.id
-            resource_type = "infrastructure"
-        elif personal_resource:
-            resource_id = personal_resource.id
-            resource_type = "personal"
-        else:
+        kind, group_name = cell("resource type").lower(), cell("resource group").lower()
+        if "resource type" in columns and kind not in {"personal", "infrastructure"}:
             result.errors.append(
-                f"Row {row_idx}: Resource '{resource_name}' not found."
+                f"Row {row_idx}: Resource Type must be personal or infrastructure."
+            )
+            continue
+        if "resource group" in columns and not group_name:
+            result.errors.append(
+                f"Row {row_idx}: Resource Group is required when its column is present."
+            )
+            continue
+        candidates = [
+            (resource, resource_type)
+            for resource, resource_type in resources_by_name.get(
+                resource_name.lower(), []
+            )
+            if (not kind or kind == resource_type)
+            and (not group_name or groups.get(resource.group_id) == group_name)
+        ]
+        if len(candidates) != 1:
+            if not candidates:
+                reason = "not found among active resources"
+            elif kind and group_name:
+                reason = (
+                    "ambiguous even with type/group; use unique resource or group names"
+                )
+            else:
+                reason = "ambiguous; specify Resource Type and Resource Group"
+            result.errors.append(f"Row {row_idx}: Resource '{resource_name}' {reason}.")
+            continue
+        resource, resource_type = candidates[0]
+
+        fields: dict[str, date | datetime | float]
+        try:
+            if resource_type == ResourceType.infrastructure:
+                start_at = _infrastructure_time(cell("start"), hour=6)
+                end_at = _infrastructure_time(cell("end"), hour=18)
+                if end_at <= start_at:
+                    raise ValueError("End time must be after Start time.")
+                start_date, end_date = (
+                    local_date(start_at, planning_zone()),
+                    local_date(end_at, planning_zone()),
+                )
+                fields = {"start_at": start_at, "end_at": end_at}
+            else:
+                start_date, end_date = (
+                    date.fromisoformat(cell("start")),
+                    date.fromisoformat(cell("end")),
+                )
+                if end_date < start_date:
+                    raise ValueError("End date must not be before Start date.")
+                allocation = float(cell("allocation") or "100")
+                if not math.isfinite(allocation) or not 0 < allocation <= 100:
+                    raise ValueError(
+                        "Allocation must be a finite number greater than 0 and at most 100."
+                    )
+                fields = {
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "allocation_percent": allocation,
+                }
+        except ValueError as exc:
+            result.errors.append(
+                f"Row {row_idx}: Invalid date, time or allocation: {exc} (use YYYY-MM-DD or an ISO timestamp with a UTC offset)."
             )
             continue
 
-        affected.add(resource_id)
+        wp_name = cell("work package")
+        wp_stmt = select(WorkPackage).where(WorkPackage.project_id == project.id)
+        if wp_name:
+            wp_stmt = wp_stmt.where(func.lower(WorkPackage.name) == wp_name.lower())
+        else:
+            wp_stmt = wp_stmt.where(
+                WorkPackage.start_date <= end_date, WorkPackage.end_date >= start_date
+            )
+        work_packages = (await session.execute(wp_stmt)).scalars().all()
+        if not wp_name and not work_packages:
+            work_packages = (
+                (
+                    await session.execute(
+                        select(WorkPackage).where(WorkPackage.project_id == project.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        if len(work_packages) != 1:
+            reason = (
+                "not found"
+                if not work_packages
+                else "ambiguous; specify a unique Work Package name"
+            )
+            result.errors.append(
+                f"Row {row_idx}: Work package '{wp_name}' {reason} in project '{project_name}'."
+            )
+            continue
 
-        # Check for duplicate
-        assign_key = (resource_id, wp.id)
-        if assign_key in existing_assignments:
+        assignment = Assignment(
+            resource_id=resource.id,
+            resource_type=resource_type,
+            work_package_id=work_packages[0].id,
+            **fields,
+        )
+        # An unchanged re-import also repairs missing/stale conflict records.
+        affected.add(resource.id)
+        key = _assignment_key(assignment)
+        if key in existing_keys:
             result.skipped += 1
             continue
-
-        # Create the assignment
-        if resource_type == "infrastructure":
-            assignment = Assignment(
-                resource_id=resource_id,
-                resource_type=resource_type,
-                work_package_id=wp.id,
-                start_at=local_wall_time_to_utc(
-                    datetime_type(start_date.year, start_date.month, start_date.day, 6),
-                    planning_zone(),
-                ),
-                end_at=local_wall_time_to_utc(
-                    datetime_type(end_date.year, end_date.month, end_date.day, 18),
-                    planning_zone(),
-                ),
-            )
-        else:
-            assignment = Assignment(
-                resource_id=resource_id,
-                resource_type=resource_type,
-                work_package_id=wp.id,
-                start_date=start_date,
-                end_date=end_date,
-                allocation_percent=allocation,
-            )
-
         session.add(assignment)
-        existing_assignments.add(assign_key)
+        existing_keys.add(key)
         result.created += 1
 
     await session.commit()
     await check_import_conflicts(session, result, affected)
     return result
+
+
+CSV_AREA = CsvArea(
+    "assignments",
+    (
+        entity(
+            m.Assignment,
+            "id resource_id resource_type work_package_id start_date end_date allocation_percent start_at end_at created_at updated_at",
+            reference_tables=("personal_resources", "infrastructure_resources"),
+            existing_by_id=True,
+        ),
+    ),
+)
+
+
+async def load_export(session: AsyncSession) -> dict[str, list[dict]]:
+    """Read this area's approved data and the references needed by its exporter."""
+    return await load_data(session, CSV_AREA.entities)
+
+
+def export_csv(data: dict[str, list[dict]]) -> bytes:
+    """Produce the complete area CSV used by both downloads and ZIP exports."""
+    return dump_area(CSV_AREA, data)
+
+
+def parse_csv(rows: list[tuple] | list[list[str]]) -> CsvBatch:
+    """Decode and check the versioned CSV belonging to this domain."""
+    return parse_area_rows(CSV_AREA, rows)
+
+
+def validate_import(context: ImportContext) -> None:
+    """Validate resource references and the distinct personal/infrastructure shapes."""
+    by_id = context.merged
+    validate_ranges(
+        list(by_id["assignments"].values()), context=context, table="assignments"
+    )
+    for row in by_id["assignments"].values():
+        personal = row["resource_type"] == "personal"
+        table = "personal_resources" if personal else "infrastructure_resources"
+        if row["resource_id"] not in by_id[table]:
+            context.fail("assignments", row, "resource_id", "unknown resource.")
+        required = (
+            ("start_date", "end_date", "allocation_percent")
+            if personal
+            else ("start_at", "end_at")
+        )
+        forbidden = (
+            ("start_at", "end_at")
+            if personal
+            else ("start_date", "end_date", "allocation_percent")
+        )
+        if any(row[key] is None for key in required) or any(
+            row[key] is not None for key in forbidden
+        ):
+            context.fail(
+                "assignments",
+                row,
+                "resource_type/start_date/end_date/start_at/end_at/allocation_percent",
+                "Assignment date/time fields do not match its resource type.",
+            )
+        if not personal and row["end_at"] <= row["start_at"]:
+            context.fail(
+                "assignments",
+                row,
+                "end_at",
+                "Assignment end time must follow start time.",
+            )
+
+
+async def write_import(
+    session: AsyncSession, batch: CsvBatch, context: ImportContext
+) -> ImportResult:
+    """Write this area's prepared records inside the caller's transaction."""
+    context.track_resources("assignments")
+    return await write_area(session, CSV_AREA.entities, batch.data, context)

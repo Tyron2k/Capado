@@ -20,6 +20,7 @@ import {
   TextInput,
 } from '@mantine/core'
 import { SectionHeader } from '../../../components/layout'
+import { CsvAreaBar } from '../CsvAreaBar'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../../utils/errorHandling'
 import {
@@ -252,17 +253,23 @@ export function SkillsPanel({ resourceType = 'personal' }: SkillsPanelProps) {
       <SectionHeader
         title={t('skills.title')}
         actions={
-          !addSkillMode ? (
-            <Button
-              size="xs"
-              leftSection={<IconPlus size={14} />}
-              onClick={() => setAddSkillMode(true)}
-            >
-              {t('skills.addSkill')}
-            </Button>
-          ) : undefined
+          <Group gap="xs">
+            <CsvAreaBar area="skills" />
+            {!addSkillMode && (
+              <Button
+                size="xs"
+                leftSection={<IconPlus size={14} />}
+                onClick={() => setAddSkillMode(true)}
+              >
+                {t('skills.addSkill')}
+              </Button>
+            )}
+          </Group>
         }
       />
+      <Text size="xs" c="dimmed">
+        {t('importExport.skillsDescription')}
+      </Text>
 
       {addSkillMode && (
         <Group gap="xs">

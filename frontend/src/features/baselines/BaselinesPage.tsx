@@ -31,6 +31,7 @@ import {
 import { notifications } from '@mantine/notifications'
 import { IconCamera, IconInfoCircle, IconTrash } from '@tabler/icons-react'
 import { DataTable, PageLayout, SectionHeader } from '../../components/layout'
+import { CsvAreaBar } from '../resources/CsvAreaBar'
 import { showErrorNotification } from '../../utils/errorHandling'
 import {
   createBaseline,
@@ -209,7 +210,10 @@ export function BaselinesPage() {
   }
 
   return (
-    <PageLayout title={t('baselines.title')}>
+    <PageLayout
+      title={t('baselines.title')}
+      headerActions={isAdmin && <CsvAreaBar area="history" />}
+    >
       <Stack gap="md">
         {/* The single most misread thing about this feature. */}
         <Alert icon={<IconInfoCircle size={16} />} color="blue">

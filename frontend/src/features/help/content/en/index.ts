@@ -177,6 +177,39 @@ That is the complete list. There is deliberately no save shortcut: changes are c
     `.trim(),
   },
 
+  {
+    slug: 'data-migration',
+    title: 'Move all data to a new installation',
+    category: 'how-to',
+    routes: ['/settings'],
+    body: `
+## Data migration with CSV
+
+Use **Settings → Import / Export → All CSVs as ZIP** to export and import master data, active and inactive resources, the complete skill catalogue and qualifications, working time and absences, projects and hierarchies, requirements and bookings, user roles, settings with the logo, baselines and audit history.
+
+1. Upgrade source and destination to the same version supporting this feature.
+2. Download the CSV package from the source. Keep the source installation for comparison.
+3. Set up only the administrator in the empty destination and sign in. Do not create sites, profiles, additional accounts or planning data yet.
+4. Upload the **unchanged ZIP** at the destination. Capado validates the CSVs together and restores their order, identifiers and relationships automatically.
+5. Check the import log, conflicts, capacity, qualifications, requirement coverage and baselines.
+6. Reset imported users' passwords or configure their login again. Then configure and enable email and scheduled maintenance if required.
+
+The destination must be empty. Its administrator account, settings and setup audit records may already exist. Existing planning/master data, additional accounts or an invalid package cause rejection with **nothing imported**. Settings are replaced; the destination account and its login remain usable. A source account with the same email must be an active administrator and is mapped to it.
+
+Passwords, identity bindings and sessions are excluded. User roles, scopes and personal-resource links are retained. Historic password values are redacted in audit records. Conflicts are recalculated; technical maintenance-run state is excluded. Email and maintenance remain disabled after import so that verification does not send messages or automatically prune historic data.
+
+The package is limited to 50 MiB compressed, 100 MiB expanded and 200,000 records total. Do not unpack or edit it before importing. A repeat complete import into the now-populated destination is rejected.
+
+Export and import enforce the same limits: each CSV field may contain at most 4 MiB of UTF-8 data. An oversized field is rejected during export with its file, row and field. Import errors also identify the affected location; related existing records are identified by ID. File limits do not count records already present at the destination.
+
+The ZIP contains exactly the same ten complete CSV files available individually on their pages and under **Settings → Import / Export**. Existing personnel, infrastructure, project, template and assignment exports are extended; working time, the skill catalogue, absences, users/organization and history have additional exports.
+
+For individual imports into an empty target, use **Working time → Skill catalogue → Personnel and infrastructure → Projects and templates → Assignments and absences → Users/organization → History**. Referenced data must already exist. Individual imports update by ID; omitted records remain unchanged. Each whole file is validated and rolls back completely on error. Other previously successful file imports remain in place. The ZIP restores every area in one transaction.
+
+CSV contains complete data; Excel remains a report or editable list with a narrower scope. Old flat CSVs remain importable through the existing routes. Re-export from the upgraded source for complete data; machine times already lost in older exports cannot be recovered from those files.
+    `.trim(),
+  },
+
   // --- Explanation (understanding-oriented) ---
   {
     slug: 'capacity-model',
@@ -375,7 +408,7 @@ After saving, the system automatically checks for conflicts. If the resource is 
     body: `
 ## Import and export assignments
 
-Assignments can be bulk-created and downloaded via Excel or CSV.
+Assignments can be downloaded as CSV and bulk-created via Excel or CSV.
 
 ### Where do I find it?
 
@@ -385,23 +418,26 @@ Assignments can be bulk-created and downloaded via Excel or CSV.
 
 ### Export
 
-Click the download icon and choose the format (Excel or CSV). The file contains all personal and infrastructure assignments.
+Click the download icon. The CSV file contains all personal and infrastructure assignments, including precise machine times and fractional allocations.
 
 ### Import
 
 1. Click the upload icon and select your file
 2. After import, a notification shows how many assignments were created, skipped, or errored
 
-### File format
+### Complete CSV
 
-CSV format: **Project; Work Package; Resource; Start; End; Allocation**
+The export preserves original booking IDs, precise machine instants and fractional allocations. Personnel, infrastructure and projects must exist before importing this area. IDs distinguish equally named objects.
 
-- The **Work Package** column is optional. If omitted, the work package is resolved by date overlap within the project.
-- **Resources** and **projects** must already exist — they are resolved by name.
-- Dates in ISO format (YYYY-MM-DD).
-- Duplicate assignments (same resource + work package) are skipped.
+Editing a booking with the same ID updates it. Different IDs remain separate even with identical resources, intervals and allocations. Omitted bookings remain unchanged. Any error rejects the entire file.
 
-Import files must be no larger than 20 MiB and contain no more than 10,000 rows including the header. Larger imports are rejected in full.
+The first two rows identify the format, version, area and columns. Preserve those rows and the IDs. Individual CSVs are limited to 100 MiB and 200,000 records. For every area together use **Settings → Import / Export → All CSVs as ZIP**; see “Move all data to a new installation”.
+
+### Older files
+
+Old flat CSVs and Excel lists remain accepted. Their header contains **Project; Work Package; Resource; Start; End; Allocation**, optionally **Resource Type; Resource Group**. References resolve by unambiguous names. If the work package is omitted, exactly one must overlap the interval; without overlap, the project must contain only one.
+
+Personnel use dates and allocations greater than zero up to 100. Machines accept offset-bearing timestamps; date-only values retain 06:00 on the start day through 18:00 on the end day. Only identical legacy rows are skipped; editing a row without an ID creates a separate booking. Legacy files are limited to 20 MiB and 10,000 rows including the header.
     `.trim(),
   },
   {
@@ -437,7 +473,9 @@ Skills and their attributes are global — once created, they are available for 
 
 ### Import/Export
 
-Use the import/export icons in the header to bulk-manage skills via Excel or CSV.
+The skill-header icons transfer the complete skill catalogue, including unused skills and attributes for personnel and infrastructure. They use the same file as **All CSVs as ZIP**.
+
+The resource section additionally offers these formats:
 
 **Three export formats, and only two of them can be imported back:**
 
@@ -445,13 +483,15 @@ Use the import/export icons in the header to bulk-manage skills via Excel or CSV
 |--------|---------|---------------|
 | Excel — skill matrix | a report, for reading and filling in on paper | **no** |
 | Excel — flat | edit in Excel **and** get back in | yes |
-| CSV | the same, as CSV | yes |
+| CSV (complete) | active/inactive resources, group hierarchies, complete qualifications and resource-specific working time | yes, as a whole area |
 
 The skill matrix has its header across two rows and separator rows between groups — the importer cannot read it. Upload it anyway and Capado says so, naming the flat export as the way out.
 
-**File format of the flat export:** five columns — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Everything but Name and Group is optional. **An unknown site is rejected, not created** — unlike a skill, because a site owns the holiday calendar and a typo would produce a plant with no holidays. Create it under Working time first. A missing column leaves the site untouched; an empty cell **removes** it. The header must start with \`Name\` and \`Group\` **in that order**; columns are read positionally, so a swapped header is refused rather than guessed. Case does not matter, and \`Gruppe\` is accepted too.
+**Format of flat Excel and older CSVs:** five columns — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Everything but Name and Group is optional. **An unknown site is rejected, not created** — unlike a skill, because a site owns the holiday calendar and a typo would produce a plant with no holidays. Create it under Working time first. A missing column leaves the site untouched; an empty cell **removes** it. The header must start with \`Name\` and \`Group\` **in that order**; columns are read positionally, so a swapped header is refused rather than guessed. Case does not matter, and \`Gruppe\` is accepted too.
 
-Only \`.xlsx\` and \`.csv\` are accepted, up to 20 MiB and 10,000 rows including the header. Valid rows are saved together; invalid rows are skipped and listed in the result log. An oversized file is rejected before import.
+Complete CSVs update by ID, validate the whole area and require working time and the skill catalogue first. They may contain 100 MiB and 200,000 records.
+
+Excel and older CSVs are limited to 20 MiB and 10,000 rows including the header. Valid rows are saved together; invalid rows are skipped and listed in the result log. An oversized file is rejected before import.
     `.trim(),
   },
   {
@@ -605,7 +645,9 @@ Use the "Import/Export" section in the "Administration" tab on the People or Inf
 - **Export**: three formats — Excel as a skill matrix (a report, **not** re-importable), Excel flat, or CSV
 - **Import**: upload a file to create resources and assign skills in one go
 
-Import format: five columns — "Name", "Group", "Skill", "Attribute", "Site". Everything but Name and Group is optional; an unknown site is rejected rather than created. Pick "Excel — flat" or CSV when you intend to edit and upload again; the skill matrix cannot be read back.
+Complete CSV includes inactive resources, group hierarchies, qualification levels/validity and work-profile bindings or availability windows. Import working time and the skill catalogue first. It is the same file as in the ZIP.
+
+Legacy import or flat Excel format: five columns — "Name", "Group", "Skill", "Attribute", "Site". Everything but Name and Group is optional; an unknown site is rejected rather than created. Pick "Excel — flat" or CSV when you intend to edit and upload again; the skill matrix cannot be read back.
 
 ### Usage
 

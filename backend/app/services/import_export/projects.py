@@ -6,7 +6,6 @@ projects, their work packages, and optional work package requirements.
 """
 
 import asyncio
-import csv
 import io
 from uuid import UUID
 
@@ -15,9 +14,19 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app import models as m
+from app.models.project import ProjectFolder, WorkPackageDependency
 from app.models.skill import Skill, SkillAttribute
 
 from .common import ImportResult, _parse_header
+from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
+from .csv_storage import (
+    ImportContext,
+    _parent_order,
+    load_data,
+    validate_ranges,
+    write_area,
+)
 
 
 async def _load_projects_export_rows(session: AsyncSession) -> list[tuple]:
@@ -220,55 +229,10 @@ def _build_projects_xlsx(rows: list[tuple]) -> bytes:
 
 
 async def export_projects_csv(session: AsyncSession) -> str:
-    """Export projects, work packages, and requirements as CSV."""
-    rows = await _load_projects_export_rows(session)
-    return await asyncio.to_thread(_build_projects_csv, rows)
+    """Export the complete area CSV also included verbatim in the all-data ZIP."""
+    from .csv_transfer import export_area
 
-
-def _build_projects_csv(rows: list[tuple]) -> str:
-    """Build projects CSV content (CPU-bound, runs in thread pool)."""
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow(
-        [
-            "Project",
-            "Project Start",
-            "Project End",
-            "Work Package",
-            "WP Start",
-            "WP End",
-            "Skill",
-            "Attribute",
-            "Quantity",
-        ]
-    )
-
-    for (
-        project_name,
-        p_start,
-        p_end,
-        wp_name,
-        wp_start,
-        wp_end,
-        skill_name,
-        attr_name,
-        quantity,
-    ) in rows:
-        writer.writerow(
-            [
-                project_name,
-                p_start.isoformat() if p_start else "",
-                p_end.isoformat() if p_end else "",
-                wp_name or "",
-                wp_start.isoformat() if wp_start else "",
-                wp_end.isoformat() if wp_end else "",
-                skill_name or "",
-                attr_name or "",
-                quantity if quantity else "",
-            ]
-        )
-
-    return output.getvalue()
+    return (await export_area(session, "projects")).decode("utf-8-sig")
 
 
 async def import_projects(session: AsyncSession, rows: list[tuple]) -> ImportResult:
@@ -288,6 +252,12 @@ async def import_projects(session: AsyncSession, rows: list[tuple]) -> ImportRes
     Returns:
         Import result with counts.
     """
+    from .csv_format import is_area_csv
+    from .csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        return await import_area_rows(session, "projects", rows)
+
     from datetime import date as date_type
 
     from app.models.project import Project, WorkPackage
@@ -452,3 +422,114 @@ async def import_projects(session: AsyncSession, rows: list[tuple]) -> ImportRes
 
     await session.commit()
     return result
+
+
+CSV_AREA = CsvArea(
+    "projects",
+    (
+        entity(m.Customer, "id name reference note is_active created_at updated_at"),
+        entity(
+            ProjectFolder,
+            "id name parent_id position external_ref customer_id created_at updated_at",
+        ),
+        entity(
+            m.Project,
+            "id name folder_id position external_ref committed_delivery_date customer_id priority start_date end_date created_at updated_at",
+        ),
+        entity(
+            m.WorkPackage,
+            "id project_id name start_date end_date completed_at lead_time_working_days created_at updated_at",
+        ),
+        entity(
+            m.WorkPackageRequirement,
+            "id work_package_id skill_id skill_attribute_id quantity requirement_mode min_allocation_percent min_level created_at",
+        ),
+        entity(
+            WorkPackageDependency,
+            "id predecessor_id successor_id lag_working_days created_at updated_at",
+        ),
+    ),
+)
+
+
+async def load_export(session: AsyncSession) -> dict[str, list[dict]]:
+    """Read this area's approved data and the references needed by its exporter."""
+    return await load_data(session, CSV_AREA.entities)
+
+
+def export_csv(data: dict[str, list[dict]]) -> bytes:
+    """Produce the complete area CSV used by both downloads and ZIP exports."""
+    return dump_area(CSV_AREA, data)
+
+
+def parse_csv(rows: list[tuple] | list[list[str]]) -> CsvBatch:
+    """Decode and check the versioned CSV belonging to this domain."""
+    return parse_area_rows(CSV_AREA, rows)
+
+
+def validate_import(context: ImportContext) -> None:
+    """Check project hierarchy, requirements and the work-package dependency DAG."""
+    by_id = context.merged
+    _parent_order(
+        list(by_id["project_folders"].values()),
+        context=context,
+        table="project_folders",
+    )
+    for table in ("projects", "work_packages"):
+        validate_ranges(list(by_id[table].values()), context=context, table=table)
+    for row in by_id["work_package_requirements"].values():
+        if (
+            row["skill_attribute_id"] is not None
+            and by_id["skill_attributes"][row["skill_attribute_id"]]["skill_id"]
+            != row["skill_id"]
+        ):
+            context.fail(
+                "work_package_requirements",
+                row,
+                "skill_attribute_id",
+                "Requirement skill/attribute mismatch.",
+            )
+    _validate_dependency_graph(by_id, context)
+
+
+async def write_import(
+    session: AsyncSession, batch: CsvBatch, context: ImportContext
+) -> ImportResult:
+    """Write this area's prepared records inside the caller's transaction."""
+    return await write_area(
+        session,
+        CSV_AREA.entities,
+        batch.data,
+        context,
+        hierarchical=("project_folders",),
+    )
+
+
+def _validate_dependency_graph(by_id: dict, context: ImportContext) -> None:
+    outgoing: dict[UUID, list[UUID]] = {}
+    incoming = dict.fromkeys(by_id["work_packages"], 0)
+    for row in by_id["work_package_dependencies"].values():
+        predecessor, successor = row["predecessor_id"], row["successor_id"]
+        outgoing.setdefault(predecessor, []).append(successor)
+        incoming[successor] += 1
+    ready = [key for key, degree in incoming.items() if degree == 0]
+    visited = 0
+    while ready:
+        node = ready.pop()
+        visited += 1
+        for successor in outgoing.get(node, []):
+            incoming[successor] -= 1
+            if incoming[successor] == 0:
+                ready.append(successor)
+    if visited != len(incoming):
+        row = next(
+            row
+            for row in by_id["work_package_dependencies"].values()
+            if incoming[row["successor_id"]] > 0
+        )
+        context.fail(
+            "work_package_dependencies",
+            row,
+            "predecessor_id/successor_id",
+            "Cyclic work-package dependencies.",
+        )
