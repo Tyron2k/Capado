@@ -184,6 +184,39 @@ Das ist die vollständige Liste. Es gibt bewusst keine Tastenkürzel zum Speiche
     `.trim(),
   },
 
+  {
+    slug: 'datenumzug',
+    title: 'Alle Daten in eine neue Installation übernehmen',
+    category: 'how-to',
+    routes: ['/settings'],
+    body: `
+## Datenumzug mit CSV
+
+Unter **Einstellungen → Import / Export** können Sie mit **Alle CSVs als ZIP** sämtliche Bereiche gemeinsam exportieren und importieren. Es enthält Stammdaten, aktive und inaktive Ressourcen, vollständige Skills und Qualifikationen, Arbeitszeit und Abwesenheiten, Projekte und Hierarchien, Anforderungen und Buchungen, Benutzerrollen, Einstellungen mit Logo sowie Planstände und Audit-Historie.
+
+1. Aktualisieren Sie Quelle und Ziel auf dieselbe Version mit dieser Funktion.
+2. Laden Sie das CSV-Paket in der Quelle herunter. Bewahren Sie die Quellinstallation zum Vergleichen auf.
+3. Richten Sie im leeren Ziel nur das Administratorkonto ein und melden Sie sich an. Legen Sie noch keine Betriebsstätten, Profile, weiteren Konten oder Planungsdaten an.
+4. Laden Sie das **unveränderte ZIP** im Ziel hoch. Capado prüft alle CSVs gemeinsam und übernimmt Reihenfolge, Kennungen und Verknüpfungen automatisch.
+5. Prüfen Sie Importprotokoll, Konflikte, Kapazität, Qualifikationen, Anforderungsdeckung und Planstände.
+6. Setzen Sie Benutzerpasswörter neu oder richten Sie die Anmeldung erneut ein. Konfigurieren und aktivieren Sie bei Bedarf anschließend E-Mail-Versand und automatische Wartung.
+
+Das Ziel muss leer sein. Das Ziel-Administratorkonto, dessen Einstellungen und das Einrichtungsprotokoll dürfen bereits existieren. Bei vorhandenen Planungs-/Stammdaten, weiteren Konten oder einem fehlerhaften Paket wird **nichts übernommen**. Einstellungen werden ersetzt; das Zielkonto und dessen Anmeldung bleiben erhalten. Hat ein Quellkonto dieselbe E-Mail, muss es ein aktiver Administrator sein und wird dem Zielkonto zugeordnet.
+
+Passwörter, Anmeldeverknüpfungen und Sitzungen werden nicht übertragen. Benutzerrollen, Berechtigungsbereiche und Personenverknüpfungen bleiben erhalten. Historische Passwortwerte im Audit-Protokoll werden geschwärzt. Konflikte werden neu berechnet; technische Wartungsläufe werden nicht mitgenommen. Versand und Wartung bleiben im Ziel zunächst ausgeschaltet, damit während Ihrer Prüfung keine Nachrichten versendet oder historische Daten automatisch gelöscht werden.
+
+Das Paket darf höchstens 50 MiB groß sein, entpackt höchstens 100 MiB und insgesamt höchstens 200.000 Datensätze enthalten. Entpacken oder bearbeiten Sie es vor dem Import nicht. Ein erneuter vollständiger Import in das nun gefüllte Ziel wird abgelehnt.
+
+Export und Import prüfen dieselben Grenzen: ein CSV-Feld darf höchstens 4 MiB UTF-8-Daten enthalten. Ist ein Feld zu groß, wird bereits der Export mit Datei, Zeile und Feld abgewiesen. Fehlermeldungen beim Import nennen ebenfalls die betroffene Stelle; bei abhängigen bestehenden Datensätzen nennen sie deren Kennung. Die Dateigrenzen zählen keine bereits vorhandenen Datensätze im Ziel.
+
+Das ZIP enthält genau dieselben zehn vollständigen CSV-Dateien, die einzeln auf den jeweiligen Seiten und unter **Einstellungen → Import / Export** verfügbar sind. Die bisherigen Exporte für Personal, Infrastruktur, Projekte, Vorlagen und Zuweisungen sind erweitert; hinzu kommen Arbeitszeit, Skillkatalog, Abwesenheiten, Benutzer/Organisation und Historie.
+
+Für Einzelimporte in ein leeres Ziel gilt: **Arbeitszeit → Skillkatalog → Personal und Infrastruktur → Projekte und Vorlagen → Zuweisungen und Abwesenheiten → Benutzer/Organisation → Historie**. Referenzierte Daten müssen vorher vorhanden sein. Einzelimporte aktualisieren anhand der Kennungen; ausgelassene Datensätze bleiben erhalten. Jede Datei wird vollständig geprüft und bei Fehlern komplett zurückgerollt. Bereits erfolgreich importierte andere Dateien bleiben bestehen. Das ZIP übernimmt alle Bereiche gemeinsam in einem Schritt.
+
+CSV enthält vollständige Daten; Excel bleibt eine Übersicht oder bearbeitbare Liste mit geringerem Umfang. Alte flache CSV-Dateien bleiben auf den bisherigen Importwegen lesbar. Für vollständige Daten müssen Sie aus der aktualisierten Quelle neu exportieren; bereits in alten Maschinenexporten verlorene Uhrzeiten lassen sich daraus nicht rekonstruieren.
+    `.trim(),
+  },
+
   // --- Explanation (understanding-oriented) ---
   {
     slug: 'kapazitaetsmodell',
@@ -382,7 +415,7 @@ Nach dem Speichern prüft das System automatisch auf Konflikte. Wenn die Ressour
     body: `
 ## Zuweisungen importieren und exportieren
 
-Zuweisungen können per Excel oder CSV in großer Menge angelegt und heruntergeladen werden.
+Zuweisungen können per CSV heruntergeladen und per Excel oder CSV in großer Menge angelegt werden.
 
 ### Wo finde ich das?
 
@@ -392,23 +425,26 @@ Zuweisungen können per Excel oder CSV in großer Menge angelegt und heruntergel
 
 ### Export
 
-Klicken Sie auf das Download-Symbol und wählen Sie das Format (Excel oder CSV). Die Datei enthält alle personellen und infrastrukturellen Zuweisungen.
+Klicken Sie auf das Download-Symbol. Die CSV-Datei enthält alle personellen und infrastrukturellen Zuweisungen, einschließlich genauer Maschinenzeiten und Nachkommastellen bei der Auslastung.
 
 ### Import
 
 1. Klicken Sie auf das Upload-Symbol und wählen Sie Ihre Datei
 2. Nach dem Import zeigt eine Benachrichtigung, wie viele Zuweisungen angelegt, übersprungen oder fehlerhaft waren
 
-### Dateiformat
+### Vollständiges CSV
 
-CSV-Format: **Projekt; Arbeitspaket; Ressource; Start; Ende; Auslastung**
+Der Export erhält ursprüngliche Buchungskennungen, genaue Maschinenzeitpunkte und Nachkommastellen bei der Auslastung. Personal, Infrastruktur und Projekte müssen vor dem Einzelimport vorhanden sein. Gleichnamige Objekte werden über ihre Kennungen unterschieden.
 
-- Die Spalte **Arbeitspaket** ist optional. Fehlt sie, wird das Arbeitspaket über die Datumsüberlappung im Projekt ermittelt.
-- **Ressourcen** und **Projekte** müssen bereits existieren — sie werden über den Namen aufgelöst.
-- Datumsangaben im ISO-Format (JJJJ-MM-TT).
-- Doppelte Zuweisungen (gleiche Ressource + Arbeitspaket) werden übersprungen.
+Eine geänderte Buchung mit derselben Kennung wird aktualisiert. Zwei Buchungen mit unterschiedlichen Kennungen bleiben getrennt, auch wenn Ressource, Zeitraum und Auslastung identisch sind. Ausgelassene Buchungen bleiben erhalten. Bei einem Fehler wird die ganze Datei abgelehnt.
 
-Importdateien dürfen höchstens 20 MiB groß sein und einschließlich Kopfzeile höchstens 10.000 Zeilen enthalten. Größere Importe werden vollständig abgelehnt.
+Die ersten zwei Zeilen kennzeichnen Format, Version, Datenbereich und Spalten. Lassen Sie sie und die Kennungen unverändert. Einzel-CSV-Dateien dürfen höchstens 100 MiB und 200.000 Datensätze enthalten. Für alle Bereiche gemeinsam verwenden Sie **Einstellungen → Import / Export → Alle CSVs als ZIP**; siehe „Alle Daten in eine neue Installation übernehmen“.
+
+### Ältere Dateien
+
+Alte flache CSVs und Excel-Listen bleiben lesbar. Ihre Kopfzeile enthält **Project; Work Package; Resource; Start; End; Allocation**, optional **Resource Type; Resource Group**. Referenzen werden über eindeutige Namen aufgelöst. Fehlt das Arbeitspaket, muss genau eines den Zeitraum überlappen; ohne Überlappung darf das Projekt nur eines haben.
+
+Bei Personal gelten Datumsangaben und Auslastungen größer als 0 bis 100. Maschinen akzeptieren Zeitstempel mit Zeitzonenversatz; reine Datumsangaben behalten 06:00 am Starttag bis 18:00 am Endtag. Nur identische alte Zeilen werden übersprungen; eine geänderte Zeile ohne Kennung legt eine weitere Buchung an. Alte Importdateien dürfen höchstens 20 MiB und einschließlich Kopfzeile 10.000 Zeilen enthalten.
     `.trim(),
   },
   {
@@ -444,7 +480,9 @@ Skills und ihre Attribute sind global — einmal angelegt, stehen sie für Perso
 
 ### Import/Export
 
-Nutzen Sie die Import/Export-Icons im Header für die Massenverwaltung per Excel oder CSV.
+Die Icons im Skill-Header übertragen den vollständigen Skillkatalog einschließlich unbenutzter Skills und Ausprägungen für Personal und Infrastruktur. Sie verwenden dieselbe Datei wie **Alle CSVs als ZIP**.
+
+Im Abschnitt für Ressourcen stehen zusätzlich die folgenden Formate zur Verfügung:
 
 **Drei Exportformate, und nur zwei davon lassen sich wieder importieren:**
 
@@ -452,13 +490,15 @@ Nutzen Sie die Import/Export-Icons im Header für die Massenverwaltung per Excel
 |--------|-------|---------------------|
 | Excel — Skill-Matrix | Bericht zum Ansehen und Ausfüllen auf Papier | **nein** |
 | Excel — flach | Bearbeiten in Excel **und** Rückweg | ja |
-| CSV | dasselbe als CSV | ja |
+| CSV (vollständig) | aktive und inaktive Ressourcen, Gruppenhierarchien, vollständige Qualifikationen und ressourcenspezifische Arbeitszeit | ja, als ganzer Bereich |
 
 Die Skill-Matrix hat ihre Kopfzeile über zwei Zeilen und Trennzeilen zwischen den Gruppen — der Import kann sie nicht lesen. Laden Sie sie trotzdem hoch, sagt Capado es und nennt den flachen Export als Ausweg.
 
-**Dateiformat des flachen Exports:** fünf Spalten — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Alles außer Name und Group ist optional. **Eine unbekannte Betriebsstätte wird abgelehnt, nicht angelegt** — anders als bei Skills, denn eine Betriebsstätte besitzt den Feiertagskalender, und ein Tippfehler würde ein Werk ohne Feiertage erzeugen. Legen Sie sie zuerst unter Arbeitszeit an. Fehlt die Spalte ganz, bleibt die Zuordnung unverändert; ist die Zelle leer, wird sie **entfernt**. Die Kopfzeile muss mit \`Name\` und \`Group\` **in dieser Reihenfolge** beginnen; die Spalten werden nach Position gelesen, deshalb wird eine vertauschte Kopfzeile abgelehnt statt geraten. Groß-/Kleinschreibung ist gleichgültig, und \`Gruppe\` wird ebenfalls akzeptiert.
+**Dateiformat von Excel (flach) und älteren CSVs:** fünf Spalten — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Alles außer Name und Group ist optional. **Eine unbekannte Betriebsstätte wird abgelehnt, nicht angelegt** — anders als bei Skills, denn eine Betriebsstätte besitzt den Feiertagskalender, und ein Tippfehler würde ein Werk ohne Feiertage erzeugen. Legen Sie sie zuerst unter Arbeitszeit an. Fehlt die Spalte ganz, bleibt die Zuordnung unverändert; ist die Zelle leer, wird sie **entfernt**. Die Kopfzeile muss mit \`Name\` und \`Group\` **in dieser Reihenfolge** beginnen; die Spalten werden nach Position gelesen, deshalb wird eine vertauschte Kopfzeile abgelehnt statt geraten. Groß-/Kleinschreibung ist gleichgültig, und \`Gruppe\` wird ebenfalls akzeptiert.
 
-Hochgeladen werden nur \`.xlsx\` und \`.csv\`, mit höchstens 20 MiB und 10.000 Zeilen einschließlich Kopfzeile. Gültige Zeilen werden gemeinsam gespeichert; fehlerhafte Zeilen werden übersprungen und im Ergebnisprotokoll aufgeführt. Eine zu große Datei wird vor dem Import vollständig abgelehnt.
+Vollständige CSVs aktualisieren nach Kennung, prüfen den gesamten Bereich und benötigen Arbeitszeit und Skillkatalog als Voraussetzung. Sie dürfen 100 MiB und 200.000 Datensätze enthalten.
+
+Für Excel und ältere CSVs gelten höchstens 20 MiB und 10.000 Zeilen einschließlich Kopfzeile. Gültige Zeilen werden gemeinsam gespeichert; fehlerhafte Zeilen werden übersprungen und im Ergebnisprotokoll aufgeführt. Eine zu große Datei wird vor dem Import vollständig abgelehnt.
     `.trim(),
   },
   {
@@ -612,7 +652,9 @@ Nutzen Sie den Abschnitt "Import/Export" im Tab "Administration" auf der Persone
 - **Export**: drei Formate — Excel als Skill-Matrix (ein Bericht, **nicht** re-importierbar), Excel flach, oder CSV
 - **Import**: Laden Sie eine Datei hoch um Ressourcen und Skills in einem Schritt anzulegen
 
-Import-Format: fünf Spalten — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Alles außer Name und Group ist optional; eine unbekannte Betriebsstätte wird abgelehnt statt angelegt. Wählen Sie "Excel — flach" oder CSV, wenn Sie die Datei bearbeiten und wieder hochladen wollen; die Skill-Matrix lässt sich nicht zurücklesen.
+Vollständiges CSV erhält auch inaktive Ressourcen, Gruppenhierarchien, Qualifikationsniveau und Gültigkeit sowie Arbeitszeitzuordnungen oder Verfügbarkeitsfenster. Importieren Sie Arbeitszeit und Skillkatalog zuerst. Die Datei ist dieselbe wie im ZIP.
+
+Älteres Import-Format bzw. Excel (flach): fünf Spalten — \`Name\`, \`Group\`, \`Skill\`, \`Attribute\`, \`Site\`. Alles außer Name und Group ist optional; eine unbekannte Betriebsstätte wird abgelehnt statt angelegt. Wählen Sie "Excel — flach" oder CSV, wenn Sie die Datei bearbeiten und wieder hochladen wollen; die Skill-Matrix lässt sich nicht zurücklesen.
 
 ### Verwendung
 

@@ -7,6 +7,7 @@ import { Group, Stack, Text } from '@mantine/core'
 import { useTranslation } from '../../i18n'
 import { SectionHeader } from '../../components/layout'
 import { ImportExportBar } from '../resources/ImportExportBar'
+import { CsvAreaBar } from '../resources/CsvAreaBar'
 
 /**
  * Renders the Administration tab of the Planning page, exposing bulk
@@ -30,12 +31,19 @@ export function PlanningAdminPanel() {
                 exportPath="/api/assignments/export"
                 importPath="/api/assignments/import"
                 filenameBase="assignments"
+                csvOnly
               />
             </Group>
             <Text size="xs" c="dimmed">
               {t('admin.assignmentsCsvHint')}
             </Text>
           </div>
+          <Group justify="space-between">
+            <Text size="sm" fw={500}>
+              {t('importExport.areas.absences')}
+            </Text>
+            <CsvAreaBar area="absences" />
+          </Group>
         </Stack>
       </div>
     </Stack>

@@ -25,6 +25,8 @@ import {
 } from '@mantine/core'
 import { DateInput } from '@mantine/dates'
 import { MaintenanceRuns } from './MaintenanceRuns'
+import { ImportExportBar } from '../resources/ImportExportBar'
+import { CsvAreaBar, type CsvArea } from '../resources/CsvAreaBar'
 import { MailSettingsSection } from './MailSettingsSection'
 import { mailStateFrom, type MailFormState } from './mailFormState'
 import { notifications } from '@mantine/notifications'
@@ -411,6 +413,44 @@ export function SettingsPage() {
             configErrors={mailErrors}
           />
         )}
+
+        <Paper withBorder p="md">
+          <SectionHeader title={t('importExport.migrationTitle')} />
+          <Stack gap="sm">
+            <Text size="sm">{t('importExport.migrationDescription')}</Text>
+            <Text size="sm" c="dimmed">
+              {t('importExport.migrationCredentials')}
+            </Text>
+            <ImportExportBar
+              exportPath="/api/migration/export"
+              importPath="/api/migration/import"
+              filenameBase="capado-csv"
+              csvBundle
+            />
+            <Text size="sm" c="dimmed">
+              {t('importExport.individualAreas')}
+            </Text>
+            {(
+              [
+                'working-time',
+                'skills',
+                'personnel',
+                'infrastructure',
+                'projects',
+                'templates',
+                'assignments',
+                'absences',
+                'administration',
+                'history',
+              ] satisfies CsvArea[]
+            ).map((area) => (
+              <Group key={area} justify="space-between">
+                <Text size="sm">{t(`importExport.areas.${area}`)}</Text>
+                <CsvAreaBar area={area} />
+              </Group>
+            ))}
+          </Stack>
+        </Paper>
 
         <Group justify="flex-end">
           <Button onClick={handleSave} loading={saving}>

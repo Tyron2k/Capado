@@ -553,11 +553,11 @@
   "admin": {
     "title": "Stammdaten",
     "importExport": "Import / Export",
-    "peopleCsvHint": "CSV-Format: Name; Gruppe; [Skill; Attribut]. Skill-Spalten sind optional. Skills werden automatisch erstellt.",
-    "infrastructureCsvHint": "CSV-Format: Name; Gruppe; [Skill; Attribut]. Skill-Spalten sind optional. Skills werden automatisch erstellt.",
-    "projectsCsvHint": "CSV-Format: Projekt; Start; Ende; Arbeitspaket; AP Start; AP Ende; [Skill; Attribut; Anzahl]. Skill-Spalten sind optional. Skills müssen bereits existieren.",
-    "templatesCsvHint": "CSV-Format: Vorlage; Beschreibung; Skill; Attribut; Anzahl. Skills müssen bereits existieren.",
-    "assignmentsCsvHint": "CSV-Format: Projekt; Arbeitspaket; Ressource; Start; Ende; Auslastung. Die Arbeitspaket-Spalte ist optional (wird sonst über die Datumsüberlappung ermittelt). Ressourcen und Projekte müssen bereits existieren. Datumsangaben im ISO-Format (JJJJ-MM-TT)."
+    "peopleCsvHint": "CSV enthält auch inaktives Personal, Gruppenhierarchien, Qualifikationsniveau und Gültigkeit sowie Arbeitszeitzuordnungen. Arbeitszeit und Skillkatalog zuerst importieren. Excel bleibt eine Übersicht bzw. bearbeitbare Liste.",
+    "infrastructureCsvHint": "CSV enthält auch inaktive Ressourcen, Gruppenhierarchien, Qualifikationsniveau und Gültigkeit sowie Arbeitszeitzuordnungen und Verfügbarkeitsfenster. Arbeitszeit und Skillkatalog zuerst importieren. Excel bleibt eine Übersicht bzw. bearbeitbare Liste.",
+    "projectsCsvHint": "CSV enthält Kunden, Ordner, Projektdetails, vollständige Anforderungen, Abschluss, Durchlaufzeiten und Abhängigkeiten. Skillkatalog zuerst importieren.",
+    "templatesCsvHint": "CSV enthält Durchlaufzeiten und vollständige Anforderungen. Skillkatalog zuerst importieren.",
+    "assignmentsCsvHint": "CSV erhält Buchungs-IDs, genaue Zeitpunkte und Auslastung. Personal, Infrastruktur und Projekte zuerst importieren."
   },
   "skills": {
     "title": "Skills",
@@ -591,12 +591,31 @@
     "errors": "Fehler",
     "formatMatrix": "Excel — Skill-Matrix (Bericht, nicht importierbar)",
     "formatFlatXlsx": "Excel — flach (importierbar)",
-    "formatCsv": "CSV (importierbar)",
+    "formatCsv": "CSV (vollständig)",
     "logTitle": "Import-Protokoll",
     "logNoErrors": "Keine Fehler. Alle Zeilen wurden verarbeitet.",
     "logRejectedTitle": "Nichts wurde gespeichert",
-    "logRejectedBody": "Der Import läuft als eine einzige Transaktion: sobald eine Zeile abgelehnt wird, wird nichts geschrieben. Korrigieren Sie die unten genannten Zeilen und importieren Sie die Datei erneut.",
-    "logClose": "Schließen"
+    "logRejectedBody": "Fehlerhafte Zeilen wurden übersprungen. Gültige Zeilen können bereits gespeichert sein; prüfen Sie die Zähler und korrigieren Sie die unten genannten Zeilen vor dem erneuten Import.",
+    "logClose": "Schließen",
+    "formatCsvBundle": "Alle CSVs als ZIP",
+    "bundleRejectedBody": "Die Datei wurde vollständig abgelehnt. Es wurden keine Daten übernommen.",
+    "migrationTitle": "Import / Export",
+    "migrationDescription": "Die vollständigen CSVs der einzelnen Datenbereiche sind auch hier verfügbar. „Alle CSVs als ZIP“ bündelt genau diese Dateien für einen Datenumzug in eine leere Installation.",
+    "migrationCredentials": "Das Administratorkonto der Zielinstallation bleibt erhalten. Passwörter, Anmeldeverknüpfungen und Sitzungen werden nicht übertragen; setzen Sie Benutzerpasswörter neu oder verknüpfen Sie die Anmeldung erneut. E-Mail-Versand und automatische Wartung bleiben nach dem Import ausgeschaltet, bis Sie diese wieder einrichten.",
+    "individualAreas": "Einzelne Bereiche: Import aktualisiert anhand der IDs; nicht enthaltene Datensätze bleiben erhalten.",
+    "skillsDescription": "Vollständiger Skillkatalog für Personal und Infrastruktur, einschließlich unbenutzter Skills und Ausprägungen.",
+    "areas": {
+      "working-time": "Arbeitszeit und Kalender",
+      "skills": "Skillkatalog",
+      "personnel": "Personal",
+      "infrastructure": "Infrastruktur",
+      "projects": "Projekte und Kunden",
+      "templates": "Vorlagen",
+      "assignments": "Zuweisungen",
+      "absences": "Abwesenheiten",
+      "administration": "Benutzer und Organisation",
+      "history": "Baselines und Änderungshistorie"
+    }
   },
   "groups": {
     "title": "Gruppen",

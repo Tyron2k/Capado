@@ -1,8 +1,7 @@
 """Router for unified import/export of personnel, infrastructure, projects, and templates.
 
-Each resource type supports both Excel (.xlsx) and CSV (.csv) for upload and download.
-Personnel and infrastructure exports include skill assignments inline.
-Project exports include work package requirements inline.
+Complete CSV files are shared between existing pages and the all-data ZIP.
+Legacy flat CSV/Excel imports and Excel reports remain available.
 """
 
 import asyncio
@@ -23,16 +22,11 @@ from app.models.user import User
 from app.schemas.import_export import ImportResultResponse
 from app.services.import_export import (
     ImportResult,
-    export_assignments_csv,
-    export_infrastructure_csv,
     export_infrastructure_matrix_xlsx,
     export_infrastructure_xlsx,
-    export_personnel_csv,
     export_personnel_matrix_xlsx,
     export_personnel_xlsx,
-    export_projects_csv,
     export_projects_xlsx,
-    export_templates_csv,
     export_templates_xlsx,
     import_assignments,
     import_infrastructure,
@@ -44,9 +38,119 @@ from app.services.permissions import (
     EntityType,
     check_write_permission,
     get_current_user,
+    require_admin,
 )
 
 router = APIRouter(tags=["Import/Export"])
+
+
+@router.get(
+    "/migration/export", summary="Export complete migration as a CSV ZIP package"
+)
+async def export_migration_endpoint(
+    session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_admin),
+):
+    """Download planning, administration and history as versioned CSVs (admin only).
+
+    Credentials, identity-provider bindings, sessions, derived conflicts and
+    maintenance-run state are excluded. The archive preserves stable entity IDs.
+    """
+    from app.services.import_export.csv_transfer import export_migration
+
+    try:
+        content = await export_migration(session)
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=capado-csv.zip"},
+    )
+
+
+@router.post(
+    "/migration/import",
+    response_model=ImportResultResponse,
+    summary="Restore a CSV migration package into an empty installation",
+)
+async def import_migration_endpoint(
+    file: UploadFile = File(..., description="Complete Capado CSV ZIP package"),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> ImportResultResponse:
+    """Validate and atomically restore every CSV with no manual import ordering.
+
+    The destination may contain its bootstrap administrator, settings and audit
+    records, but must contain no planning/master data. Keep that administrator's
+    credentials; other accounts require password reset or identity relinking.
+    Mail/scheduled maintenance stay disabled until explicitly configured again.
+    """
+    from app.services.import_export.csv_transfer import (
+        MAX_ARCHIVE_BYTES,
+        import_migration,
+    )
+
+    if not (file.filename or "").lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=400, detail="Choose the complete Capado CSV ZIP package."
+        )
+    content = await file.read(MAX_ARCHIVE_BYTES + 1)
+    if len(content) > MAX_ARCHIVE_BYTES:
+        raise HTTPException(
+            status_code=413, detail="CSV migration exceeds the 50 MiB archive limit."
+        )
+    result = await import_migration(session, content, current_user.id)
+    return _result_to_dict(result, atomic=True)
+
+
+@router.get("/data/{area}/export", summary="Export a complete CSV data area")
+async def export_area_endpoint(
+    area: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Download exactly the area CSV contained in the all-data ZIP."""
+    from app.services.import_export import AREA_BY_NAME
+    from app.services.import_export.csv_transfer import export_area
+
+    if area not in AREA_BY_NAME:
+        raise HTTPException(status_code=404, detail="Unknown CSV data area.")
+    if area in {"administration", "history"}:
+        check_write_permission(current_user, EntityType.bulk_import)
+    try:
+        content = await export_area(session, area)
+    except ValueError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={area}.csv"},
+    )
+
+
+@router.post(
+    "/data/{area}/import",
+    response_model=ImportResultResponse,
+    summary="Atomically import a complete CSV data area",
+)
+async def import_area_endpoint(
+    area: str,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_admin),
+) -> ImportResultResponse:
+    """Insert/update by stable ID; validate external references against the target."""
+    from app.services.import_export import AREA_BY_NAME
+    from app.services.import_export.csv_transfer import import_area_rows
+
+    if area not in AREA_BY_NAME:
+        raise HTTPException(status_code=404, detail="Unknown CSV data area.")
+    rows = await _parse_upload(file)
+    return _result_to_dict(
+        await import_area_rows(session, area, rows, current_user.id), atomic=True
+    )
+
 
 #: Named once because it appears six times and a typo in one of them produces a download that the
 #: browser saves with the right extension and Excel then refuses to open.
@@ -70,7 +174,7 @@ async def export_personnel_endpoint(
     session: AsyncSession = Depends(get_session),
     _current_user: User = Depends(get_current_user),
 ):
-    """Download all active personal resources with skill assignments.
+    """Download complete personnel CSVs or active-personnel Excel reports.
 
     Formats:
     - ``xlsx``: Skill matrix (resources as rows, skill/attributes as columns,
@@ -78,7 +182,8 @@ async def export_personnel_endpoint(
       it cannot be imported back, because its header spans two rows.
     - ``xlsx-flat``: Flat list (Name, Group, Skill, Attribute) as a workbook.
       Editable in Excel AND re-importable.
-    - ``csv``: Same flat list as CSV.
+    - ``csv``: Complete versioned area, including inactive resources, group
+      hierarchy, qualifications and resource-specific working time; shared with ZIP.
 
     Args:
         format: Export format — 'xlsx', 'xlsx-flat', or 'csv'.
@@ -92,12 +197,7 @@ async def export_personnel_endpoint(
 
     """
     if format == "csv":
-        content = await export_personnel_csv(session)
-        return Response(
-            content=content.encode("utf-8-sig"),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": "attachment; filename=personnel.csv"},
-        )
+        return await export_area_endpoint("personnel", session, _current_user)
     if format == "xlsx-flat":
         data = await export_personnel_xlsx(session)
         return Response(
@@ -144,6 +244,12 @@ async def import_personnel_endpoint(
     """
     check_write_permission(current_user, EntityType.bulk_import)
     rows = await _parse_upload(file)
+    from app.services.import_export.csv_format import is_area_csv
+    from app.services.import_export.csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        result = await import_area_rows(session, "personnel", rows, current_user.id)
+        return _result_to_dict(result, atomic=True)
     result = await import_personnel(session, rows)
     return _result_to_dict(result)
 
@@ -161,7 +267,7 @@ async def export_infrastructure_endpoint(
     session: AsyncSession = Depends(get_session),
     _current_user: User = Depends(get_current_user),
 ):
-    """Download all active infrastructure resources with skill assignments.
+    """Download complete infrastructure CSVs or active-resource Excel reports.
 
     Formats:
     - ``xlsx``: Skill matrix (resources as rows, skill/attributes as columns,
@@ -169,7 +275,8 @@ async def export_infrastructure_endpoint(
       it cannot be imported back, because its header spans two rows.
     - ``xlsx-flat``: Flat list (Name, Group, Skill, Attribute) as a workbook.
       Editable in Excel AND re-importable — the combination the matrix cannot offer.
-    - ``csv``: Same flat list as CSV.
+    - ``csv``: Complete versioned area, including inactive resources, group
+      hierarchy, qualifications and resource-specific working time; shared with ZIP.
 
     Args:
         format: Export format — 'xlsx', 'xlsx-flat', or 'csv'.
@@ -183,12 +290,7 @@ async def export_infrastructure_endpoint(
 
     """
     if format == "csv":
-        content = await export_infrastructure_csv(session)
-        return Response(
-            content=content.encode("utf-8-sig"),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": "attachment; filename=infrastructure.csv"},
-        )
+        return await export_area_endpoint("infrastructure", session, _current_user)
     if format == "xlsx-flat":
         data = await export_infrastructure_xlsx(session)
         return Response(
@@ -239,6 +341,14 @@ async def import_infrastructure_endpoint(
     """
     check_write_permission(current_user, EntityType.bulk_import)
     rows = await _parse_upload(file)
+    from app.services.import_export.csv_format import is_area_csv
+    from app.services.import_export.csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        result = await import_area_rows(
+            session, "infrastructure", rows, current_user.id
+        )
+        return _result_to_dict(result, atomic=True)
     result = await import_infrastructure(session, rows)
     return _result_to_dict(result)
 
@@ -256,8 +366,8 @@ async def export_projects_endpoint(
 ):
     """Download all projects with work packages and requirements as Excel or CSV.
 
-    Format: Project; Project Start; Project End; Work Package; WP Start; WP End;
-    Skill; Attribute; Quantity.
+    CSV preserves all project-area fields and IDs through the shared area export.
+    Excel retains its report columns: Project, dates, Work Package, Skill, Attribute, Quantity.
 
     Args:
         format: Export format, either 'xlsx' or 'csv'.
@@ -267,12 +377,7 @@ async def export_projects_endpoint(
         File download response with project data.
     """
     if format == "csv":
-        content = await export_projects_csv(session)
-        return Response(
-            content=content.encode("utf-8-sig"),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": "attachment; filename=projects.csv"},
-        )
+        return await export_area_endpoint("projects", session, _current_user)
     data = await export_projects_xlsx(session)
     return Response(
         content=data,
@@ -308,6 +413,12 @@ async def import_projects_endpoint(
     """
     check_write_permission(current_user, EntityType.bulk_import)
     rows = await _parse_upload(file)
+    from app.services.import_export.csv_format import is_area_csv
+    from app.services.import_export.csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        result = await import_area_rows(session, "projects", rows, current_user.id)
+        return _result_to_dict(result, atomic=True)
     result = await import_projects(session, rows)
     return _result_to_dict(result)
 
@@ -325,7 +436,8 @@ async def export_templates_endpoint(
 ):
     """Download all templates with their skill requirements as Excel or CSV.
 
-    Format: Template; Description; Skill; Attribute; Quantity.
+    CSV preserves the complete template area and IDs; Excel retains the flat
+    Template, Description, Skill, Attribute, Quantity report.
 
     Args:
         format: Export format, either 'xlsx' or 'csv'.
@@ -335,12 +447,7 @@ async def export_templates_endpoint(
         File download response with template data.
     """
     if format == "csv":
-        content = await export_templates_csv(session)
-        return Response(
-            content=content.encode("utf-8-sig"),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": "attachment; filename=templates.csv"},
-        )
+        return await export_area_endpoint("templates", session, _current_user)
     data = await export_templates_xlsx(session)
     return Response(
         content=data,
@@ -361,7 +468,8 @@ async def import_templates_endpoint(
 ) -> ImportResultResponse:
     """Upload template data and create or update templates matched by name.
 
-    Format: Template; Description; Skill; Attribute; Quantity.
+    CSV preserves the complete template area and IDs; Excel retains the flat
+    Template, Description, Skill, Attribute, Quantity report.
     Skills and attributes must already exist.
     Admin only: the file may name resources in any group, so no scope can authorise it.
 
@@ -375,6 +483,12 @@ async def import_templates_endpoint(
     """
     check_write_permission(current_user, EntityType.bulk_import)
     rows = await _parse_upload(file)
+    from app.services.import_export.csv_format import is_area_csv
+    from app.services.import_export.csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        result = await import_area_rows(session, "templates", rows, current_user.id)
+        return _result_to_dict(result, atomic=True)
     result = await import_templates(session, rows)
     return _result_to_dict(result)
 
@@ -391,8 +505,8 @@ async def export_assignments_endpoint(
 ):
     """Download all assignments as CSV.
 
-    Format: Project; Work Package; Resource; Start; End; Allocation.
-    Includes both personal and infrastructure assignments.
+    The same complete area CSV as in the ZIP, including original booking IDs,
+    dates/fractional allocations and UTC instants including subsecond precision.
 
     Args:
         session: Database session.
@@ -400,12 +514,7 @@ async def export_assignments_endpoint(
     Returns:
         CSV file download with assignment data.
     """
-    content = await export_assignments_csv(session)
-    return Response(
-        content=content.encode("utf-8-sig"),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": "attachment; filename=assignments.csv"},
-    )
+    return await export_area_endpoint("assignments", session, _current_user)
 
 
 @router.post(
@@ -420,17 +529,14 @@ async def import_assignments_endpoint(
 ) -> ImportResultResponse:
     """Upload assignment data to create resource-to-work-package assignments.
 
-    Supports two CSV column formats:
-    - 5 columns: Project; Resource; Start; End; Allocation
-    - 6 columns: Project; Work Package; Resource; Start; End; Allocation
+    New CSVs preserve IDs and all assignment fields through the shared area importer.
+    Legacy flat files include Resource Type and Resource Group to qualify names.
+    Legacy five/six-column files are accepted only with unambiguous references.
+    Without Work Package, exactly one overlapping (or one total) work package
+    must exist. Only identical intervals and allocations are skipped.
 
-    In 5-column mode the work package is auto-resolved by finding the first
-    WP in the project whose date range overlaps the assignment dates.
-
-    Resources are resolved by name — if found as infrastructure, an
-    infrastructure assignment is created; if found as personal, a personal
-    assignment is created. Duplicates (same resource + work package) are
-    skipped. Dates must be in ISO format (YYYY-MM-DD).
+    Personnel use ISO dates. Infrastructure accepts offset-bearing ISO
+    timestamps; legacy date-only values retain the 06:00/18:00 planning-zone defaults.
 
     Admin only: the file may name resources in any group, so no scope can authorise it.
 
@@ -444,6 +550,12 @@ async def import_assignments_endpoint(
     """
     check_write_permission(current_user, EntityType.bulk_import)
     rows = await _parse_upload(file)
+    from app.services.import_export.csv_format import is_area_csv
+    from app.services.import_export.csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        result = await import_area_rows(session, "assignments", rows, current_user.id)
+        return _result_to_dict(result, atomic=True)
     result = await import_assignments(session, rows)
     return _result_to_dict(result)
 
@@ -480,7 +592,18 @@ async def _parse_upload(file: UploadFile) -> list[tuple]:
         )
 
     content = await file.read(_MAX_IMPORT_BYTES + 1)
-    if len(content) > _MAX_IMPORT_BYTES:
+    from app.services.import_export.csv_format import MAX_EXPANDED_BYTES
+
+    canonical = filename.endswith(".csv") and content.removeprefix(
+        b"\xef\xbb\xbf"
+    ).startswith(b"Capado CSV;")
+    if canonical:
+        content += await file.read(MAX_EXPANDED_BYTES + 1 - len(content))
+        if len(content) > MAX_EXPANDED_BYTES:
+            raise HTTPException(
+                status_code=413, detail="CSV imports must not exceed 100 MiB."
+            )
+    if not canonical and len(content) > _MAX_IMPORT_BYTES:
         raise HTTPException(
             status_code=413, detail="Import files must not exceed 20 MiB."
         )
@@ -531,13 +654,22 @@ def _parse_xlsx(content: bytes) -> list[tuple]:
 
 def _parse_csv(content: bytes) -> list[tuple]:
     """Parse CSV content into row tuples (CPU-bound, runs in thread pool)."""
+    from app.services.import_export.csv_format import _read_csv
+
+    if content.removeprefix(b"\xef\xbb\xbf").startswith(b"Capado CSV;"):
+        try:
+            return [tuple(row) for row in _read_csv(content)]
+        except (ValueError, csv.Error) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
     text = content.decode("utf-8-sig")
     delimiter = ";" if ";" in text.split("\n")[0] else ","
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
     return _limited_rows(tuple(row) for row in reader)
 
 
-def _result_to_dict(result: ImportResult) -> ImportResultResponse:
+def _result_to_dict(
+    result: ImportResult, *, atomic: bool = False
+) -> ImportResultResponse:
     """Convert ImportResult to a response model."""
     return ImportResultResponse(
         created=result.created,
@@ -545,6 +677,7 @@ def _result_to_dict(result: ImportResult) -> ImportResultResponse:
         skipped=result.skipped,
         errors=result.errors,
         success=len(result.errors) == 0,
+        atomic=atomic,
         conflicts_found=result.conflicts_found,
         conflict_check_failed=result.conflict_check_failed,
     )

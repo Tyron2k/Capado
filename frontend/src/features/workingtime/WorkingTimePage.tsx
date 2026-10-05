@@ -12,6 +12,7 @@
 
 import { IconBuildingFactory2, IconCalendarOff, IconClockHour4 } from '@tabler/icons-react'
 import { useTranslation } from '../../i18n'
+import { CsvAreaBar } from '../resources/CsvAreaBar'
 import { PageTabs, type TabDefinition } from '../../components/layout'
 import { HolidaysTab } from './HolidaysTab'
 import { SitesTab } from './SitesTab'
@@ -41,5 +42,12 @@ export function WorkingTimePage() {
     },
   ]
 
-  return <PageTabs title={t('workingTime.title')} tabs={tabs} defaultTab="profiles" />
+  return (
+    <PageTabs
+      title={t('workingTime.title')}
+      tabs={tabs}
+      defaultTab="profiles"
+      actions={<CsvAreaBar area="working-time" />}
+    />
+  )
 }

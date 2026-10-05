@@ -29,6 +29,108 @@ PROJECT = UUID("33333333-3333-3333-3333-333333333333")
 PACKAGE = UUID("44444444-4444-4444-4444-444444444444")
 
 
+async def test_small_area_import_allows_concurrent_unrelated_history_writes(
+    legacy_database, monkeypatch
+):
+    """Scoped table locks leave independent edits writable during an import."""
+    from app import models as m
+    from app.services.import_export import skills
+    from app.services.import_export.csv_format import _read_csv
+    from app.services.import_export.csv_transfer import import_area_rows
+
+    url, engine = legacy_database
+    assert (await migrate(url, "head")).returncode == 0
+    original = skills.write_import
+    concurrent_id = uuid4()
+
+    async def write_with_unrelated_edit(session, batch, context):
+        result = await original(session, batch, context)
+        async with AsyncSession(engine) as writer:
+            await writer.execute(sa.text("SET LOCAL lock_timeout TO '250ms'"))
+            writer.add(
+                m.AuditLog(
+                    id=concurrent_id,
+                    entity_type="projects",
+                    entity_id=uuid4(),
+                    action="created",
+                )
+            )
+            await writer.commit()
+        return result
+
+    monkeypatch.setattr(skills, "write_import", write_with_unrelated_edit)
+    record = m.Skill(name="Independent import", resource_type="personal").model_dump()
+    content = skills.export_csv({"skills": [record], "skill_attributes": []})
+    async with AsyncSession(engine) as session:
+        result = await import_area_rows(session, "skills", _read_csv(content))
+        assert not result.errors and result.created == 1
+        assert await session.get(m.AuditLog, concurrent_id) is not None
+        assert await session.get(m.Skill, record["id"]) is not None
+
+
+async def test_zip_export_keeps_one_snapshot_across_dedicated_exporters(
+    legacy_database, monkeypatch
+):
+    """A concurrent edit between exporters cannot produce a mixed-time archive."""
+    from app import models as m
+    from app.services.import_export import skills
+    from app.services.import_export.csv_format import _read_csv
+    from app.services.import_export.csv_transfer import (
+        export_migration,
+        parse_migration,
+    )
+
+    url, engine = legacy_database
+    assert (await migrate(url, "head")).returncode == 0
+    site = m.Site(name="Before")
+    user = m.User(
+        name="Before",
+        email="snapshot@example.test",
+        role="admin",
+        password_hash="test-only",
+    )
+    async with AsyncSession(engine, expire_on_commit=False) as session:
+        group = m.ResourceGroup(name="Machines", resource_type="infrastructure")
+        session.add_all([site, user, group])
+        await session.flush()
+        booking = await session.get(Assignment, BOOKING)
+        session.add(
+            m.InfrastructureResource(
+                id=booking.resource_id, name="Machine", group_id=group.id
+            )
+        )
+        await session.commit()
+    original = skills.load_export
+    calls = 0
+
+    async def edit_between_exporters(snapshot):
+        nonlocal calls
+        calls += 1
+        async with AsyncSession(engine) as writer:
+            await writer.execute(
+                sa.update(m.Site).where(m.Site.id == site.id).values(name="After")
+            )
+            await writer.execute(
+                sa.update(m.User).where(m.User.id == user.id).values(name="After")
+            )
+            await writer.commit()
+        return await original(snapshot)
+
+    monkeypatch.setattr(skills, "load_export", edit_between_exporters)
+    async with AsyncSession(engine) as session:
+        data = parse_migration(await export_migration(session))
+    assert calls == 1
+    assert (
+        next(row for row in data["sites"] if row["id"] == site.id)["name"] == "Before"
+    )
+    assert (
+        next(row for row in data["users"] if row["id"] == user.id)["name"] == "Before"
+    )
+    async with AsyncSession(engine) as session:
+        assert (await session.get(m.Site, site.id)).name == "After"
+        assert (await session.get(m.User, user.id)).name == "After"
+
+
 async def migrate(url: str, revision: str) -> subprocess.CompletedProcess[str]:
     return await asyncio.to_thread(
         subprocess.run,
@@ -280,3 +382,137 @@ async def test_ambiguous_history_rolls_back_the_entire_upgrade(
                 )
             ).scalar_one()
             assert payload["start_at"] == "2026-07-01T08:00:00"
+
+
+async def test_csv_migration_preserves_real_postgres_instants_and_history(
+    legacy_database,
+):
+    """Exercise archive locks, enum/array bindings and atomic inserts on migrated PostgreSQL."""
+    from app.models.baseline import Baseline
+    from app.models.calendar import ResourceWorkProfile, WorkWeekProfile
+    from app.models.resource import InfrastructureResource, PersonalResource
+    from app.models.resource_group import ResourceGroup
+    from app.models.user import User
+    from app.services.import_export.csv_format import _read_csv
+    from app.services.import_export.csv_transfer import (
+        export_area,
+        export_migration,
+        import_area_rows,
+        import_migration,
+    )
+
+    url, source_engine = legacy_database
+    assert (await migrate(url, "head")).returncode == 0
+    admin_engine = create_async_engine(url, isolation_level="AUTOCOMMIT")
+    target_name = "capado_csv_test_" + uuid4().hex
+    target_url = (
+        sa.engine.make_url(url)
+        .set(database=target_name)
+        .render_as_string(hide_password=False)
+    )
+    async with admin_engine.connect() as connection:
+        await connection.execute(sa.text(f'CREATE DATABASE "{target_name}"'))
+        await connection.execute(
+            sa.text(f"ALTER DATABASE \"{target_name}\" SET timezone TO 'Asia/Tokyo'")
+        )
+    target_engine = create_async_engine(target_url)
+    try:
+        result = await migrate(target_url, "head")
+        assert result.returncode == 0, result.stderr
+        async with AsyncSession(source_engine, expire_on_commit=False) as source:
+            booking = await source.get(Assignment, BOOKING)
+            infra_group = ResourceGroup(name="Machines", resource_type="infrastructure")
+            people_group = ResourceGroup(name="People", resource_type="personal")
+            source.add_all([infra_group, people_group])
+            await source.flush()
+            profile = WorkWeekProfile(name="Infrastructure hours", monday_minutes=360)
+            source.add(profile)
+            await source.flush()
+            binding = ResourceWorkProfile(
+                group_id=infra_group.id,
+                profile_id=profile.id,
+                valid_from=booking.start_at.date(),
+            )
+            source.add(binding)
+            person = PersonalResource(name="Planner", group_id=people_group.id)
+            source.add_all(
+                [
+                    person,
+                    InfrastructureResource(
+                        id=booking.resource_id, name="Machine", group_id=infra_group.id
+                    ),
+                ]
+            )
+            await source.flush()
+            editor = User(
+                email="editor@example.test",
+                name="Planner",
+                role="editor",
+                password_hash="excluded",
+                resource_id=person.id,
+                scope_group_ids=[people_group.id],
+                scope_project_ids=[PROJECT],
+            )
+            source.add(editor)
+            booking.start_at = datetime(2026, 7, 1, 6, 15, 23, 123456, UTC)
+            booking.end_at = datetime(2026, 7, 1, 8, 45, 23, 654321, UTC)
+            await source.commit()
+            editor_id, people_group_id, person_id = (
+                editor.id,
+                people_group.id,
+                person.id,
+            )
+            archive = await export_migration(source)
+        async with AsyncSession(target_engine, expire_on_commit=False) as target:
+            admin = User(
+                email="bootstrap@example.test",
+                name="Admin",
+                role="admin",
+                password_hash="unusable",
+            )
+            target.add(admin)
+            await target.commit()
+            result = await import_migration(target, archive, admin.id)
+            assert result.errors == []
+            assert not result.conflict_check_failed
+            restored = await target.get(Assignment, BOOKING)
+            assert restored.start_at == datetime(2026, 7, 1, 6, 15, 23, 123456, UTC)
+            assert restored.end_at == datetime(2026, 7, 1, 8, 45, 23, 654321, UTC)
+            assert (await target.get(Baseline, BASELINE)).created_by is None
+            restored_editor = await target.get(User, editor_id)
+            assert restored_editor.scope_group_ids == [people_group_id]
+            assert restored_editor.scope_project_ids == [PROJECT]
+            assert restored_editor.resource_id == person_id
+            assert (
+                restored_editor.password_hash == ""
+                and restored_editor.must_change_password
+            )
+            assert (
+                await target.execute(sa.text("SELECT count(*) FROM baseline_entries"))
+            ).scalar_one() == 2
+            # Standalone updates exercise the same writer, real UUID arrays and
+            # timezone-aware values after the destination is already populated.
+            content = await export_area(target, "assignments")
+            rows = _read_csv(content)
+            start_column = rows[1].index("start_at")
+            rows[2][start_column] = "2026-07-01T15:30:23.222333+09:00"
+            changed = await import_area_rows(target, "assignments", rows, admin.id)
+            assert not changed.errors and changed.updated == 1
+            await target.refresh(restored)
+            assert restored.start_at == datetime(2026, 7, 1, 6, 30, 23, 222333, UTC)
+            infra_rows = _read_csv(await export_area(target, "infrastructure"))
+            assert any(row[0] == "resource_work_profiles" for row in infra_rows[2:])
+            updated_infra = await import_area_rows(
+                target, "infrastructure", infra_rows, admin.id
+            )
+            assert not updated_infra.errors
+            # A populated target rejects repeat restores rather than duplicating data.
+            again = await import_migration(target, archive, admin.id)
+            assert again.created == 0 and "empty destination" in again.errors[0]
+    finally:
+        await target_engine.dispose()
+        async with admin_engine.connect() as connection:
+            await connection.execute(
+                sa.text(f'DROP DATABASE "{target_name}" WITH (FORCE)')
+            )
+        await admin_engine.dispose()

@@ -10,18 +10,30 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from app import models as m
 from app.models.resource import PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.site import Site
 from app.models.skill import PersonalResourceSkill, Skill, SkillAttribute
 
 from .common import (
+    RESOURCE_GROUP_CSV,
+    RESOURCE_WORK_PROFILE_CSV,
     ImportResult,
-    _build_flat_resource_csv,
     _build_flat_resource_xlsx,
     _build_skill_matrix_xlsx,
     _import_resources,
     _load_matrix_data,
+    binding_resource_type,
+    resource_csv_data,
+    track_resource_csv,
+    validate_resource_csv,
+)
+from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
+from .csv_storage import (
+    ImportContext,
+    load_data,
+    write_area,
 )
 
 
@@ -50,9 +62,10 @@ async def export_personnel_matrix_xlsx(session: AsyncSession) -> bytes:
 
 
 async def export_personnel_csv(session: AsyncSession) -> str:
-    """Export active personal resources with skill assignments as CSV."""
-    rows = await _load_personal_export_rows(session)
-    return await asyncio.to_thread(_build_flat_resource_csv, rows)
+    """Export the complete area CSV also included verbatim in the all-data ZIP."""
+    from .csv_transfer import export_area
+
+    return (await export_area(session, "personnel")).decode("utf-8-sig")
 
 
 async def import_personnel(session: AsyncSession, rows: list[tuple]) -> ImportResult:
@@ -70,6 +83,12 @@ async def import_personnel(session: AsyncSession, rows: list[tuple]) -> ImportRe
         Import result with counts.
 
     """
+    from .csv_format import is_area_csv
+    from .csv_transfer import import_area_rows
+
+    if is_area_csv(rows):
+        return await import_area_rows(session, "personnel", rows)
+
     return await _import_resources(
         session,
         rows,
@@ -116,3 +135,81 @@ async def _load_personal_export_rows(
         (row.name, row.group_name, row.skill_name, row.attr_name, row.site_name)
         for row in result.all()
     ]
+
+
+CSV_AREA = CsvArea(
+    "personnel",
+    (
+        RESOURCE_GROUP_CSV,
+        entity(
+            m.PersonalResource,
+            "id name group_id site_id is_active created_at updated_at",
+        ),
+        entity(
+            m.PersonalResourceSkill,
+            "id resource_id skill_attribute_id valid_from valid_until level created_at",
+            existing_by_id=True,
+        ),
+        RESOURCE_WORK_PROFILE_CSV,
+    ),
+)
+
+
+async def load_export(session: AsyncSession) -> dict[str, list[dict]]:
+    """Read this area's approved data and the references needed by its exporter."""
+    return await load_data(
+        session,
+        CSV_AREA.entities
+        + (
+            entity(
+                m.InfrastructureResource,
+                "id name group_id site_id is_active created_at updated_at",
+            ),
+        ),
+    )
+
+
+def export_csv(data: dict[str, list[dict]]) -> bytes:
+    """Produce the complete area CSV used by both downloads and ZIP exports."""
+    return dump_area(CSV_AREA, resource_csv_data(data, "personal"))
+
+
+def parse_csv(rows: list[tuple] | list[list[str]]) -> CsvBatch:
+    """Decode and check the versioned CSV belonging to this domain."""
+    batch = parse_area_rows(CSV_AREA, rows)
+    for row in batch.data["resource_groups"]:
+        if row["resource_type"] != "personal":
+            number = batch.row_numbers[("resource_groups", row["id"])]
+            raise ValueError(
+                f"{CSV_AREA.name}.csv, row {number}, field resource_type: resource group belongs to another area."
+            )
+    return batch
+
+
+def validate_import(context: ImportContext) -> None:
+    """Check this domain's rules against the complete planned destination."""
+    validate_resource_csv(context, "personal")
+    batch = context.batches.get(CSV_AREA.name)
+    if batch:
+        for row in batch.data["resource_work_profiles"]:
+            if binding_resource_type(row, context.merged) != "personal":
+                context.fail(
+                    "resource_work_profiles",
+                    row,
+                    "resource_id/group_id",
+                    "Work-profile binding belongs to another CSV area.",
+                )
+
+
+async def write_import(
+    session: AsyncSession, batch: CsvBatch, context: ImportContext
+) -> ImportResult:
+    """Write this area's prepared records inside the caller's transaction."""
+    track_resource_csv(context, "personal")
+    return await write_area(
+        session,
+        CSV_AREA.entities,
+        batch.data,
+        context,
+        hierarchical=("resource_groups",),
+    )

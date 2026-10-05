@@ -297,8 +297,8 @@ class TestImport5ColInfra:
         assert result.created == 1
         assert result.errors == []
 
-    async def test_skips_duplicate_same_resource_and_wp(self):
-        """Second assignment to same resource+WP is skipped."""
+    async def test_preserves_separate_bookings_for_same_resource_and_wp(self):
+        """Different intervals are distinct bookings even on the same work package."""
         session = _build_mock_session(
             projects=[_make_project()],
             infra_resources=[_make_infra()],
@@ -313,8 +313,8 @@ class TestImport5ColInfra:
 
         result = await import_assignments(session, rows)
 
-        assert result.created == 1
-        assert result.skipped == 1
+        assert result.created == 2
+        assert result.skipped == 0
 
 
 # ---------------------------------------------------------------------------
@@ -372,8 +372,8 @@ class TestImport5ColPersonal:
         added = session.add.call_args_list[-1][0][0]
         assert added.allocation_percent == 100.0
 
-    async def test_infra_preferred_over_personal_on_name_collision(self):
-        """When both infra and personal match, infrastructure wins."""
+    async def test_rejects_name_collision_between_resource_types(self):
+        """A legacy file must not silently select infrastructure over personnel."""
         session = _build_mock_session(
             projects=[_make_project()],
             infra_resources=[_make_infra("Shared Name")],
@@ -388,9 +388,9 @@ class TestImport5ColPersonal:
 
         result = await import_assignments(session, rows)
 
-        assert result.created == 1
-        added = session.add.call_args_list[-1][0][0]
-        assert added.resource_type == "infrastructure"
+        assert result.created == 0
+        assert "ambiguous" in result.errors[0]
+        session.add.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

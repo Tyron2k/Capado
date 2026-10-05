@@ -19,7 +19,8 @@ Thanks for your interest in contributing to Capado!
 - Run `pre-commit run --all-files` and fix any issues
 - Add tests for new features or bug fixes
 - Update documentation (docstrings, help pages if user-facing)
-- Update `docs/changelog.md` for user-visible changes
+- Describe user-visible changes in the pull request title and description; Release Drafter
+  generates the release notes from merged pull requests (see below)
 - Add i18n strings to both `de.json` and `en.json`
 
 ## Languages
@@ -77,8 +78,11 @@ updates do not provide `update-type` metadata, so the workflow derives the type
 from the single stable-version bump in their Dependabot commit message.
 Major updates, unknown versions and ambiguous updates require review.
 
-Release Drafter groups merged PRs by their Conventional Commit titles, with
-labels as a fallback. Dependabot merges made with `GITHUB_TOKEN` do not trigger
+Release Drafter generates the release notes on [GitHub Releases](https://github.com/Tyron2k/Capado/releases)
+from merged PRs, grouped by their Conventional Commit titles with labels as a fallback.
+Maintain the PR title and description instead of a separate manual changelog file.
+
+Dependabot merges made with `GITHUB_TOKEN` do not trigger
 `push` workflows; the draft is refreshed after **Dependabot Auto-Merge** finishes.
 Use **Run workflow** on **Release Drafter** to refresh a stale draft manually.
 

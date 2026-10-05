@@ -182,7 +182,7 @@ keeps every pre-ADR-005 plan valid. The consequence is that the whole window-vio
 mechanism does nothing on a fresh deployment: a booking at 03:00 on a Sunday is accepted
 until somebody defines operating hours.
 
-## Import limits do not include a time or decompressed-size bound
+## Individual Excel imports have no decompressed-size bound
 
 All five importers reject files over 20 MiB and files over 10,000 rows (including the header) before
 writing anything. The upload is read only up to the size limit plus one byte, and parsing runs in a
@@ -193,7 +193,9 @@ workbook. A compact, pathological `.xlsx` file can therefore consume more resour
 size suggests. This residual risk matters if the import endpoint is ever exposed to less-trusted
 administrators or a leaked admin token.
 
-See [import and export](import-export.md) for the formats themselves.
+Complete area CSVs have 100 MiB/200,000-record bounds; the ZIP bundles those same files with
+50 MiB archive, 100 MiB expanded and 200,000-total-record bounds. Its credentials/session exclusions and empty-target requirement are deliberate; see
+[import and export](import-export.md) for both workflows.
 
 ## Local passwords cannot be reset by their owner
 

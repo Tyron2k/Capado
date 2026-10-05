@@ -259,6 +259,19 @@ JOBS: dict[str, Callable[[AsyncSession], Awaitable[tuple[int, str]]]] = {
 }
 
 
+async def lock_maintenance_for_migration(session: AsyncSession) -> None:
+    """Wait for existing jobs and exclude new jobs until CSV restore commits.
+
+    Transaction-level locks use the scheduler's keys and are automatically
+    released on commit or rollback of the restore's pinned connection.
+    """
+    for job_name in sorted(JOBS):
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(:ns, :key)"),
+            {"ns": _LOCK_NAMESPACE, "key": _job_key(job_name)},
+        )
+
+
 async def run_due_jobs(
     session: AsyncSession,
     now: datetime | None = None,
@@ -283,7 +296,21 @@ async def run_due_jobs(
         async with _job_lock(session, job_name) as acquired:
             if not acquired:
                 continue
-            # Another process may have finished between the first read and lock.
+            # A CSV restore may have disabled maintenance while this worker
+            # waited. Refresh settings as well as the last successful run.
+            current_settings = (
+                (
+                    await session.execute(
+                        select(OrganizationSettings)
+                        .limit(1)
+                        .execution_options(populate_existing=True)
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            enabled = current_settings.scheduler_enabled if current_settings else True
+            hour = current_settings.maintenance_hour if current_settings else 2
             if not _job_due(
                 job_name, moment, await _last_success(session, job_name), enabled, hour
             ):

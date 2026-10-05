@@ -553,11 +553,11 @@
   "admin": {
     "title": "Master data",
     "importExport": "Import / Export",
-    "peopleCsvHint": "CSV format: Name; Group; [Skill; Attribute]. Skill columns are optional. Skills are auto-created if missing.",
-    "infrastructureCsvHint": "CSV format: Name; Group; [Skill; Attribute]. Skill columns are optional. Skills are auto-created if missing.",
-    "projectsCsvHint": "CSV format: Project; Start; End; Work Package; WP Start; WP End; [Skill; Attribute; Quantity]. Skill columns are optional. Skills must already exist.",
-    "templatesCsvHint": "CSV format: Template; Description; Skill; Attribute; Quantity. Skills must already exist.",
-    "assignmentsCsvHint": "CSV format: Project; Work Package; Resource; Start; End; Allocation. The Work Package column is optional (otherwise resolved by date overlap). Resources and projects must already exist. Dates in ISO format (YYYY-MM-DD)."
+    "peopleCsvHint": "CSV includes inactive personnel, group hierarchies, qualification levels and validity, and work-profile bindings. Import working time and the skill catalogue first. Excel remains a report or editable list.",
+    "infrastructureCsvHint": "CSV includes inactive resources, group hierarchies, qualification levels and validity, work-profile bindings and availability windows. Import working time and the skill catalogue first. Excel remains a report or editable list.",
+    "projectsCsvHint": "CSV includes customers, folders, project metadata, full requirements, completion, lead times and dependencies. Import the skill catalogue first.",
+    "templatesCsvHint": "CSV includes lead times and full requirements. Import the skill catalogue first.",
+    "assignmentsCsvHint": "CSV preserves booking IDs, precise instants and allocations. Import personnel, infrastructure and projects first."
   },
   "skills": {
     "title": "Skills",
@@ -591,12 +591,31 @@
     "errors": "Errors",
     "formatMatrix": "Excel — skill matrix (report, not importable)",
     "formatFlatXlsx": "Excel — flat (importable)",
-    "formatCsv": "CSV (importable)",
+    "formatCsv": "CSV (complete)",
     "logTitle": "Import log",
     "logNoErrors": "No errors. Every row was processed.",
     "logRejectedTitle": "Nothing was saved",
-    "logRejectedBody": "The import runs as a single transaction: as soon as one row is rejected, nothing is written. Fix the rows listed below and import the file again.",
-    "logClose": "Close"
+    "logRejectedBody": "Invalid rows were skipped. Valid rows may already have been saved; check the counts and fix the rows listed below before importing again.",
+    "logClose": "Close",
+    "formatCsvBundle": "All CSVs as ZIP",
+    "bundleRejectedBody": "The entire file was rejected. No data was imported.",
+    "migrationTitle": "Import / Export",
+    "migrationDescription": "The complete CSVs from the individual data areas are also available here. “All CSVs as ZIP” bundles exactly these files for moving data into an empty installation.",
+    "migrationCredentials": "The destination administrator account is retained. Passwords, identity bindings and sessions are not transferred; reset user passwords or relink authentication. Email and scheduled maintenance remain disabled after import until configured again.",
+    "individualAreas": "Individual areas: import updates by ID; records omitted from the file remain unchanged.",
+    "skillsDescription": "Complete skill catalogue for personnel and infrastructure, including unused skills and attributes.",
+    "areas": {
+      "working-time": "Working time and calendars",
+      "skills": "Skill catalogue",
+      "personnel": "Personnel",
+      "infrastructure": "Infrastructure",
+      "projects": "Projects and customers",
+      "templates": "Templates",
+      "assignments": "Assignments",
+      "absences": "Absences",
+      "administration": "Users and organization",
+      "history": "Baselines and audit history"
+    }
   },
   "groups": {
     "title": "Groups",

@@ -14,6 +14,7 @@
  */
 
 import { useRef, useState } from 'react'
+import axios from 'axios'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../../api/queryClient'
 import {
@@ -49,6 +50,7 @@ interface ImportOutcome {
   errors: string[]
   conflicts_found?: number | null
   conflict_check_failed?: boolean
+  atomic?: boolean
 }
 
 interface ImportExportBarProps {
@@ -60,6 +62,10 @@ interface ImportExportBarProps {
   filenameBase: string
   /** Callback after successful import */
   onImportSuccess?: () => void
+  /** Complete CSV migration uses a ZIP package instead of an individual table. */
+  csvBundle?: boolean
+  /** Areas without an Excel report expose just their complete CSV. */
+  csvOnly?: boolean
 }
 
 export function ImportExportBar({
@@ -67,12 +73,19 @@ export function ImportExportBar({
   importPath,
   filenameBase,
   onImportSuccess,
+  csvBundle = false,
+  csvOnly = false,
 }: ImportExportBarProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
+  const formats = csvBundle
+    ? [{ format: 'csv-zip', extension: 'zip', labelKey: 'importExport.formatCsvBundle' }]
+    : csvOnly
+      ? EXPORT_FORMATS.filter(({ format }) => format === 'csv')
+      : EXPORT_FORMATS
 
   const handleExport = async (format: string, extension: string) => {
     try {
@@ -89,6 +102,15 @@ export function ImportExportBar({
       a.click()
       URL.revokeObjectURL(url)
     } catch (error: unknown) {
+      // Download requests return error bodies as Blob as well. Decode the
+      // API diagnostic so file/row/field details reach the notification.
+      if (axios.isAxiosError(error) && error.response?.data instanceof Blob) {
+        try {
+          error.response.data = JSON.parse(await error.response.data.text())
+        } catch {
+          // Non-JSON proxy failures use the translated fallback below.
+        }
+      }
       showErrorNotification(error, t('common.error'), t('importExport.exportFailed'))
     }
   }
@@ -111,6 +133,7 @@ export function ImportExportBar({
         errors: data.errors ?? [],
         conflicts_found: data.conflicts_found,
         conflict_check_failed: data.conflict_check_failed,
+        atomic: data.atomic ?? csvBundle,
       })
       for (const queryKey of [
         queryKeys.conflicts.all,
@@ -120,6 +143,7 @@ export function ImportExportBar({
       ]) {
         void queryClient.invalidateQueries({ queryKey })
       }
+      if ((data.atomic || csvBundle) && data.success) void queryClient.invalidateQueries()
       onImportSuccess?.()
     } catch (error: unknown) {
       showErrorNotification(error, t('common.error'), t('importExport.importFailed'))
@@ -134,7 +158,7 @@ export function ImportExportBar({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".xlsx,.csv"
+        accept={csvBundle ? '.zip' : csvOnly ? '.csv' : '.xlsx,.csv'}
         style={{ display: 'none' }}
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -163,7 +187,7 @@ export function ImportExportBar({
           </Tooltip>
         </Menu.Target>
         <Menu.Dropdown>
-          {EXPORT_FORMATS.map(({ format, extension, labelKey }) => (
+          {formats.map(({ format, extension, labelKey }) => (
             <Menu.Item key={format} onClick={() => handleExport(format, extension)}>
               {t(labelKey)}
             </Menu.Item>
@@ -209,15 +233,16 @@ export function ImportExportBar({
               </Text>
             ) : (
               <>
-                {/* The whole import is ONE transaction: if anything was rejected, nothing was
-                    written. Saying so is the difference between "fix these rows" and the false
-                    impression that part of the file already landed. */}
                 <Alert
                   icon={<IconAlertTriangle size={16} />}
                   color="yellow"
                   title={t('importExport.logRejectedTitle')}
                 >
-                  {t('importExport.logRejectedBody')}
+                  {t(
+                    outcome.atomic
+                      ? 'importExport.bundleRejectedBody'
+                      : 'importExport.logRejectedBody',
+                  )}
                 </Alert>
                 <ScrollArea.Autosize mah={320}>
                   <List size="sm" spacing={4}>
