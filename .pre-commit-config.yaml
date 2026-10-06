@@ -57,7 +57,7 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Keep this in step with ruff in backend/pyproject.toml. Two ruff versions means the hook and a
     # developer's own `ruff check` can disagree, which produces a CI failure nobody can reproduce
-    # locally. Dependabot now watches this file too, so both move together.
+    # locally. Renovate includes both in the same non-major update group.
     rev: f12be1ebaa5351c1fc76472de98db2c3446c8253 # v0.16.10
     hooks:
       - id: ruff
@@ -76,6 +76,7 @@ repos:
     hooks:
       - id: prettier
         name: prettier (format, frontend)
+        language: node # Also lets Renovate identify additional_dependencies as npm packages.
         files: ^frontend/(src|public)/.*\.(ts|tsx|js|jsx|css|scss|json|md|yaml|yml)$
         additional_dependencies:
           - prettier@3.9.9

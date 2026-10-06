@@ -73,17 +73,19 @@ chore(deps): bump fastapi to 0.116.0
 
 ### Dependency updates and release notes
 
-Dependabot minor/patch updates enter auto-merge only after CI succeeds. Pre-commit
-updates do not provide `update-type` metadata, so the workflow derives the type
-from the single stable-version bump in their Dependabot commit message.
-Major updates, unknown versions and ambiguous updates require review.
+Self-hosted Renovate runs nightly through GitHub Actions. Minor/patch updates and
+existing hash refreshes share one PR across ecosystems and use GitHub squash
+auto-merge after required checks succeed. Major updates remain for review;
+TypeScript major updates stay disabled until the lint tooling supports them.
+See [CI and bot setup](docs/reference/ci.md#renovate-updates-dependencies) for
+credentials, dry runs, security updates and weekly lockfile maintenance.
 
 Release Drafter generates the release notes on [GitHub Releases](https://github.com/Tyron2k/Capado/releases)
 from merged PRs, grouped by their Conventional Commit titles with labels as a fallback.
 Maintain the PR title and description instead of a separate manual changelog file.
 
-Dependabot merges made with `GITHUB_TOKEN` do not trigger
-`push` workflows; the draft is refreshed after **Dependabot Auto-Merge** finishes.
+Renovate uses the project's own GitHub App token, so its merges trigger the regular
+`push` workflow and refresh the release draft.
 Use **Run workflow** on **Release Drafter** to refresh a stale draft manually.
 
 Keep merged commits on `main` intact. Rewording or rebasing them after merge

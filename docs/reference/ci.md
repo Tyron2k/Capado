@@ -20,7 +20,7 @@ skip fails the gate. The `main` ruleset requires this single Actions check, with
 date, plus CodeQL merge protection. Add any new required CI job to this gate's `needs` list.
 
 PRs do not build container images or run browser tests. Build and exercise the production targets
-locally on the feature branch for larger application or deployment changes. Routine Dependabot
+locally on the feature branch for larger application or deployment changes. Routine Renovate
 minor/patch updates rely on the PR checks; image builds and scans follow after merge.
 
 That is worth being precise about, because it decides where a mistake surfaces. A commit that reaches
@@ -69,22 +69,94 @@ CI calls `codeql.yml` to analyze Python and JavaScript/TypeScript on every pull 
 pushes to `main` and weekly, CI runs **only CodeQL**; lint, builds, tests, audits and the final PR
 gate are skipped. This keeps the main baseline and PR scans under the same analysis identity, which
 GitHub uses when comparing findings. It uses CodeQL's `security-extended` queries and waits for GitHub
-to process the results before completing. Including it in CI means the Dependabot merge workflow
-starts after the analysis, rather than racing a separate PR workflow.
+to process the results before completing. GitHub auto-merge waits for the final CI gate, including
+both analyses, rather than racing a separate scan workflow.
 
 The `main` ruleset requires CodeQL results and blocks code-scanning errors and HIGH/CRITICAL security
 alerts. PRs have no path filter because a required scan must report results even for configuration-only
 changes. The repository is public, so the results appear in GitHub code scanning without a separate
 paid Advanced Security license.
 
-## Dependabot merges itself
+## Renovate updates dependencies
 
-Dependabot checks every configured ecosystem daily at staggered times. Minor and patch updates are
-grouped per ecosystem. `.github/workflows/dependabot-automerge.yml` reacts only after CI succeeded,
-verifies that the tested commit is still the pull request head, then enables squash auto-merge with
-GitHub's expected-head guard.
+`.github/workflows/renovate.yml` runs the open-source Renovate container on GitHub Actions at
+01:23 UTC every day (02:23 in Berlin in winter, 03:23 in summer). It also supports a manual
+run on `main`, with a read-only full dry run selected by default. It does not run on PR code.
+Both the action and the Renovate version are pinned; the GitHub Actions manager also tracks
+the `renovate-version` input, keeping the bot itself up to date.
 
-Major updates, updates without trustworthy Dependabot metadata and ordinary pull requests remain for
-manual review. Branch rules require **CI passed** and CodeQL but do not require a human approval,
-which avoids making the only maintainer approve their own routine changes. Dependabot has no
-administrator bypass; auto-merge is still governed by the same required checks as any other pull request.
+`renovate.json` enables npm, Python/uv, GitHub Actions, Dockerfiles/Compose, pip requirements
+and pre-commit. All minor/patch updates and existing hash refreshes share
+`renovate/all-minor-patch` across ecosystems. This includes both Ruff pins and non-major
+security fixes. Security updates retain Renovate's priority behavior and can ignore normal
+PR limits. Major updates are separated and stay manual; TypeScript major updates retain the
+existing exclusion until the lint tooling supports them. Docker tags retain their existing
+precision and are not converted into digest pins. Weekly lockfile maintenance refreshes
+indirect npm/Python dependencies in its own PR and can also auto-merge after checks pass.
+
+Renovate queues GitHub's squash auto-merge. The existing strict branch rules still require
+**CI passed**, an up-to-date branch and CodeQL. The app receives no administrator bypass.
+Renovate updates branches that fall behind on its next run; with the daily schedule this may
+take until the next night. Use a manual run if a merge should progress sooner. Ordinary
+contributor PRs still require the maintainer's review.
+
+### One-time bot setup
+
+The bot uses a **private GitHub App owned by the repository owner**, reusable across their repositories.
+There is no Mend-hosted app or Mend repository grant. Create the app under
+[GitHub developer settings](https://github.com/settings/apps/new), for example named `Tyron2k Renovate`, with the owner's profile URL
+as its homepage, no callback URL, and webhooks disabled. Only this account may install the app.
+Grant the [permissions documented by Renovate](https://docs.renovatebot.com/modules/platform/github/#running-as-a-github-app):
+
+| Repository permission | Access |
+| --- | --- |
+| Checks, commit statuses, contents, issues, pull requests | Read and write |
+| Workflows | Write |
+| Administration, Dependabot alerts, metadata | Read |
+
+No organization permission is needed for this personal-account repository. If transferred to
+an organization and using team features, also check Renovate's documented Members permission.
+Keep the dependency graph and Dependabot **alerts** enabled. The app needs alert access for
+indirect vulnerability fixes; removing the Dependabot update configuration does not disable alerts.
+
+Install the app on the owner's account with **All repositories** to make it available to
+current and future repositories. This grants access; it does not start Renovate in those
+repositories. Capado's workflow still requests a token restricted to Capado and processes
+only Capado. For a repository in another account or organization, the app also needs an
+installation there; a private app is restricted to the account that owns it.
+
+Generate its private key and set these
+[repository Actions secrets](https://github.com/Tyron2k/Capado/settings/secrets/actions):
+
+- `RENOVATE_APP_CLIENT_ID`: the app's Client ID from its settings page.
+- `RENOVATE_APP_PRIVATE_KEY`: the complete generated PEM private key.
+
+The workflow checks these names before starting, creates an installation token limited to the
+current repository, and revokes it when the job finishes. Use the app token rather than
+`GITHUB_TOKEN`: app-created PRs start CI automatically and app merges trigger the normal
+Release Drafter push workflow. The workflow's `RENOVATE_*` environment variables require
+repository config, disable discovery/onboarding and enable GitHub-signed API commits.
+The repository's update rules remain in `renovate.json`.
+
+For a future run across multiple repositories, prefer a central bot workflow with the app
+private key stored only in that runner repository. A copy of the app key can mint tokens for
+any repository in the installation, even when a particular job requests a narrower token.
+The central runner must explicitly target the desired repositories and their account's
+installation; this Capado migration does not enable a multi-repository run.
+
+After merging the migration and configuring the app, first preview the planned updates:
+
+```bash
+gh workflow run renovate.yml --ref main -f dry_run=true
+```
+
+Confirm that extraction finds both lockfile ecosystems, both Ruff pins and the expected update
+group. Disable **Dependabot security updates** in repository settings to avoid two bots opening
+the same fixes; keep **Dependabot alerts** enabled. Then start the first writing run:
+
+```bash
+gh workflow run renovate.yml --ref main -f dry_run=false
+```
+
+Close any remaining Dependabot PR only after Renovate has produced an equivalent replacement
+or the update is already on `main`. The nightly schedule uses writing mode automatically.

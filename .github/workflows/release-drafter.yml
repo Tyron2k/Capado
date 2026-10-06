@@ -5,11 +5,6 @@ on: # zizmor: ignore[dangerous-triggers] API-only; never checks out or executes 
     branches: [main]
   pull_request:
     types: [opened, reopened, synchronize, edited]
-  # Merges made with GITHUB_TOKEN do not emit a push workflow. Update the draft
-  # after the merge workflow completes instead; always read the main branch.
-  workflow_run:
-    workflows: ["Dependabot Auto-Merge"]
-    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -37,10 +32,7 @@ jobs:
 
   update-release-draft:
     name: Update release draft
-    if: >-
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
