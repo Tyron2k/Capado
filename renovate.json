@@ -1,0 +1,49 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "dependencyDashboard": true,
+  "timezone": "Europe/Berlin",
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps",
+  "enabledManagers": [
+    "npm",
+    "pep621",
+    "github-actions",
+    "dockerfile",
+    "docker-compose",
+    "pip_requirements",
+    "pre-commit"
+  ],
+  "pre-commit": { "enabled": true },
+  "pinDigests": false,
+  "automerge": false,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "platformAutomerge": true,
+  "separateMajorMinor": true,
+  "rebaseWhen": "behind-base-branch",
+  "prConcurrentLimit": 2,
+  "prHourlyLimit": 2,
+  "lockFileMaintenance": { "enabled": true, "automerge": true },
+  "vulnerabilityAlerts": {
+    "groupName": "{{#if isMajor}}major security fixes{{else}}all non-major dependencies{{/if}}",
+    "groupSlug": "all-minor-patch",
+    "vulnerabilityFixStrategy": "highest",
+    "prConcurrentLimit": 2
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch",
+      "groupSingleUpdates": true,
+      "automerge": true
+    },
+    {
+      "description": "Keep TypeScript major updates blocked until the lint tooling supports them.",
+      "matchPackageNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
+}

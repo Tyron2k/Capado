@@ -28,8 +28,8 @@
 #   layer stays near zero, because a freshly rebuilt base has nothing left to upgrade.
 #   Pinning therefore preserves exactly the state that inflates the image.
 #
-#   Dependabot watches this file (.github/dependabot.yml, ecosystem docker, /backend,
-#   weekly) and reads plain `FROM` instructions — it has raised a base-image PR here
+#   Renovate watches this file (dockerfile manager in renovate.json) and reads plain
+#   `FROM` instructions — dependency bots have raised a base-image PR here
 #   before. A pin hidden behind `ARG` + `FROM ${VAR}` risks being invisible to it, which
 #   is the worst of the options: a pin nobody refreshes accumulates the very upgrade it
 #   was meant to make unnecessary.
@@ -38,8 +38,8 @@
 # systems. Accepted knowingly — the alternative is carrying a base we do not update, and
 # a security update we do not take is a security update we do not have.
 #
-# Dependabot will occasionally propose the next MAJOR bump (e.g. 3.14 -> 3.15). That is a
-# judgement call; taking or declining one is deliberate, not automatic.
+# Renovate tracks these tags without adding digest pins. Major version updates remain
+# manual; minor/patch updates use the shared CI-gated dependency group.
 #
 # --- Builder stage: compile native extensions (asyncpg, etc.) --------------
 #
