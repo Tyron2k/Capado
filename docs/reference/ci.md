@@ -87,12 +87,21 @@ the `renovate-version` input, keeping the bot itself up to date.
 
 `renovate.json` enables npm, Python/uv, GitHub Actions, Dockerfiles/Compose, pip requirements
 and pre-commit. All minor/patch updates and existing hash refreshes share
-`renovate/all-minor-patch` across ecosystems. This includes both Ruff pins and non-major
+`renovate/all-minor-patch` across ecosystems. This includes both Ruff pins and supported non-major
 security fixes. Security updates retain Renovate's priority behavior and can ignore normal
 PR limits. Major updates are separated and stay manual; TypeScript major updates retain the
 existing exclusion until the lint tooling supports them. Docker tags retain their existing
 precision and are not converted into digest pins. Weekly lockfile maintenance refreshes
 indirect npm/Python dependencies in its own PR and can also auto-merge after checks pass.
+
+Keep Dependabot **security updates** enabled alongside Renovate for targeted transitive fixes
+in `uv.lock` and `package-lock.json`; see the
+[documented Renovate limitation](known-limitations.md#renovate-transitive-security-fixes).
+Dependabot handles those alert-driven fixes; Renovate handles routine version updates.
+
+CI's Python 3.12 entry remains fixed to test the minimum supported version. Pre-commit revisions
+use SHA pins with `# frozen: <tag>` comments, letting Renovate recognize their actual versions
+and preserve the pins instead of treating hexadecimal hashes as version numbers.
 
 Renovate queues GitHub's squash auto-merge. The existing strict branch rules still require
 **CI passed**, an up-to-date branch and CodeQL. The app receives no administrator bypass.
@@ -116,8 +125,9 @@ Grant the [permissions documented by Renovate](https://docs.renovatebot.com/modu
 
 No organization permission is needed for this personal-account repository. If transferred to
 an organization and using team features, also check Renovate's documented Members permission.
-Keep the dependency graph and Dependabot **alerts** enabled. The app needs alert access for
-indirect vulnerability fixes; removing the Dependabot update configuration does not disable alerts.
+Keep the dependency graph, Dependabot **alerts** and Dependabot **security updates** enabled.
+The app needs alert access to prioritize supported vulnerability fixes; removing the Dependabot
+version update configuration does not disable alerts or security updates.
 
 Install the app on the owner's account with **All repositories** to make it available to
 current and future repositories. This grants access; it does not start Renovate in those
@@ -144,6 +154,10 @@ any repository in the installation, even when a particular job requests a narrow
 The central runner must explicitly target the desired repositories and their account's
 installation; this Capado migration does not enable a multi-repository run.
 
+In repository Actions settings, allow `renovatebot/github-action@*` if third-party actions
+are restricted to a selected list. Keep the requirement to pin actions to a full commit SHA
+enabled; the workflow already pins this action.
+
 After merging the migration and configuring the app, first preview the planned updates:
 
 ```bash
@@ -151,8 +165,8 @@ gh workflow run renovate.yml --ref main -f dry_run=true
 ```
 
 Confirm that extraction finds both lockfile ecosystems, both Ruff pins and the expected update
-group. Disable **Dependabot security updates** in repository settings to avoid two bots opening
-the same fixes; keep **Dependabot alerts** enabled. Then start the first writing run:
+group. Keep **Dependabot security updates** enabled for the transitive fixes described above.
+Then start the first writing run:
 
 ```bash
 gh workflow run renovate.yml --ref main -f dry_run=false

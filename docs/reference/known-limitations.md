@@ -139,6 +139,20 @@ next nightly build rather than by the pull request. `edge-<sha>` and the OCI rev
 last published commit explicit. A published release uses the same build-and-scan workflow and will
 not promote release tags when either image fails.
 
+## Renovate transitive security fixes
+
+As verified on 6 October 2026, Renovate 44.138.0 does not yet provide targeted transitive
+security fixes for `uv.lock` and `package-lock.json`.
+[Upstream support is still being implemented](https://github.com/renovatebot/renovate/issues/46377).
+The first Capado update group left the vulnerable Mako and smol-toml versions in those
+lockfiles unchanged, despite existing GitHub alerts and read access for the bot.
+
+Dependabot **security updates** therefore remain enabled, alongside Dependabot alerts and
+the dependency graph. Renovate owns routine version updates and weekly lockfile maintenance;
+maintenance may refresh an affected indirect dependency, but is not a targeted security fix.
+Remove this fallback only after upgrading to a Renovate release supporting both lockfiles
+and verifying an actual transitive alert's fix. See [CI](ci.md) for the bot configuration.
+
 ## Free-text fields defeat the enum work
 
 `Absence.note` (500 chars) and `AuditLog.reason` accept anything. Migration 013 removed the
