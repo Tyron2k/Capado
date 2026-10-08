@@ -10,11 +10,11 @@ description = "Capado backend service"
 license = "GPL-3.0-only"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi==0.142.2",
+    "fastapi==0.142.4",
     "uvicorn[standard]==0.54.0",  # CLI entry point: uv run uvicorn app.main:app
     "sqlmodel==0.0.48",
     "asyncpg==0.32.0",  # Engine driver loaded via postgresql+asyncpg:// URI
-    "sqlalchemy[asyncio]==2.1.3",
+    "sqlalchemy[asyncio]==2.1.4",
     "alembic==1.20.0",
     "pydantic==2.13.5",
     "bcrypt==5.0.0",
