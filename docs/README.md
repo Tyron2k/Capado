@@ -28,8 +28,8 @@ docs/
 │   ├── capacity-model.md
 │   └── conflict-detection.md
 ├── decisions/       Architecture Decision Records
-│   ├── README.md                 Which numbers are absent, and why
-│   └── 003…012                   The cross-cutting decisions that are still cited
+│   ├── README.md                 What merits a separate decision record
+│   └── 001…009                   The cross-cutting decisions that are still cited
 └── compliance/      For readers outside the development team
     └── zweck-und-grenzen-de.md
 ```

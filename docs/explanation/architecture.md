@@ -15,6 +15,12 @@ planning:
 └─────────────────┴─────────────────┴─────────────────────┘
 ```
 
+The standard backend runs as a native FastAPI container with PostgreSQL and
+asynchronous SQLAlchemy (`AsyncSession`) over asyncpg. Deployment targets are
+chosen around this runtime. Focused services use request-scoped sessions with
+explicit transaction boundaries for business writes, audit records and derived
+updates.
+
 ## Backend Layers
 
 Requests flow through four layers:
