@@ -10,7 +10,7 @@ planning:
 │                    Docker Compose                        │
 ├─────────────────┬─────────────────┬─────────────────────┤
 │    frontend     │     backend     │         db          │
-│  React + Vite   │    FastAPI      │   PostgreSQL 16     │
+│  React + Vite   │    FastAPI      │   PostgreSQL 18     │
 │     :3000       │     :3001       │       :5432         │
 └─────────────────┴─────────────────┴─────────────────────┘
 ```
