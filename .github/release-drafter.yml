@@ -4,24 +4,29 @@ tag-template: "v$RESOLVED_VERSION"
 # Classify by Conventional Commit titles as well as existing labels. The root
 # v7 action drafts releases; autolabeling is a separate action, and most of this
 # repository's PRs have no labels. Title matching also categorizes past PRs.
+# Use the first matching changelog category when a PR has several kinds of labels.
 categories:
   - title: "🚀 Features"
+    exclusive: true
     semver-increment: minor
     when:
       - conventional:
           type: feat
       - labels: [feature, enhancement]
   - title: "🐛 Bug Fixes"
+    exclusive: true
     when:
       - conventional:
           type: fix
       - labels: [fix, bug]
   - title: "🧹 Maintenance"
+    exclusive: true
     when:
       - conventional:
           types: [chore, ci, refactor, build, perf, test]
       - labels: [dependencies, ci, refactor]
   - title: "📖 Documentation"
+    exclusive: true
     when:
       - conventional:
           type: docs
