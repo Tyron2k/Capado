@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: capado_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
@@ -9,7 +9,8 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # PostgreSQL 18 uses /var/lib/postgresql/18/docker inside this volume.
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -72,4 +73,4 @@ services:
 volumes:
   postgres_data:
     external: true
-    name: capado_postgres_data
+    name: ${CAPADO_DEV_DATABASE_VOLUME:-capado_postgres_data}

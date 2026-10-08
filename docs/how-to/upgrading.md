@@ -8,6 +8,73 @@ Capado is pre-1.0 and the schema still changes between releases. Read the releas
 you are moving to before starting; anything version-specific lives there, and the sections below are
 the procedure that applies every time.
 
+## PostgreSQL 16 to 18
+
+The Compose defaults now use PostgreSQL 18. This is a **database engine upgrade**, separate from
+Capado's Alembic migrations. Changing the image tag does not upgrade a PostgreSQL 16 data directory.
+PostgreSQL 18 also changes its default data directory to `/var/lib/postgresql/18/docker`; both
+Compose files therefore mount the volume at `/var/lib/postgresql`.
+[Official image documentation](https://hub.docker.com/_/postgres).
+
+For a fresh installation, use an empty volume and the normal setup procedure. For an existing
+installation, choose one of the following paths before deploying the new Compose file:
+
+- **Keep PostgreSQL 16 temporarily:** retain `image: postgres:16-alpine` and the volume mount at
+  `/var/lib/postgresql/data`. Capado continues to work with this combination while you prepare
+  the database migration. Save this Compose file and the original project name for rollback.
+- **Move application data through CSV:** export the full CSV ZIP from the old installation, then
+  import it into a fresh PostgreSQL 18 installation as described below.
+- **Preserve the complete database with `pg_upgrade`:** follow PostgreSQL's
+  [major-version upgrade procedure](https://www.postgresql.org/docs/18/pgupgrade.html), rehearsed
+  on a copy of the volume. This requires both server versions and an explicit data-directory
+  migration; the normal Capado Compose startup does not perform it.
+
+### CSV migration to a fresh PostgreSQL 18 database
+
+1. Use a Capado version with the full CSV ZIP exporter on the source and destination. If your
+   source only offers the legacy five-file exports, update its application first while keeping
+   PostgreSQL 16 and its existing volume mount. Then sign in as an administrator and export the
+   **full CSV ZIP** in Settings → Import / Export. Stop writes before the final export so later
+   changes are not lost. Keep the original volume and archive until the new installation is verified.
+2. Save the PostgreSQL 16 Compose file and its application image version. Stop and remove the
+   old containers with `docker compose -f docker-compose.prod.yml down`. **Do not use
+   `down -v`**, which deletes the database volume. Both installations use the same explicit
+   container names, so the old containers must be removed before starting the new project.
+3. Start the new PostgreSQL 18 stack with a **different, empty volume**. For production Compose,
+   use a new project name consistently for every command; this generates a separate managed
+   database volume while preserving the old one:
+
+   ```bash
+   docker compose -p capado-pg18 -f docker-compose.prod.yml up -d
+   ```
+
+   If you already set `COMPOSE_PROJECT_NAME`, note its old value for rollback. Reuse the
+   configured database credentials and application secrets from your existing deployment.
+
+   For development, the external volume name is independent of the Compose project. Create a
+   fresh volume and set `CAPADO_DEV_DATABASE_VOLUME=capado_postgres18_data` in the development
+   environment before starting:
+
+   ```bash
+   docker volume create capado_postgres18_data
+   ```
+
+4. Create the first administrator in the new installation, using the same email as an exported
+   administrator. Import the full ZIP into this otherwise empty installation. The importer
+   validates the complete archive before writing; resolve any reported validation errors before
+   retrying. It maps the bootstrap account to its exported identity and restores the domain data
+   and history in one transaction.
+5. Verify projects, resources, assignments, working-time calendars, skills, baselines and user
+   scopes. CSV intentionally excludes passwords, active sessions, OIDC subject links and the SMTP
+   password. Reset imported users' local passwords or reconfigure OIDC, and configure SMTP and
+   the scheduler explicitly before enabling them. See the
+   [CSV contract and exclusions](../reference/import-export.md).
+
+For rollback, stop and remove the new project's containers without deleting its volume. Start
+the saved PostgreSQL 16 Compose file with the **original project name and application version**;
+it still references the untouched original volume. Changes made in PostgreSQL 18 after cutover
+are not automatically copied back.
+
 ## 1. Back up, without exception
 
 Not every migration is reversible. Migration 013, for example, collapsed absence reasons to

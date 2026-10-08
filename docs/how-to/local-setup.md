@@ -15,6 +15,7 @@
 git clone <repo-url> capado && cd capado
 cp .env.example .env
 # Edit .env: set POSTGRES_PASSWORD
+docker volume create capado_postgres_data
 docker compose up -d
 ```
 
@@ -31,6 +32,10 @@ that omits the backend's `/api` prefix and makes login return 404.
 
 On first visit, you'll be redirected to the setup page to create the
 initial admin account.
+
+The default database is PostgreSQL 18. Its volume is mounted at `/var/lib/postgresql`, with
+database files in `18/docker`. An existing PostgreSQL 16 volume cannot be reused directly;
+follow the [database upgrade procedure](upgrading.md#postgresql-16-to-18) first.
 
 ### Creating the first admin without a browser
 

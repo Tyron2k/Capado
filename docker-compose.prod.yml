@@ -18,14 +18,16 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: capado_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-capado_user}
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"
       POSTGRES_DB: ${POSTGRES_DB:-capado}
     volumes:
-      - capado_data:/var/lib/postgresql/data
+      # PostgreSQL 18 stores data under 18/docker within this volume. Existing
+      # PostgreSQL 16 volumes require migration; see docs/how-to/upgrading.md.
+      - capado_data:/var/lib/postgresql
     healthcheck:
       test:
         [
