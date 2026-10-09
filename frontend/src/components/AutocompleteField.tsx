@@ -132,7 +132,7 @@ export function AutocompleteField({
   const handleBlur = () => {
     // Delay to allow click on dropdown items
     setTimeout(() => {
-      if (!containerRef.current?.contains(document.activeElement)) {
+      if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
         setDismissed(true)
         setFocusedIndex(-1)
         if (!hasSelected) {
