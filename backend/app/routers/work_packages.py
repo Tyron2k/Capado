@@ -124,7 +124,7 @@ async def get_work_package(
 
     """
     service = WorkPackageService(session)
-    work_package = await service.get_by_id(work_package_id)
+    work_package = await service.get_by_id(work_package_id, project_id=project_id)
     return work_package
 
 
@@ -160,6 +160,7 @@ async def update_work_package(
         lead_time_working_days=data.lead_time_working_days,
         completed_at=data.completed_at if "completed_at" in wp_sent else UNSET,
         work_package_id=work_package_id,
+        project_id=project_id,
         name=data.name,
         start_date=data.start_date,
         end_date=data.end_date,
@@ -192,4 +193,4 @@ async def delete_work_package(
     """
     check_write_permission(current_user, EntityType.work_package, project_id=project_id)
     service = WorkPackageService(session)
-    await service.delete(work_package_id)
+    await service.delete(work_package_id, project_id=project_id)

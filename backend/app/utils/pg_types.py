@@ -6,6 +6,7 @@ and fall back to JSON storage when running on SQLite (used in the test suite).
 
 import json
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import JSON, String, TypeDecorator
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -42,5 +43,5 @@ class UUIDArray(TypeDecorator):
         if dialect.name == "postgresql":
             return value
         if isinstance(value, str):
-            return json.loads(value)
-        return value
+            value = json.loads(value)
+        return [UUID(str(item)) for item in value]

@@ -1,35 +1,8 @@
-"""One request path commits in exactly one layer.
+"""Prevent endpoints from committing after a committing service call.
 
-WHY THIS IS A TEST AND NOT A REFACTOR
-
-An architecture review counted 67 ``session.commit()`` calls across 19 service modules and 29 across
-9 router modules and graded that a blocker: two layers committing means a router could commit after a
-service already had, and a failure between the two would leave a state no code intended and no
-rollback could reach.
-
-Then the claim was checked, twice, with two different parsers. **No function in any router both
-commits and calls a committing service function.** The double-commit path does not exist. The count
-was real and the conclusion was wrong.
-
-What is actually true is narrower and worth keeping: the codebase uses BOTH ownership patterns.
-
-- Service-owned: ``resources``, ``projects``, ``work_packages`` — the router delegates and the
-  service commits.
-- Router-owned: ``templates``, ``customers``, ``work_package_requirements``, ``users``, ``auth``,
-  resource *groups* — there is no service at all, and the router persists inline.
-
-Neither is wrong on its own. What would be wrong is a single endpoint doing both, and nothing prevents
-someone from writing one — the two patterns sit side by side in the same directory, so mixing them is
-the natural mistake rather than a careless one. Refactoring 96 call sites would fix nothing that is
-broken today; this test makes the defect impossible to introduce tomorrow, which is what the finding
-actually warranted.
-
-HOW IT DECIDES
-
-Per-FUNCTION, not per-module, and that distinction is the whole reason it can be strict. A
-module-level check would flag ``resources.py``, which legitimately commits for resource *groups* while
-also calling read-only functions of ``resource_service`` — a module that commits elsewhere. Only the
-functions that actually commit count.
+Both router-owned and service-owned transactions are supported. The guard resolves
+imported service modules/classes and local instances, including constructor aliases;
+it complements database rollback tests rather than attempting a full call graph.
 """
 
 from __future__ import annotations
@@ -76,16 +49,41 @@ def _committing_service_functions() -> set[tuple[str, str]]:
     return found
 
 
-def _service_calls(node: ast.AST) -> set[tuple[str, str]]:
-    """``(module, function)`` pairs this function calls as ``<module>.<function>(...)``."""
+def _service_calls(node: ast.AST, tree: ast.AST) -> set[tuple[str, str]]:
+    """Resolve module calls and methods on locally constructed service instances."""
+    aliases: dict[str, str] = {}
+    for imported in ast.walk(tree):
+        if isinstance(imported, ast.ImportFrom) and imported.module:
+            if imported.module.startswith("app.services."):
+                for alias in imported.names:
+                    aliases[alias.asname or alias.name] = imported.module.split(".")[-1]
+            elif imported.module == "app.services":
+                for alias in imported.names:
+                    aliases[alias.asname or alias.name] = alias.name
+        elif isinstance(imported, ast.Import):
+            for alias in imported.names:
+                if alias.name.startswith("app.services.") and alias.asname:
+                    aliases[alias.asname] = alias.name.split(".")[-1]
+
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Assign | ast.AnnAssign):
+            value = sub.value
+            if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
+                module = aliases.get(value.func.id)
+                targets = sub.targets if isinstance(sub, ast.Assign) else [sub.target]
+                if module:
+                    for target in targets:
+                        if isinstance(target, ast.Name):
+                            aliases[target.id] = module
+
     calls: set[tuple[str, str]] = set()
     for sub in ast.walk(node):
-        if (
-            isinstance(sub, ast.Call)
-            and isinstance(sub.func, ast.Attribute)
-            and isinstance(sub.func.value, ast.Name)
-        ):
-            calls.add((sub.func.value.id, sub.func.attr))
+        if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute):
+            receiver = sub.func.value
+            if isinstance(receiver, ast.Call):
+                receiver = receiver.func
+            if isinstance(receiver, ast.Name) and receiver.id in aliases:
+                calls.add((aliases[receiver.id], sub.func.attr))
     return calls
 
 
@@ -102,10 +100,11 @@ def test_no_endpoint_commits_in_two_layers():
     for path in sorted(ROUTERS.rglob("*.py")):
         if path.name == "__init__.py":
             continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         for name, node in _functions(path).items():
             if not _commits(node):
                 continue
-            overlap = _service_calls(node) & committing_services
+            overlap = _service_calls(node, tree) & committing_services
             if overlap:
                 calls = ", ".join(f"{m}.{f}" for m, f in sorted(overlap))
                 offenders.append(
@@ -132,3 +131,23 @@ def test_the_check_can_actually_see_a_committing_service():
         f"Expected many committing service functions, found {len(committing)}. The detection is "
         "broken, so test_no_endpoint_commits_in_two_layers is passing without checking anything."
     )
+
+
+def test_instance_and_module_aliases_are_resolved():
+    tree = ast.parse("""
+from app.services.project_service import ProjectService as Projects
+from app.services import resource_service as resources
+async def create(session):
+    service = Projects(session)
+    await service.create()
+    await Projects(session).delete()
+    await resources.update_resource()
+    await session.commit()
+""")
+    node = tree.body[-1]
+    assert _commits(node)
+    assert _service_calls(node, tree) == {
+        ("project_service", "create"),
+        ("project_service", "delete"),
+        ("resource_service", "update_resource"),
+    }

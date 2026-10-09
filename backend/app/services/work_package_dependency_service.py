@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.project import WorkPackage, WorkPackageDependency
 from app.services.dependencies import DependencyEdge, would_create_cycle
+from app.services.work_package_service import WorkPackageService
 
 
 def _utcnow() -> datetime:
@@ -51,14 +52,27 @@ class WorkPackageDependencyService:
             for row in result.all()
         ]
 
-    async def _require_work_package(self, wp_id: UUID) -> WorkPackage:
-        wp = await self.session.get(WorkPackage, wp_id)
-        if wp is None:
-            raise NotFoundError("WorkPackage", wp_id)
-        return wp
+    async def _require_work_package(
+        self, wp_id: UUID, project_id: UUID | None = None
+    ) -> WorkPackage:
+        return await WorkPackageService(self.session).get_by_id(
+            wp_id, project_id=project_id
+        )
+
+    async def _require_dependency(
+        self, dependency_id: UUID, successor_id: UUID | None, project_id: UUID | None
+    ) -> WorkPackageDependency:
+        if successor_id is not None:
+            await self._require_work_package(successor_id, project_id)
+        dependency = await self.session.get(WorkPackageDependency, dependency_id)
+        if dependency is None or (
+            successor_id is not None and dependency.successor_id != successor_id
+        ):
+            raise NotFoundError("WorkPackageDependency", dependency_id)
+        return dependency
 
     async def list_for_work_package(
-        self, wp_id: UUID
+        self, wp_id: UUID, *, project_id: UUID | None = None
     ) -> tuple[list[WorkPackageDependency], list[WorkPackageDependency]]:
         """Links where this package is the successor, and where it is the predecessor.
 
@@ -66,7 +80,7 @@ class WorkPackageDependencyService:
         directional: "what has to finish before this can start" is a different question
         from "what is waiting on this".
         """
-        await self._require_work_package(wp_id)
+        await self._require_work_package(wp_id, project_id)
 
         predecessors = await self.session.execute(
             select(WorkPackageDependency).where(
@@ -84,7 +98,12 @@ class WorkPackageDependencyService:
         )
 
     async def create(
-        self, predecessor_id: UUID, successor_id: UUID, lag_working_days: int = 0
+        self,
+        predecessor_id: UUID,
+        successor_id: UUID,
+        lag_working_days: int = 0,
+        *,
+        project_id: UUID | None = None,
     ) -> WorkPackageDependency:
         """Link two work packages, refusing a cycle.
 
@@ -101,7 +120,7 @@ class WorkPackageDependencyService:
             )
 
         await self._require_work_package(predecessor_id)
-        await self._require_work_package(successor_id)
+        await self._require_work_package(successor_id, project_id)
 
         if predecessor_id == successor_id:
             raise BusinessRuleError(
@@ -133,7 +152,12 @@ class WorkPackageDependencyService:
         return dependency
 
     async def update_lag(
-        self, dependency_id: UUID, lag_working_days: int
+        self,
+        dependency_id: UUID,
+        lag_working_days: int,
+        *,
+        successor_id: UUID | None = None,
+        project_id: UUID | None = None,
     ) -> WorkPackageDependency:
         """Change the waiting time on an existing link.
 
@@ -146,9 +170,9 @@ class WorkPackageDependencyService:
                 "The lag must not be negative.", field="lag_working_days"
             )
 
-        dependency = await self.session.get(WorkPackageDependency, dependency_id)
-        if dependency is None:
-            raise NotFoundError("WorkPackageDependency", dependency_id)
+        dependency = await self._require_dependency(
+            dependency_id, successor_id, project_id
+        )
 
         dependency.lag_working_days = lag_working_days
         dependency.updated_at = _utcnow()
@@ -156,11 +180,17 @@ class WorkPackageDependencyService:
         await self.session.commit()
         return dependency
 
-    async def delete(self, dependency_id: UUID) -> None:
+    async def delete(
+        self,
+        dependency_id: UUID,
+        *,
+        successor_id: UUID | None = None,
+        project_id: UUID | None = None,
+    ) -> None:
         """Remove a link. Neither work package is touched."""
-        dependency = await self.session.get(WorkPackageDependency, dependency_id)
-        if dependency is None:
-            raise NotFoundError("WorkPackageDependency", dependency_id)
+        dependency = await self._require_dependency(
+            dependency_id, successor_id, project_id
+        )
         await self.session.delete(dependency)
         await self.session.commit()
 

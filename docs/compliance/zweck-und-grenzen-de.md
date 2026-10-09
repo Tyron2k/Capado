@@ -292,7 +292,7 @@ werden und wie die zurückgemeldeten Zahlen dokumentiert werden.⟩
 
 - **Betrieb im eigenen Haus.** Keine Cloud, kein externer Dienstleister, keine
   Datenübermittlung an Dritte. ⟨Der Betrieb benennt Server und Verantwortlichen.⟩
-- **Quelloffen** unter GPL-3.0. Jede Aussage in diesem Dokument ist am Quellcode
+- **Quelloffen** unter GPL-3.0-or-later. Jede Aussage in diesem Dokument ist am Quellcode
   überprüfbar — auch von einer Stelle, die der Betriebsrat selbst hinzuzieht.
 - **Zugang** über persönliche Konten mit Rollen; keine Sammelkonten vorgesehen.
 - ⟨Löschkonzept, Sicherungskonzept und Verantwortlichkeiten trägt der Betrieb

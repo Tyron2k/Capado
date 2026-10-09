@@ -25,6 +25,7 @@ import {
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { usePermissions } from '../../hooks/usePermissions'
+import { useAuth } from '../../context/AuthContext'
 import { FolderTree } from './FolderTree'
 import { ProjectForm, type ProjectFormValues } from './ProjectForm'
 import { WorkPackagesSection } from './WorkPackagesSection'
@@ -35,6 +36,7 @@ export function ProjectsPanel() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { canEditProject, canWrite } = usePermissions()
+  const { user, refresh } = useAuth()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
@@ -68,25 +70,27 @@ export function ProjectsPanel() {
     }
   }, [foldersQuery.error, t])
 
-  /**
-   * PROJECT MASTER DATA DOES NOT CHANGE THE PLAN.
-   *
-   * A project's name, folder, customer, reference and priority are labels and structure. Nothing about
-   * how much work is committed to whom changes when they do — which is why this invalidates `projects`
-   * and stops, where an assignment invalidates five keys. The distinction is the whole reason work
-   * packages and projects are separate kinds in the key tree.
-   *
-   * Dates are the exception in principle, and are handled where they have consequences: a work
-   * package's dates drive the schedule, and WorkPackagesSection invalidates accordingly. A project's
-   * own dates are the envelope the packages sit in, and the backend derives nothing from them alone.
-   *
-   * ONE COARSE PREFIX COVERS THE FOLDER COUPLING FOR FREE. Deleting a folder unfiles the projects
-   * inside it, so the hand-written version had to remember to reload BOTH lists — one call did folders,
-   * one did projects, and getting it right depended on noticing. Folders and projects both live under
-   * `['projects', ...]`, so the coarse prefix invalidates both whether or not anyone remembered.
-   */
-  const invalidateProjects = () =>
+  // Folder writes change the project lists and inherited customer metadata.
+  const invalidateFolders = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.projects.all })
+
+  // Dates and commitments drive overview/digest calculations; names appear throughout the plan.
+  // Deleting a project also removes bookings and changes resource utilization.
+  const invalidateProjects = (deleted = false) =>
+    Promise.all(
+      [
+        queryKeys.projects.all,
+        queryKeys.dashboard.all,
+        queryKeys.digest.all,
+        queryKeys.gantt.all,
+        queryKeys.baselines.diffs,
+        queryKeys.assignments.all,
+        queryKeys.planning.all,
+        queryKeys.myPlan.all,
+        queryKeys.conflicts.all,
+        deleted ? queryKeys.resources.all : queryKeys.resources.teamWeeks,
+      ].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    )
 
   /**
    * Projects per folder, for the counts in the tree.
@@ -110,7 +114,7 @@ export function ProjectsPanel() {
       external_ref: string | null
       customer_id: string | null
     }) => createProjectFolder(input),
-    onSuccess: () => invalidateProjects(),
+    onSuccess: () => invalidateFolders(),
     onError: (error) =>
       showErrorNotification(error, t('common.error'), t('common.unexpectedError')),
   })
@@ -156,7 +160,7 @@ export function ProjectsPanel() {
         customer_id?: string | null
       }
     }) => updateProjectFolder(id, patch),
-    onSuccess: () => invalidateProjects(),
+    onSuccess: () => invalidateFolders(),
     onError: (error) =>
       showErrorNotification(error, t('common.error'), t('common.unexpectedError')),
   })
@@ -186,8 +190,8 @@ export function ProjectsPanel() {
         color: 'green',
       })
       if (selectedFolder === id) setSelectedFolder(null)
-      // Unfiles the projects inside it. One coarse prefix covers both lists — see invalidateProjects.
-      await invalidateProjects()
+      // Unfiles projects and changes their inherited customer metadata.
+      await invalidateFolders()
     },
     onError: (error) =>
       showErrorNotification(error, t('common.error'), t('common.unexpectedError')),
@@ -233,7 +237,7 @@ export function ProjectsPanel() {
         color: 'green',
       })
       setDeleteConfirmId(null)
-      await invalidateProjects()
+      await invalidateProjects(true)
     },
     onError: (error) =>
       showErrorNotification(error, t('common.error'), t('common.unexpectedError')),
@@ -252,6 +256,8 @@ export function ProjectsPanel() {
         message: editingProject ? t('projects.projectUpdated') : t('projects.projectCreated'),
         color: 'green',
       })
+      // The backend grants access atomically; refresh the editor's local permission scopes.
+      if (!editingProject && user?.role === 'editor') await refresh()
       setModalOpen(false)
       setEditingProject(null)
       await invalidateProjects()

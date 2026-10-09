@@ -2,7 +2,7 @@
 
 *Capacity Done.*
 
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 **Deutsch** · [English](README.en.md) — *Capacity planning for people and machines. Self-hosted.*
 
@@ -177,5 +177,5 @@ tun.
 
 ## Mitmachen
 
-Siehe [CONTRIBUTING.md](CONTRIBUTING.md). Beiträge stehen unter der GPL-3.0 wie das übrige Projekt —
+Siehe [CONTRIBUTING.md](CONTRIBUTING.md). Beiträge stehen unter der GPL-3.0-or-later wie das übrige Projekt —
 es ist keine Vereinbarung zu unterschreiben.

@@ -94,14 +94,76 @@ class CapacityService:
         self._assignments_cache: dict[UUID, list[Assignment]] = {}
         self._absences_cache: dict[UUID, list] = {}
         self._working_time: WorkingTimeService | None = None
+        self._prepared_resources: set[UUID] = set()
+        self._prepared_span: tuple[date, date] | None = None
+
+    async def prepare(
+        self, resource_ids: set[UUID], start: date, end: date
+    ) -> WorkingTimeService:
+        """Batch-load a read snapshot for an overview.
+
+        Bookings include other projects: utilization describes the whole resource.
+        Missing resources remain unresolved, and personal IDs retain precedence.
+        """
+        self._resource_type_cache.clear()
+        self._assignments_cache.clear()
+        if resource_ids:
+            personal = set(
+                (
+                    await self.session.scalars(
+                        select(PersonalResource.id).where(
+                            PersonalResource.id.in_(resource_ids)
+                        )
+                    )
+                ).all()
+            )
+            remaining = resource_ids - personal
+            infrastructure = (
+                set(
+                    (
+                        await self.session.scalars(
+                            select(InfrastructureResource.id).where(
+                                InfrastructureResource.id.in_(remaining)
+                            )
+                        )
+                    ).all()
+                )
+                if remaining
+                else set()
+            )
+            self._resource_type_cache = {
+                rid: ResourceType.personal
+                if rid in personal
+                else (ResourceType.infrastructure if rid in infrastructure else None)
+                for rid in resource_ids
+            }
+            self._assignments_cache = {rid: [] for rid in resource_ids}
+            assignments = await self.session.scalars(
+                select(Assignment).where(Assignment.resource_id.in_(resource_ids))
+            )
+            for assignment in assignments:
+                self._assignments_cache[assignment.resource_id].append(assignment)
+        working_time = WorkingTimeService(self.session)
+        await working_time.prepare(list(resource_ids), start, end)
+        self._working_time = working_time
+        self._prepared_resources = set(resource_ids)
+        self._prepared_span = (start, end)
+        return working_time
 
     async def _get_working_time(
         self, resource_id: UUID, start: date, end: date
     ) -> WorkingTimeService:
         """Working-time service prepared for this resource and window."""
+        if (
+            self._working_time is not None
+            and resource_id in self._prepared_resources
+            and self._prepared_span is not None
+            and self._prepared_span[0] <= start
+            and end <= self._prepared_span[1]
+        ):
+            return self._working_time
         service = WorkingTimeService(self.session)
         await service.prepare([resource_id], start, end)
-        self._working_time = service
         return service
 
     async def _resolve_resource_type(self, resource_id: UUID) -> ResourceType | None:

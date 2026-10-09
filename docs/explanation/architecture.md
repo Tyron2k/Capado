@@ -140,6 +140,33 @@ every calendar day as a full working day overstates a five-day week by roughly
 `WorkWeekProfile` plus the site calendar — see
 [ADR-004](../decisions/004-hours-as-capacity-base.md).
 
+### Project overview queries
+
+The overview scopes conflict links and resource membership to the selected projects in SQL.
+It counts distinct persisted conflicts per project, including links crossing project boundaries.
+`CapacityService.prepare` batch-loads resource types, all bookings of involved resources and
+one calendar window; repeated resource/date windows reuse the utilization calculation.
+Resource utilization still includes bookings from other projects. Default-profile lead times,
+site holidays, part-time profiles, absences and missing resources retain their semantics.
+
+Local measurement on 2026-10-09 used PostgreSQL 18 with the migrated schema, comparing main
+`9f1d709` with this implementation. All three synthetic fixtures shared one database; each
+request selected one fixture. Projects ran from 2026-01-05 to 2026-03-27; work packages lasted
+five days, booked one round-robin person at 25%, with a persisted conflict every tenth booking.
+The default calendar granted 480 minutes Monday–Friday. Times are medians of three requests
+with established connections, excluding HTTP overhead.
+
+| Selected projects / work packages / resources | Queries before → after | Median before → after |
+|---|---|---|
+| 3 / 6 / 2 | 65 → 16 | 50.8 → 26.7 ms |
+| 20 / 100 / 8 | 923 → 16 | 748.1 → 263.5 ms |
+| 60 / 480 / 20 | 4,367 → 16 | 3,628.0 → 1,104.4 ms |
+
+Complete response payloads matched in every case. Database regression tests bound query counts
+as projects/resources grow and compare utilization with the single-resource path, including
+foreign bookings and calendar exceptions. These local timings describe synthetic fixtures;
+CPU work still grows with planning data and distinct resource/date windows.
+
 ## Authentication & Authorization
 
 ```
@@ -159,6 +186,16 @@ every calendar day as a full working day overstates a five-day week by roughly
 First-time setup: POST /api/auth/setup creates the initial admin user
 when no users exist in the database.
 ```
+
+Nested work-package routes verify that the package belongs to the URL project. Dependency
+writes also verify that the dependency's successor matches the URL work package; predecessors
+may belong to other projects. An editor outside the URL project's scope receives 403; a
+mismatched nested object receives 404 before any write. Authenticated reads retain global
+visibility when the nested URL is valid.
+
+Project creation, the editor's new scope and audit records are committed once by `ProjectService`.
+A row lock protects the scope append against concurrent creates. Failure rolls back all three;
+the frontend refreshes editor permission scopes after successful creation.
 
 ### Roles and Responsibility
 
@@ -268,10 +305,12 @@ The interesting decisions are the asymmetries, not the mechanism:
 - **An assignment** invalidates `assignments`, `conflicts`, `planning`, `digest`,
   `resources` and `gantt` — but **not** `capacity`. An assignment *consumes* capacity;
   it does not change how much there is. The relationship runs one way.
-- **Project master data** (name, folder, customer, reference) invalidates `projects`
-  and stops. A **work package** invalidates the whole plan: its dates are what
-  assignments hang off and what the critical path is computed from. A project's name
-  is a label; a work package's end date is a commitment.
+- **Project writes** refresh `projects`, dashboard figures, digest, Gantt, assignments,
+  planning, personal plans, team sheets, conflict views and live baseline diffs: names appear
+  in derived views, while dates and delivery commitments affect calculations. Deletion also
+  invalidates all resource views because it removes bookings. Capacity definitions and frozen
+  baseline lists are retained. **Folder writes** only refresh `projects`, including inherited
+  customer metadata. **Work-package writes** refresh the plan and derived schedule.
 - **The skill catalogue** is the one piece of master data that reaches into the plan.
   A requirement points at a skill and a qualification points at a skill, so deleting an
   attribute changes no assignment yet can turn a covered requirement into an uncovered
