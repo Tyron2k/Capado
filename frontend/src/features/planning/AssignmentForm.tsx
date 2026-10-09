@@ -257,6 +257,7 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
         )}
 
         <AutocompleteField
+          initialLabel={assignment?.resource_name ?? undefined}
           type={resourceType}
           label={t('assignmentForm.resource')}
           placeholder={

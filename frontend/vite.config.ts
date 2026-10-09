@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  envDir: process.env.CAPADO_E2E === '1' ? false : undefined,
   server: {
     port: 3000,
     host: '0.0.0.0',

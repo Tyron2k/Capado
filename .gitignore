@@ -114,3 +114,8 @@ code2prompt-*.md
 # untracked directory that `git add -A` would happily commit — several hundred generated files.
 # CI builds and publishes it; nobody needs it in the tree.
 /site/
+
+# Disposable browser tests
+/frontend/.e2e-state.json
+/frontend/playwright-report/
+/frontend/test-results/

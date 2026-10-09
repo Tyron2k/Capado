@@ -54,6 +54,8 @@ interface DependencyDrawerProps {
   onClose: () => void
 }
 
+import { usePermissions } from '../../hooks/usePermissions'
+
 export function DependencyDrawer({
   projectId,
   workPackage,
@@ -62,6 +64,8 @@ export function DependencyDrawer({
   onClose,
 }: DependencyDrawerProps) {
   const { t } = useTranslation()
+  const { canEditProject } = usePermissions()
+  const canWrite = canEditProject(projectId)
   const queryClient = useQueryClient()
   const [newPredecessor, setNewPredecessor] = useState<string | null>(null)
   const [newLag, setNewLag] = useState<number | ''>(0)
@@ -232,54 +236,59 @@ export function DependencyDrawer({
                   allowNegative={false}
                   w={90}
                   value={d.lag_working_days}
+                  readOnly={!canWrite}
                   onChange={(value) => typeof value === 'number' && handleLagChange(d.id, value)}
                 />
               </Table.Td>
               <Table.Td ta="right">
-                <ActionIcon
-                  variant="subtle"
-                  color="red"
-                  size="sm"
-                  aria-label={t('common.delete')}
-                  onClick={() => handleDelete(d.id)}
-                >
-                  <IconTrash size={14} />
-                </ActionIcon>
+                {canWrite && (
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    size="sm"
+                    aria-label={t('common.delete')}
+                    onClick={() => handleDelete(d.id)}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                )}
               </Table.Td>
             </Table.Tr>
           ))}
         </DataTable>
 
-        <Group align="flex-end" gap="sm">
-          <Select
-            label={t('dependencies.addPredecessor')}
-            placeholder={t('dependencies.selectPredecessor')}
-            searchable
-            data={options}
-            value={newPredecessor}
-            onChange={setNewPredecessor}
-            style={{ flex: 1 }}
-          />
-          <NumberInput
-            label={t('dependencies.lag')}
-            description={t('dependencies.lagDesc')}
-            min={0}
-            max={365}
-            allowDecimal={false}
-            allowNegative={false}
-            w={150}
-            value={newLag}
-            onChange={(value) => setNewLag(typeof value === 'number' ? value : '')}
-          />
-          <Button
-            leftSection={<IconPlus size={14} />}
-            loading={saving}
-            disabled={!newPredecessor}
-            onClick={handleAdd}
-          >
-            {t('common.add')}
-          </Button>
-        </Group>
+        {canWrite && (
+          <Group align="flex-end" gap="sm">
+            <Select
+              label={t('dependencies.addPredecessor')}
+              placeholder={t('dependencies.selectPredecessor')}
+              searchable
+              data={options}
+              value={newPredecessor}
+              onChange={setNewPredecessor}
+              style={{ flex: 1 }}
+            />
+            <NumberInput
+              label={t('dependencies.lag')}
+              description={t('dependencies.lagDesc')}
+              min={0}
+              max={365}
+              allowDecimal={false}
+              allowNegative={false}
+              w={150}
+              value={newLag}
+              onChange={(value) => setNewLag(typeof value === 'number' ? value : '')}
+            />
+            <Button
+              leftSection={<IconPlus size={14} />}
+              loading={saving}
+              disabled={!newPredecessor}
+              onClick={handleAdd}
+            >
+              {t('common.add')}
+            </Button>
+          </Group>
+        )}
 
         {successors.length > 0 && (
           <>
