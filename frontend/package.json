@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "test:coverage": "vitest --run --coverage"
+    "test:coverage": "vitest --run --coverage",
+    "api:generate": "uv --directory ../backend run --frozen --no-dev python -m app.openapi | openapi-typescript --output src/api/generated/schema.d.ts --default-non-nullable false",
+    "api:check": "uv --directory ../backend run --frozen --no-dev python -m app.openapi | openapi-typescript --output src/api/generated/schema.d.ts --default-non-nullable false --check"
   },
   "dependencies": {
     "@js-temporal/polyfill": "^0.5.1",
@@ -27,7 +29,8 @@
     "dayjs": "^1.11.23",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "@tanstack/react-table": "^9.2.6"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -50,10 +53,25 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.71.0",
     "vite": "^8.3.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "openapi-typescript": "7.13.0"
   },
   "//dependencies-notes": {
-    "postcss": "Loaded indirectly by Vite via postcss.config.cjs — required as the PostCSS engine",
-    "postcss-preset-mantine": "Loaded as a plugin via postcss.config.cjs — provides Mantine CSS transformations"
+    "postcss": "Loaded indirectly by Vite via postcss.config.cjs \u2014 required as the PostCSS engine",
+    "postcss-preset-mantine": "Loaded as a plugin via postcss.config.cjs \u2014 provides Mantine CSS transformations",
+    "openapi-typescript": "Its peer metadata still names TypeScript 5. Scope the override to this generator; validate emitted types against TypeScript 5 and the application TypeScript 6 build."
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
+  },
+  "knip": {
+    "ignore": [
+      "src/api/generated/schema.d.ts"
+    ],
+    "ignoreBinaries": [
+      "uv"
+    ]
   }
 }

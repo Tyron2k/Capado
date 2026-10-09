@@ -10,6 +10,9 @@ runs first; Python type checks, frontend build and tests, backend tests on Pytho
 3.14, dependency audits and a real PostgreSQL migration smoke test follow. Dockerfiles are checked
 with hadolint and the production container configuration is scanned for misconfigurations.
 
+The existing lint job also checks the generated HTTP contract with `npm run api:check`. Its offline
+exporter uses locked backend dependencies without application startup; no extra CI job is needed.
+
 The frontend job installs dependencies once and runs `npm run build` (TypeScript build mode and
 Vite) before the coverage tests. CI skips the local `vite-build` pre-commit hook, avoiding a second
 build in the lint gate and a separate TypeScript job. The hook remains available locally.

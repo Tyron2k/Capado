@@ -3,6 +3,7 @@
  */
 
 import apiClient from './client'
+import type { components, paths } from './generated/schema'
 import type {
   Project,
   ProjectCreate,
@@ -14,6 +15,8 @@ import type {
 } from '../types/project'
 
 const BASE_PATH = '/api/projects'
+type ProjectsPage = paths['/api/projects']['get']['responses'][200]['content']['application/json']
+
 const FOLDERS_PATH = '/api/project-folders'
 
 /**
@@ -27,11 +30,20 @@ export async function getProjects(
   signal?: AbortSignal,
   folderId?: string | 'unfiled',
 ): Promise<Project[]> {
-  const response = await apiClient.get<{ items: Project[]; total: number }>(BASE_PATH, {
-    signal,
-    params: folderId ? { folder_id: folderId } : undefined,
-  })
-  return response.data.items
+  const projects: Project[] = []
+  let total: number
+  do {
+    const { data } = await apiClient.get<ProjectsPage>(BASE_PATH, {
+      signal,
+      params: { limit: 500, offset: projects.length, ...(folderId ? { folder_id: folderId } : {}) },
+    })
+    total = data.total
+    if (data.items.length === 0 && projects.length < total) {
+      throw new Error('The project list ended before all projects were loaded')
+    }
+    projects.push(...data.items)
+  } while (projects.length < total)
+  return projects
 }
 
 /** Create a new project. */
@@ -94,31 +106,7 @@ export async function deleteProjectFolder(id: string): Promise<ProjectFolderDele
 // Schedule analysis
 // ---------------------------------------------------------------------------
 
-/** Where one work package sits in the schedule. */
-/** One package in a project schedule. Not exported: the section that renders float infers it from
- * getProjectSchedule's return type rather than naming it. */
-interface ScheduleNode {
-  work_package_id: string
-  work_package_name: string
-  earliest_start: string
-  earliest_finish: string
-  latest_start: string
-  latest_finish: string
-  /** Working days it can slip before the project does. Negative = already unreachable. */
-  float_working_days: number
-  is_critical: boolean
-  /** From the lead time when recorded, otherwise the entered span. */
-  duration_working_days: number
-}
-
-interface ProjectSchedule {
-  project_id: string
-  /** What the analysis measured against. */
-  deadline: string
-  /** True when the deadline is the committed delivery date rather than the planned end. */
-  deadline_is_commitment: boolean
-  nodes: ScheduleNode[]
-}
+type ProjectSchedule = components['schemas']['ProjectScheduleResponse']
 
 /** Critical path and float for one project. */
 export async function getProjectSchedule(

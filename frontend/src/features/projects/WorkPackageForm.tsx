@@ -143,7 +143,7 @@ export function WorkPackageForm({
   })
 
   const removeReqMutation = useMutation({
-    mutationFn: (req: WorkPackageRequirement) =>
+    mutationFn: (req: Pick<WorkPackageRequirement, 'id'>) =>
       removeWorkPackageRequirement(workPackage!.id, req.id),
     onSuccess: () => invalidateAfterRequirementChange(),
     onError: (error) => showErrorNotification(error, t('common.error'), t('common.genericError')),
@@ -160,7 +160,7 @@ export function WorkPackageForm({
     return addReqMutation.mutateAsync(data).then(() => undefined)
   }
 
-  const handleRemoveRequirement = (req: WorkPackageRequirement) => {
+  const handleRemoveRequirement = (req: Pick<WorkPackageRequirement, 'id'>) => {
     if (!workPackage) return Promise.resolve()
     return removeReqMutation.mutateAsync(req).then(() => undefined)
   }

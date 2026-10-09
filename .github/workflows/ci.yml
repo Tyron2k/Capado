@@ -46,7 +46,9 @@ jobs:
 
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
+          enable-cache: true
           prune-cache: true
+          cache-dependency-glob: "backend/uv.lock"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
@@ -56,6 +58,12 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+        working-directory: frontend
+
+      # Reuse this job's Node/uv tools. The exporter imports schemas in an
+      # isolated environment and never starts HTTP, migrations or maintenance.
+      - name: Check generated API contract
+        run: npm run api:check
         working-directory: frontend
 
       - name: Run prek (pre-commit hooks)
@@ -118,9 +126,9 @@ jobs:
       run:
         working-directory: backend
 
-    # mypy lives here rather than in prek because the lint job installs no
-    # Python dependencies: without sqlmodel, fastapi and pydantic importable,
-    # mypy resolves nothing and every annotation becomes Any. Duplicating the
+    # mypy uses the complete locked development environment here. The lint job
+    # also imports production dependencies for the offline OpenAPI contract,
+    # while type checking requires its own development tools. Duplicating the
     # dependency list into a pre-commit `additional_dependencies` block would
     # mean maintaining a second copy of uv.lock by hand.
     steps:

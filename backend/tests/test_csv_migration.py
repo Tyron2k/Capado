@@ -517,7 +517,7 @@ def test_every_table_and_column_has_an_explicit_migration_decision():
     }
     for entity in ENTITIES:
         assert set(entity.columns) | omitted.get(entity.name, set()) == set(
-            entity.model.model_fields
+            entity.table.columns.keys()
         )
         assert not (set(entity.columns) & history._SECRET_KEYS)
 

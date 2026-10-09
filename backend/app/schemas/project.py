@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.models.project import ProjectPriority
+from app.schemas import ResponseModel
 
 # --- Project Schemas ---
 
@@ -37,7 +38,7 @@ class ProjectFolderUpdate(BaseModel):
     customer_id: UUID | None = None
 
 
-class ProjectFolderResponse(BaseModel):
+class ProjectFolderResponse(ResponseModel):
     """Response schema for a project folder."""
 
     id: UUID
@@ -53,7 +54,7 @@ class ProjectFolderResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ProjectFolderDeleteResponse(BaseModel):
+class ProjectFolderDeleteResponse(ResponseModel):
     """What a folder deletion did.
 
     Reported rather than silent: the user should see that their projects survived
@@ -112,7 +113,7 @@ class ProjectUpdate(BaseModel):
     priority: ProjectPriority | None = None
 
 
-class ProjectResponse(BaseModel):
+class ProjectResponse(ResponseModel):
     """Response schema for a project."""
 
     id: UUID
@@ -163,7 +164,7 @@ class WorkPackageUpdate(BaseModel):
     completed_at: datetime | None = None
 
 
-class WorkPackageResponse(BaseModel):
+class WorkPackageResponse(ResponseModel):
     """Response schema for a work package."""
 
     id: UUID
@@ -198,7 +199,7 @@ class WorkPackageDependencyUpdate(BaseModel):
     lag_working_days: int = Field(ge=0)
 
 
-class WorkPackageDependencyResponse(BaseModel):
+class WorkPackageDependencyResponse(ResponseModel):
     """Response schema for one finish-to-start link."""
 
     id: UUID
@@ -209,7 +210,7 @@ class WorkPackageDependencyResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class WorkPackageDependenciesResponse(BaseModel):
+class WorkPackageDependenciesResponse(ResponseModel):
     """Both directions, because the question a user asks is directional.
 
     "What has to finish before this can start" is a different question from "what is
@@ -220,14 +221,14 @@ class WorkPackageDependenciesResponse(BaseModel):
     successors: list[WorkPackageDependencyResponse]
 
 
-class WorkPackageCreateResponse(BaseModel):
+class WorkPackageCreateResponse(ResponseModel):
     """Response schema for a newly created work package (with warnings)."""
 
     work_package: WorkPackageResponse
     warnings: list[str] = []
 
 
-class WorkPackageUpdateResponse(BaseModel):
+class WorkPackageUpdateResponse(ResponseModel):
     """Response schema for an updated work package (with warnings)."""
 
     work_package: WorkPackageResponse

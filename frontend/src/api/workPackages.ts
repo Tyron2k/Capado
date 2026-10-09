@@ -5,6 +5,7 @@
  */
 
 import apiClient from './client'
+import type { components, paths } from './generated/schema'
 import type {
   WorkPackage,
   WorkPackageCreate,
@@ -15,13 +16,9 @@ import type {
   WorkPackageWithWarnings,
 } from '../types/workPackage'
 
-/** Response shape for paginated work packages. */
-interface WorkPackagesListResponse {
-  items: WorkPackage[]
-  total: number
-  limit: number
-  offset: number
-}
+type WorkPackagesListResponse =
+  paths['/api/projects/{project_id}/work-packages']['get']['responses'][200]['content']['application/json']
+type RequirementCreate = components['schemas']['WorkPackageRequirementCreate']
 
 function basePath(projectId: string): string {
   return `/api/projects/${projectId}/work-packages`
@@ -29,10 +26,19 @@ function basePath(projectId: string): string {
 
 /** Fetch all work packages of a project (paginated, returns all by default). */
 export async function getWorkPackages(projectId: string): Promise<WorkPackage[]> {
-  const response = await apiClient.get<WorkPackagesListResponse>(basePath(projectId), {
-    params: { limit: 500 },
-  })
-  return response.data.items
+  const packages: WorkPackage[] = []
+  let total: number
+  do {
+    const { data } = await apiClient.get<WorkPackagesListResponse>(basePath(projectId), {
+      params: { limit: 500, offset: packages.length },
+    })
+    total = data.total
+    if (data.items.length === 0 && packages.length < total) {
+      throw new Error('The work-package list ended before all work packages were loaded')
+    }
+    packages.push(...data.items)
+  } while (packages.length < total)
+  return packages
 }
 
 /** Create a new work package (returns warnings). */
@@ -75,7 +81,7 @@ export async function getWorkPackageRequirements(wpId: string): Promise<WorkPack
 /** Add a skill requirement to a work package. */
 export async function addWorkPackageRequirement(
   wpId: string,
-  data: { skill_id: string; skill_attribute_id?: string | null; quantity: number },
+  data: RequirementCreate,
 ): Promise<WorkPackageRequirement> {
   const response = await apiClient.post<WorkPackageRequirement>(
     `/api/work-packages/${wpId}/requirements`,
@@ -129,7 +135,10 @@ export async function createWorkPackageDependency(
 ): Promise<WorkPackageDependency> {
   const { data } = await apiClient.post<WorkPackageDependency>(
     `/api/projects/${projectId}/work-packages/${wpId}/dependencies`,
-    { predecessor_id: predecessorId, lag_working_days: lagWorkingDays },
+    {
+      predecessor_id: predecessorId,
+      lag_working_days: lagWorkingDays,
+    } satisfies components['schemas']['WorkPackageDependencyCreate'],
   )
   return data
 }
@@ -143,7 +152,9 @@ export async function updateWorkPackageDependencyLag(
 ): Promise<WorkPackageDependency> {
   const { data } = await apiClient.put<WorkPackageDependency>(
     `/api/projects/${projectId}/work-packages/${wpId}/dependencies/${dependencyId}`,
-    { lag_working_days: lagWorkingDays },
+    {
+      lag_working_days: lagWorkingDays,
+    } satisfies components['schemas']['WorkPackageDependencyUpdate'],
   )
   return data
 }

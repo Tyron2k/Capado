@@ -7,11 +7,11 @@ group-based scope model.
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import func, select
 
 from app.database import get_session
-from app.models.resource import InfrastructureResource, PersonalResource
+from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.user import User
 from app.schemas.pagination import PaginatedResponse
@@ -94,7 +94,7 @@ async def create_group(
     check_write_permission(current_user, EntityType.resource, group_id=None)
     group = ResourceGroup(
         name=data.name.strip(),
-        resource_type=data.resource_type,
+        resource_type=ResourceType(data.resource_type),
         parent_id=data.parent_id,
     )
     session.add(group)

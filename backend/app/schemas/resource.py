@@ -25,6 +25,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.models.resource import ResourceType
+
 # --- Resource Group Schemas ---
 
 
@@ -62,6 +64,21 @@ class ResourceGroupResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ResourceGroupTransfer(BaseModel):
+    """Validate full CSV rows without constructing a persistence object.
+
+    Retain the previous SQLModel constraints and nullable-parent semantics.
+    Explicit timestamp offsets remain enforced by the shared CSV parser.
+    """
+
+    id: UUID
+    name: str = Field(max_length=255)
+    resource_type: ResourceType
+    parent_id: UUID | None
+    created_at: datetime
+    updated_at: datetime
 
 
 # --- Resource Schemas (unified for personal and infrastructure) ---
