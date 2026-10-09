@@ -7,12 +7,9 @@ project (ADR-008).
 """
 
 from datetime import UTC, datetime
-from typing import Any, cast
 from uuid import UUID
 
-import sqlalchemy as sa
 from sqlalchemy import select
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import BusinessRuleError, NotFoundError
@@ -179,22 +176,34 @@ class ProjectFolderService:
         folder = await self.get_by_id(folder_id)
         parent_id = folder.parent_id
 
-        unfiled = await self.session.execute(
-            sa.update(Project)
-            .where(Project.folder_id == folder_id)
-            .values(folder_id=None)
+        projects = list(
+            (
+                await self.session.execute(
+                    select(Project).where(Project.folder_id == folder_id)
+                )
+            )
+            .scalars()
+            .all()
         )
-        moved = await self.session.execute(
-            sa.update(ProjectFolder)
-            .where(ProjectFolder.parent_id == folder_id)
-            .values(parent_id=parent_id)
+        children = list(
+            (
+                await self.session.execute(
+                    select(ProjectFolder).where(ProjectFolder.parent_id == folder_id)
+                )
+            )
+            .scalars()
+            .all()
         )
-
+        # Normal ORM history records each consequential move in this transaction.
+        for project in projects:
+            project.folder_id = None
+            project.updated_at = _utcnow()
+        for child in children:
+            child.parent_id = parent_id
+            child.updated_at = _utcnow()
         await self.session.delete(folder)
         await self.session.commit()
-        return cast(CursorResult[Any], unfiled).rowcount or 0, cast(
-            CursorResult[Any], moved
-        ).rowcount or 0
+        return len(projects), len(children)
 
     async def project_ids_in(
         self, folder_id: UUID, *, include_subfolders: bool = False
