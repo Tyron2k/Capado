@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app import models as m
+from app.models.conflict import ConflictCause
 from app.models.project import WorkPackageDependency
 from app.services.baseline_service import snapshot_payload
 from app.services.conflict_service import ConflictService
@@ -244,8 +245,9 @@ async def test_project_delete_cleans_live_graph_and_preserves_snapshots(
                     200 if infrastructure else 120
                 )
                 if infrastructure:
-                    assert conflicts[0].start_at == datetime(2026, 1, 5, 9, tzinfo=UTC)
-                    assert conflicts[0].end_at == datetime(2026, 1, 5, 10, tzinfo=UTC)
+                    assert conflicts[0].cause == ConflictCause.booking_overlap
+                    assert conflicts[0].start_date == date(2026, 1, 5)
+                    assert conflicts[0].end_date == date(2026, 1, 5)
                 links = (
                     await session.scalars(
                         sa.select(m.ConflictAssignment).where(
