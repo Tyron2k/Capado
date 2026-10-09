@@ -362,18 +362,28 @@ class ConflictService:
         entry points (edits, imports, scheduled runs) use this same boundary.
         """
         try:
-            if (
-                isinstance(self.session, AsyncSession)
-                and self.session.get_bind().dialect.name == "postgresql"
-            ):
-                await self.session.execute(
-                    text("SELECT pg_advisory_xact_lock(:key)"),
-                    {"key": resource_id.int % (2**63 - 1)},
-                )
-            return await self._refresh_conflicts(resource_id)
+            result = await self.stage_conflicts(resource_id)
+            await self.session.commit()
+            return result
         except BaseException:
             await self.session.rollback()
             raise
+
+    async def lock_resource(self, resource_id: UUID) -> None:
+        """Hold the reconciliation lock until the caller commits or rolls back."""
+        if (
+            isinstance(self.session, AsyncSession)
+            and self.session.get_bind().dialect.name == "postgresql"
+        ):
+            await self.session.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": resource_id.int % (2**63 - 1)},
+            )
+
+    async def stage_conflicts(self, resource_id: UUID) -> list[Conflict]:
+        """Reconcile within a larger planning write, without committing it."""
+        await self.lock_resource(resource_id)
+        return await self._refresh_conflicts(resource_id)
 
     async def _refresh_conflicts(self, resource_id: UUID) -> list[Conflict]:
         """Recalculate and persist conflicts for a resource.
@@ -543,12 +553,9 @@ class ConflictService:
                 old = sorted(signature(c, ids.get(c.id, set())) for c in existing)
                 new = sorted(signature(p, p.assignment_ids) for p in periods)
                 if old == new:
-                    await self.session.commit()
                     return existing
         await self._delete_conflicts_for_resource(resource_id)
-        saved = await self._save_conflict_periods(periods)
-        await self.session.commit()
-        return saved
+        return await self._save_conflict_periods(periods)
 
     def _infrastructure_overlaps(
         self, assignments: list[Assignment], resource_id: UUID

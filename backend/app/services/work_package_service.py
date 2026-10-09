@@ -3,12 +3,14 @@
 from datetime import UTC, date, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.assignment import Assignment
-from app.models.project import Project, WorkPackage
+from app.models.project import Project, WorkPackage, WorkPackageDependency
+from app.models.work_package_requirement import WorkPackageRequirement
+from app.services.conflict_service import ConflictService
 from app.services.partial_update import UNSET, UnsetType
 
 
@@ -65,6 +67,57 @@ def _check_project_boundaries(
             f"({project.end_date.isoformat()})."
         )
     return warnings
+
+
+async def _delete_work_packages(
+    session: AsyncSession, packages: list[WorkPackage]
+) -> None:
+    """Stage audited planning deletion and conflict reconciliation; the caller commits.
+
+    Dependencies at either end and requirements are explicit ORM deletes, so their
+    audit events are retained. Frozen baselines and existing audit rows are untouched.
+    """
+    ids = {package.id for package in packages}
+    if not ids:
+        return
+    assignments = list(
+        (
+            await session.scalars(
+                select(Assignment).where(Assignment.work_package_id.in_(ids))
+            )
+        ).all()
+    )
+    resource_ids = sorted({assignment.resource_id for assignment in assignments})
+    conflicts = ConflictService(session)
+    for resource_id in resource_ids:
+        await conflicts.lock_resource(resource_id)
+        # Derived links must go before the bookings their foreign keys reference.
+        await conflicts._delete_conflicts_for_resource(resource_id)
+    requirements = (
+        await session.scalars(
+            select(WorkPackageRequirement).where(
+                WorkPackageRequirement.work_package_id.in_(ids)
+            )
+        )
+    ).all()
+    dependencies = (
+        await session.scalars(
+            select(WorkPackageDependency).where(
+                or_(
+                    WorkPackageDependency.predecessor_id.in_(ids),
+                    WorkPackageDependency.successor_id.in_(ids),
+                )
+            )
+        )
+    ).all()
+    for item in [*assignments, *requirements, *dependencies]:
+        await session.delete(item)
+    await session.flush()
+    for package in packages:
+        await session.delete(package)
+    await session.flush()
+    for resource_id in resource_ids:
+        await conflicts.stage_conflicts(resource_id)
 
 
 class WorkPackageService:
@@ -243,15 +296,7 @@ class WorkPackageService:
         """Delete a work package and all associated assignments (hard delete, cascade)."""
         work_package = await self.get_by_id(work_package_id, project_id=project_id)
 
-        # Cascade delete assignments
-        statement = select(Assignment).where(
-            Assignment.work_package_id == work_package_id
-        )
-        result = await self.session.execute(statement)
-        assignments = result.scalars().all()
-        for assignment in assignments:
-            await self.session.delete(assignment)
-
-        # Delete work package
-        await self.session.delete(work_package)
+        # Prevent new child references while discovering and removing the live plan.
+        await self.session.refresh(work_package, with_for_update=True)
+        await _delete_work_packages(self.session, [work_package])
         await self.session.commit()

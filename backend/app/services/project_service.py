@@ -8,9 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import BusinessRuleError, NotFoundError
-from app.models.project import Project, ProjectFolder, ProjectPriority
+from app.models.project import Project, ProjectFolder, ProjectPriority, WorkPackage
 from app.models.user import User
 from app.services.partial_update import UNSET, UnsetType
+from app.services.work_package_service import _delete_work_packages
 
 
 def _utcnow() -> datetime:
@@ -243,11 +244,28 @@ class ProjectService:
         return project
 
     async def delete(self, project_id: UUID) -> None:
-        """Delete a project (hard delete).
-
-        No child check: a project cannot contain a project. Grouping lives in
-        folders, and deleting a project only removes that project.
-        """
+        """Remove the live plan and editor references, preserving frozen history."""
         project = await self.get_by_id(project_id)
+        await self.session.refresh(project, with_for_update=True)
+        packages = list(
+            (
+                await self.session.scalars(
+                    select(WorkPackage)
+                    .where(WorkPackage.project_id == project_id)
+                    .order_by(WorkPackage.id)
+                    .with_for_update()
+                )
+            ).all()
+        )
+        users = select(User).order_by(User.id).with_for_update()
+        if self.session.get_bind().dialect.name == "postgresql":
+            users = users.where(User.scope_project_ids.op("@>")([project_id]))
+        # Lock scopes before audit writes acquire actor-FK key-share locks.
+        for user in (await self.session.scalars(users)).all():
+            if project_id in (user.scope_project_ids or []):
+                user.scope_project_ids = [
+                    pid for pid in user.scope_project_ids or [] if pid != project_id
+                ]
+        await _delete_work_packages(self.session, packages)
         await self.session.delete(project)
         await self.session.commit()
