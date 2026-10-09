@@ -112,18 +112,39 @@ class ProjectOverviewService:
             max(p.end_date for p in projects) + timedelta(days=6),
         )
         capacity_service = CapacityService(self.session)
+        involved_resources = {
+            rid for ids in resources_by_project.values() for rid in ids
+        }
         working_time = await capacity_service.prepare(
-            {rid for ids in resources_by_project.values() for rid in ids},
+            involved_resources,
             span_start,
             span_end,
         )
 
+        # Plant lead times use the static default week, without resource/site
+        # overrides. Resolve it once rather than revisit ORM fields on every
+        # candidate day. An empty week makes every derived end unreachable.
+        profile = working_time.profile_for(_NO_RESOURCE, span_start)
+        working_weekdays = frozenset(
+            weekday
+            for weekday in range(7)
+            if profile is not None and profile.minutes_for_weekday(weekday) > 0
+        )
+
+        # Preserve dated resolution if a CSV-imported resource actually uses
+        # the legacy UUID-zero sentinel. Normal plant calendars are static.
+        static_calendar = _NO_RESOURCE not in involved_resources
+        calendar_has_work = bool(working_weekdays) or not static_calendar
+
         def _is_working_day(day: date) -> bool:
-            """Whether the plant works on this date, per the default profile."""
-            profile = working_time.profile_for(_NO_RESOURCE, day)
-            if profile is None:
-                return False
-            return profile.minutes_for_weekday(day.weekday()) > 0
+            """Whether the plant grants work, retaining legacy dated bindings."""
+            if not static_calendar:
+                resolved = working_time.profile_for(_NO_RESOURCE, day)
+                return (
+                    resolved is not None
+                    and resolved.minutes_for_weekday(day.weekday()) > 0
+                )
+            return day.weekday() in working_weekdays
 
         # Dependency edges for every project in one pass. Per-project queries would make
         # the cost scale with how many projects the caller asked about, and the overview is
@@ -201,11 +222,15 @@ class ProjectOverviewService:
 
             late: list[LateWorkPackage] = []
             for wp in wps_by_project.get(project.id, []):
-                warning = schedule_warning(
-                    wp.start_date,
-                    wp.end_date,
-                    wp.lead_time_working_days,
-                    _is_working_day,
+                warning = (
+                    schedule_warning(
+                        wp.start_date,
+                        wp.end_date,
+                        wp.lead_time_working_days,
+                        _is_working_day,
+                    )
+                    if calendar_has_work
+                    else None
                 )
                 if warning is not None:
                     late.append(
@@ -225,7 +250,7 @@ class ProjectOverviewService:
             for edge in edges_by_project.get(project.id, []):
                 predecessor = wp_by_id.get(edge.predecessor_id)
                 successor = wp_by_id.get(edge.successor_id)
-                if predecessor is None or successor is None:
+                if not calendar_has_work or predecessor is None or successor is None:
                     # A link whose ends cannot both be resolved cannot be judged. The
                     # cascade makes this unreachable in practice; skipping beats guessing.
                     continue
@@ -255,20 +280,24 @@ class ProjectOverviewService:
             # exists, otherwise the planned end. Measuring against a planned end that
             # already misses the customer date would report comfortable float on a late
             # project.
-            analysis = analyse(
-                [
-                    ScheduleNode(
-                        id=wp.id,
-                        name=wp.name,
-                        start_date=wp.start_date,
-                        end_date=wp.end_date,
-                        lead_time_working_days=wp.lead_time_working_days,
-                    )
-                    for wp in wps_by_project.get(project.id, [])
-                ],
-                edges_by_project.get(project.id, []),
-                project.committed_delivery_date or project.end_date,
-                _is_working_day,
+            analysis = (
+                analyse(
+                    [
+                        ScheduleNode(
+                            id=wp.id,
+                            name=wp.name,
+                            start_date=wp.start_date,
+                            end_date=wp.end_date,
+                            lead_time_working_days=wp.lead_time_working_days,
+                        )
+                        for wp in wps_by_project.get(project.id, [])
+                    ],
+                    edges_by_project.get(project.id, []),
+                    project.committed_delivery_date or project.end_date,
+                    _is_working_day,
+                )
+                if calendar_has_work
+                else []
             )
             min_float = min((n.float_working_days for n in analysis), default=None)
             critical_count = sum(1 for n in analysis if n.is_critical)

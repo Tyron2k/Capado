@@ -166,7 +166,8 @@ Local measurement on 2026-10-09 used PostgreSQL 18 with the migrated schema, com
 `9f1d709` with this implementation. All three synthetic fixtures shared one database; each
 request selected one fixture. Projects ran from 2026-01-05 to 2026-03-27; work packages lasted
 five days, booked one round-robin person at 25%, with a persisted conflict every tenth booking.
-The default calendar granted 480 minutes Monday–Friday. Times are medians of three requests
+The saved fixture builder omitted the default calendar (corrected here after the CPU rerun);
+these timings describe the missing-calendar case. Times are medians of three requests
 with established connections, excluding HTTP overhead.
 
 | Selected projects / work packages / resources | Queries before → after | Median before → after |
@@ -179,6 +180,67 @@ Complete response payloads matched in every case. Database regression tests boun
 as projects/resources grow and compare utilization with the single-resource path, including
 foreign bookings and calendar exceptions. These local timings describe synthetic fixtures;
 CPU work still grows with planning data and distinct resource/date windows.
+
+### Overview CPU profile
+
+A reproducible follow-up on 2026-10-09 compared `ef770f2` with the CPU change.
+The retained PR85 fixture shapes and booking/conflict data are unchanged.
+An additional run seeds a normal 480-minute Monday–Friday profile: this matters
+because the original fixtures omitted it, causing every lead-time search to scan
+all 3,660 candidate days before returning unreachable. The original large fixture
+made 1,976,400 plant-calendar calls in the instrumented profile. With a normal
+calendar, repeated default-profile resolution/ORM attribute reads accounted for
+much of the critical-path calculation.
+
+Resolve the static plant week once per request and bypass unreachable derived
+schedule searches when it has no working day. Resource utilization retains its
+full resource/site/absence calendar. Imported UUID-zero resources retain legacy
+dated profile resolution. No persisted cache or new service is introduced.
+
+| Calendar | Projects / packages | Wall ms before → after | Process CPU ms before → after |
+|---|---:|---:|---:|
+| Missing (original) | 3 / 6 | 30.84 → 9.36 | 23.56 → 5.23 |
+| Missing (original) | 20 / 100 | 265.09 → 13.13 | 247.56 → 8.09 |
+| Missing (original) | 60 / 480 | 1116.28 → 31.49 | 1100.30 → 17.12 |
+| Standard week | 3 / 6 | 11.40 → 11.02 | 6.79 → 6.26 |
+| Standard week | 20 / 100 | 35.52 → 24.01 | 24.39 → 15.89 |
+| Standard week | 60 / 480 | 97.02 → 65.62 | 77.63 → 48.45 |
+
+Each number is the median of five warmed, unprofiled service calls on the same
+local machine with PostgreSQL 18; connection creation, seeding, HTTP and cProfile
+overhead are excluded. Every request still issues 16 queries. Canonical complete
+response hashes match before/after for all six cases, including missing-calendar
+results. These synthetic timings are measurements, not a deployment latency SLA.
+The remaining normal-calendar cost includes resource/day allocation loops, ORM
+row materialization and critical-path day counting; no further caching is justified
+by this experiment.
+
+To reproduce, start a disposable local PostgreSQL server:
+
+```bash
+docker run --rm --detach --name capado-overview-profile \
+  --publish 127.0.0.1:54328:5432 -e POSTGRES_USER=profile \
+  -e POSTGRES_PASSWORD=profile -e POSTGRES_DB=postgres postgres:18
+```
+
+Once PostgreSQL is ready, run from `backend`:
+
+```bash
+TEST_POSTGRES_URL='postgresql+asyncpg://profile:profile@127.0.0.1:54328/postgres' \
+  uv run python -m tests.benchmark_project_overview --output /tmp/overview.json
+TEST_POSTGRES_URL='postgresql+asyncpg://profile:profile@127.0.0.1:54328/postgres' \
+  uv run python -m tests.benchmark_project_overview --calendar --output /tmp/overview-calendar.json
+```
+
+Stop the disposable server afterward with `docker stop capado-overview-profile`.
+Use a dedicated loopback test administrator with CREATE DATABASE permission.
+The command creates/migrates/seeds a uniquely named benchmark database, removes
+it in `finally`, ignores developer dotenv/settings, and never writes an existing
+database. JSON includes CPU/wall medians, query counts, deterministic payload hashes
+and top self-time functions. Three `.pstats` files beside each output provide full
+profiles (`python -m pstats /tmp/overview-large.pstats`). Run the same command on both
+revisions to compare hashes; UUIDs are deterministic. This is a manual diagnostic,
+not an additional CI benchmark job.
 
 ## Authentication & Authorization
 
