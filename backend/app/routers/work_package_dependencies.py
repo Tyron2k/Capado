@@ -48,7 +48,9 @@ async def get_work_package_dependencies(
         Predecessors and successors as separate lists.
     """
     service = WorkPackageDependencyService(session)
-    predecessors, successors = await service.list_for_work_package(work_package_id)
+    predecessors, successors = await service.list_for_work_package(
+        work_package_id, project_id=project_id
+    )
     return WorkPackageDependenciesResponse(
         predecessors=[
             WorkPackageDependencyResponse.model_validate(d) for d in predecessors
@@ -93,6 +95,7 @@ async def create_work_package_dependency(
     return await service.create(
         predecessor_id=data.predecessor_id,
         successor_id=work_package_id,
+        project_id=project_id,
         lag_working_days=data.lag_working_days,
     )
 
@@ -125,7 +128,12 @@ async def update_work_package_dependency(
     """
     check_write_permission(current_user, EntityType.work_package, project_id=project_id)
     service = WorkPackageDependencyService(session)
-    return await service.update_lag(dependency_id, data.lag_working_days)
+    return await service.update_lag(
+        dependency_id,
+        data.lag_working_days,
+        successor_id=work_package_id,
+        project_id=project_id,
+    )
 
 
 @router.delete(
@@ -151,4 +159,6 @@ async def delete_work_package_dependency(
     """
     check_write_permission(current_user, EntityType.work_package, project_id=project_id)
     service = WorkPackageDependencyService(session)
-    await service.delete(dependency_id)
+    await service.delete(
+        dependency_id, successor_id=work_package_id, project_id=project_id
+    )

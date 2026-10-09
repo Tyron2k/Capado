@@ -5,7 +5,7 @@
 [English](index.md) · **Deutsch**
 
 Kapazitätsplanung für **Personal und Betriebsmittel** in einem Modell, mit Qualifikationsabgleich.
-Selbst gehostet, GPL-3.0.
+Selbst gehostet, GPL-3.0-or-later.
 
 ---
 

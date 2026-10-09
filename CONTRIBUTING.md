@@ -94,17 +94,17 @@ causing those PRs to disappear from generated release notes.
 
 ## Licensing of contributions
 
-By submitting a contribution you agree that it is licensed under the **GPL-3.0**, the same terms as
-the rest of the project. You keep your copyright — nothing is assigned and nothing is signed.
+By submitting a contribution you agree that it is licensed under **GPL-3.0-or-later**:
+GPL version 3 or, at the recipient's option, any later version, as for the rest of the project. You keep your copyright — nothing is assigned and nothing is signed.
 
 That is the whole agreement, and it is deliberately the whole agreement. Capado is not sold and has
 no commercial edition, so there is no reason to ask contributors for the broader rights a
 contributor licence agreement would need. The Linux kernel and most GNU projects work exactly this
 way.
 
-One consequence, stated plainly rather than discovered later: because the copyright stays spread
-across contributors, the project **cannot** be relicensed later without asking every one of them.
-That door is closed on purpose — the licence is the answer, not a starting position.
+The licence already permits recipients to choose a later GPL version. Licensing contributions
+under unrelated terms would require permission from the relevant copyright holders; this agreement
+does not grant that additional permission.
 
 If your employer has rights to intellectual property you create, make sure contributing is
 permitted before you do. Employment contracts assigning work-related IP are common and broadly

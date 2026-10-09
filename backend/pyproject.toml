@@ -7,7 +7,7 @@
 name = "capado-backend"
 version = "0.1.0"
 description = "Capado backend service"
-license = "GPL-3.0-only"
+license = "GPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.143.0",

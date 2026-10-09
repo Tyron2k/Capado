@@ -12,6 +12,6 @@
 # so the day either starts, this file is not the only thing that needs revisiting.
 #
 # Selling licences is no longer on the table at all: contributions are inbound = outbound under the
-# GPL-3.0 with no contributor agreement, so relicensing would require every contributor's consent.
+# GPL-3.0-or-later without a CLA granting rights to relicense under unrelated terms.
 
 github: Tyron2k

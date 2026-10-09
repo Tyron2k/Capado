@@ -120,9 +120,9 @@ export const queryKeys = {
   /**
    * Projects and their work packages.
    *
-   * A work package carries dates and a requirement, so editing one changes the plan; a project's own
-   * master data (name, folder, customer) does not. The two therefore invalidate different sets, which
-   * is why they are separate kinds rather than one `projects` blob.
+   * Work-package dates and requirements change the plan. Project dates and commitments drive
+   * aggregate calculations, and project names appear in derived views. Folder writes only change
+   * lists and inherited customer metadata; project deletion also removes bookings.
    */
   projects: {
     all: ['projects'] as const,
@@ -204,6 +204,7 @@ export const queryKeys = {
      * it. The anchor week is in the key, so paging back and forth reuses weeks already fetched instead
      * of re-requesting each one.
      */
+    teamWeeks: ['resources', 'team-week'] as const,
     teamWeek: (groupId: string, anchor: string) =>
       ['resources', 'team-week', groupId, anchor] as const,
     /** One resource's held qualifications. Read by the matrix and written a cell at a time. */
@@ -266,6 +267,7 @@ export const queryKeys = {
   baselines: {
     all: ['baselines'] as const,
     list: () => ['baselines', 'list'] as const,
+    diffs: ['baselines', 'diff'] as const,
     diff: (baselineId: string) => ['baselines', 'diff', baselineId] as const,
   },
   /**

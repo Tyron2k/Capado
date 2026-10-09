@@ -17,10 +17,12 @@ import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider, QueryObserver } from '@tanstack/react-query'
 
 import { createTestQueryClient } from '../../testUtils/queryClient'
 import type { Project } from '../../types/project'
+import type { ProjectFormValues } from './ProjectForm'
+import { queryKeys } from '../../api/queryClient'
 
 // --- Mocks ---
 
@@ -80,6 +82,10 @@ vi.mock('../../api/projects', () => ({
   createProject: vi.fn(),
   updateProject: vi.fn(),
   deleteProject: vi.fn(),
+  getProjectFolders: vi.fn().mockResolvedValue([]),
+  createProjectFolder: vi.fn(),
+  updateProjectFolder: vi.fn(),
+  deleteProjectFolder: vi.fn(),
 }))
 
 vi.mock('../../hooks/usePermissions', () => ({
@@ -93,6 +99,10 @@ vi.mock('../../hooks/usePermissions', () => ({
   })),
 }))
 
+vi.mock('../../context/AuthContext', () => ({
+  useAuth: vi.fn(() => ({ user: null, refresh: vi.fn() })),
+}))
+
 vi.mock('./WorkPackagesSection', () => ({
   WorkPackagesSection: ({ project, onBack }: { project: Project; onBack: () => void }) => (
     <div data-testid="work-packages-section">
@@ -103,12 +113,34 @@ vi.mock('./WorkPackagesSection', () => ({
 }))
 
 vi.mock('./ProjectForm', () => ({
-  ProjectForm: () => <div data-testid="project-form">Project Form</div>,
+  ProjectForm: ({ onSubmit }: { onSubmit: (values: ProjectFormValues) => void }) => (
+    <div data-testid="project-form">
+      Project Form
+      <button
+        onClick={() =>
+          onSubmit({
+            name: 'Changed project',
+            start_date: '2026-01-01',
+            end_date: '2026-02-01',
+            folder_id: null,
+            position: 0,
+            external_ref: '',
+            committed_delivery_date: null,
+            customer_id: null,
+            priority: 'normal',
+          })
+        }
+      >
+        Save test project
+      </button>
+    </div>
+  ),
 }))
 
-import { getProjects } from '../../api/projects'
+import { getProjects, createProject, updateProject, deleteProject } from '../../api/projects'
 import { usePermissions } from '../../hooks/usePermissions'
 import { ProjectsPanel } from './ProjectsPanel'
+import { useAuth } from '../../context/AuthContext'
 
 const mockedGetProjects = vi.mocked(getProjects)
 const mockedUsePermissions = vi.mocked(usePermissions)
@@ -342,4 +374,101 @@ describe('ProjectsPanel', () => {
       expect(screen.queryByTestId('work-packages-section')).not.toBeInTheDocument()
     })
   })
+})
+
+describe('project mutation cache behavior', () => {
+  it.each(['save', 'delete'] as const)(
+    'refreshes derived views after %s and preserves unrelated catalogues',
+    async (action) => {
+      vi.clearAllMocks()
+      mockedGetProjects.mockResolvedValue(mockProjects)
+      const client = createTestQueryClient()
+      client.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } })
+      let revision = 'before'
+      const changed = async () => {
+        revision = 'after'
+        return mockProjects[0]
+      }
+      vi.mocked(updateProject).mockImplementation(changed)
+      vi.mocked(deleteProject).mockImplementation(async () => {
+        revision = 'after'
+      })
+      const affected = [
+        queryKeys.dashboard.projectOverview(),
+        queryKeys.dashboard.summary(),
+        queryKeys.gantt.projects('1'),
+        queryKeys.digest.today(),
+        queryKeys.baselines.diff('baseline'),
+        queryKeys.resources.teamWeek('group', '2026-01-05'),
+        queryKeys.assignments.list(),
+        queryKeys.myPlan.current(),
+      ]
+      const preserved = [
+        queryKeys.skills.withAttributes('personal'),
+        queryKeys.settings.tenant(),
+        queryKeys.baselines.list(),
+      ]
+      const resourceList = queryKeys.resources.list('personal', false)
+      const observers = [...affected, ...preserved, resourceList].map(
+        (queryKey) =>
+          new QueryObserver(client, {
+            queryKey,
+            queryFn: async () => revision,
+          }),
+      )
+      const unsubscribe = observers.map((observer) => observer.subscribe(() => {}))
+      try {
+        await Promise.all(observers.map((observer) => observer.refetch()))
+        render(
+          <QueryClientProvider client={client}>
+            <MantineProvider>
+              <ProjectsPanel />
+            </MantineProvider>
+          </QueryClientProvider>,
+        )
+        await screen.findByText('Test Project A')
+        if (action === 'save') {
+          fireEvent.click(
+            screen.getAllByRole('button', { name: /edit project|projects.editAriaLabel/i })[0],
+          )
+          fireEvent.click(await screen.findByRole('button', { name: 'Save test project' }))
+        } else {
+          fireEvent.click(screen.getByTestId('project-delete-1'))
+          fireEvent.click(await screen.findByTestId('project-delete-confirm'))
+        }
+        await waitFor(() => {
+          for (const key of affected) expect(client.getQueryData(key)).toBe('after')
+        })
+        for (const key of preserved) expect(client.getQueryData(key)).toBe('before')
+        expect(client.getQueryData(resourceList)).toBe(action === 'delete' ? 'after' : 'before')
+      } finally {
+        unsubscribe.forEach((stop) => stop())
+        client.clear()
+      }
+    },
+  )
+})
+
+it('refreshes editor permission scopes after creating a project', async () => {
+  vi.clearAllMocks()
+  mockedGetProjects.mockResolvedValue(mockProjects)
+  vi.mocked(createProject).mockResolvedValue(mockProjects[0])
+  const refresh = vi.fn().mockResolvedValue('refreshed-token')
+  vi.mocked(useAuth).mockReturnValue({
+    ...useAuth(),
+    refresh,
+    user: {
+      id: 'editor',
+      name: 'Editor',
+      email: 'editor@example.test',
+      role: 'editor',
+      must_change_password: false,
+      scopes: { scope_group_ids: null, scope_project_ids: ['existing'] },
+    },
+  })
+  renderWithProviders(<ProjectsPanel />)
+  fireEvent.click(await screen.findByRole('button', { name: /new.*project/i }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Save test project' }))
+  await waitFor(() => expect(refresh).toHaveBeenCalledOnce())
+  expect(createProject).toHaveBeenCalledOnce()
 })

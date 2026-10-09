@@ -157,7 +157,9 @@ class WorkPackageService:
         result = await self.session.execute(statement)
         return list(result.scalars().all()), total
 
-    async def get_by_id(self, work_package_id: UUID) -> WorkPackage:
+    async def get_by_id(
+        self, work_package_id: UUID, *, project_id: UUID | None = None
+    ) -> WorkPackage:
         """Return a single work package by ID.
 
         Raises:
@@ -165,7 +167,9 @@ class WorkPackageService:
 
         """
         work_package = await self.session.get(WorkPackage, work_package_id)
-        if work_package is None:
+        if work_package is None or (
+            project_id is not None and work_package.project_id != project_id
+        ):
             raise NotFoundError("WorkPackage", work_package_id)
         return work_package
 
@@ -177,6 +181,8 @@ class WorkPackageService:
         end_date: date | None = None,
         lead_time_working_days: int | None = None,
         completed_at: datetime | None | UnsetType = UNSET,
+        *,
+        project_id: UUID | None = None,
     ) -> tuple[WorkPackage, list[str]]:
         """Update an existing work package (partial update).
 
@@ -192,7 +198,7 @@ class WorkPackageService:
                 precedes the start date.
 
         """
-        work_package = await self.get_by_id(work_package_id)
+        work_package = await self.get_by_id(work_package_id, project_id=project_id)
 
         # Merge: use new values or keep existing ones
         effective_name = name if name is not None else work_package.name
@@ -231,9 +237,11 @@ class WorkPackageService:
         await self.session.commit()
         return work_package, warnings
 
-    async def delete(self, work_package_id: UUID) -> None:
+    async def delete(
+        self, work_package_id: UUID, *, project_id: UUID | None = None
+    ) -> None:
         """Delete a work package and all associated assignments (hard delete, cascade)."""
-        work_package = await self.get_by_id(work_package_id)
+        work_package = await self.get_by_id(work_package_id, project_id=project_id)
 
         # Cascade delete assignments
         statement = select(Assignment).where(

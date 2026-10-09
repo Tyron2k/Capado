@@ -1,20 +1,4 @@
-/**
- * PROJECT MASTER DATA VERSUS PLAN DATA — the distinction this batch exists to draw.
- *
- * Both live in the projects feature and look alike on screen. A project's name, folder, customer and
- * reference are labels and structure: nothing about how much work is committed to whom changes when
- * they do. A work package's dates and its requirements are commitments: assignments hang off them, the
- * critical path is computed from them, and the digest reports on them.
- *
- * So a project write invalidates `projects` and stops, while a work-package write invalidates five
- * keys. Getting this backwards is not visibly broken either way — over-invalidating just costs
- * requests, under-invalidating just shows a stale number — which is exactly why it needs a test rather
- * than a convention.
- *
- * The work-package case also pins a REAL BUG THIS BATCH FIXED: every write reloaded the work packages
- * and nothing else, so moving a package's end date left the float column beside it showing slack
- * computed from the old date. Both live under the coarse `projects` prefix now, so they cannot disagree.
- */
+/** Project and work-package deletes invalidate their derived plan views. */
 import { MantineProvider } from '@mantine/core'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -122,7 +106,7 @@ beforeEach(() => {
 })
 
 describe('project master data', () => {
-  it('invalidates projects and NOTHING about the plan', async () => {
+  it('invalidates derived planning data when a project and its bookings are deleted', async () => {
     vi.mocked(deleteProject).mockResolvedValue(undefined)
 
     const { invalidated } = renderWith(<ProjectsPanel />)
@@ -135,17 +119,22 @@ describe('project master data', () => {
     await waitFor(() => expect(deleteProject).toHaveBeenCalledWith('p1'))
     await waitFor(() => expect(invalidated).toContainEqual([...queryKeys.projects.all]))
 
-    // A project is a label and a container. Nothing about the plan changed, so nothing plan-shaped is
-    // declared untrue -- if this list grows, somebody widened the invalidation without a reason.
+    // Deleting the container also deletes its work packages and bookings.
     for (const key of [
       queryKeys.assignments.all,
       queryKeys.conflicts.all,
       queryKeys.planning.all,
       queryKeys.digest.all,
-      queryKeys.capacity.all,
+      queryKeys.resources.all,
+      queryKeys.gantt.all,
+      queryKeys.dashboard.all,
+      queryKeys.baselines.diffs,
     ]) {
-      expect(invalidated).not.toContainEqual([...key])
+      expect(invalidated).toContainEqual([...key])
     }
+    // Availability definitions and immutable snapshots are preserved.
+    expect(invalidated).not.toContainEqual([...queryKeys.capacity.all])
+    expect(invalidated).not.toContainEqual([...queryKeys.baselines.all])
   })
 
   it('invalidates nothing when the project delete fails', async () => {

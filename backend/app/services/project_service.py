@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.project import Project, ProjectFolder, ProjectPriority
+from app.models.user import User
 from app.services.partial_update import UNSET, UnsetType
 
 
@@ -84,10 +85,21 @@ class ProjectService:
         committed_delivery_date: date | None = None,
         customer_id: UUID | None = None,
         priority: ProjectPriority = ProjectPriority.normal,
+        *,
+        scope_owner: User | None = None,
     ) -> Project:
         """Create a new project, optionally filed under a folder."""
         _validate_project_fields(name, start_date, end_date)
         await self._validate_folder(folder_id)
+        if scope_owner is not None:
+            # Lock before flushing project/audit rows: their actor FK takes a key-share
+            # lock on this user, so upgrading it afterwards can deadlock concurrent creates.
+            with self.session.no_autoflush:
+                await self.session.refresh(
+                    scope_owner,
+                    attribute_names=["scope_project_ids"],
+                    with_for_update=True,
+                )
 
         project = Project(
             name=name.strip(),
@@ -101,6 +113,13 @@ class ProjectService:
             priority=priority,
         )
         self.session.add(project)
+        if scope_owner is not None:
+            scope_owner.scope_project_ids = [
+                *(scope_owner.scope_project_ids or []),
+                project.id,
+            ]
+            self.session.add(scope_owner)
+        # Project, editor access and audit records are one atomic write.
         await self.session.commit()
         return project
 

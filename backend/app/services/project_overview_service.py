@@ -4,10 +4,10 @@ Queries share one injected session. This service neither commits nor changes pla
 warnings and date assessments are returned for the planner to act on.
 """
 
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assignment import Assignment
@@ -20,6 +20,7 @@ from app.schemas.project_overview import (
     ProjectOverviewItem,
     ProjectOverviewResponse,
 )
+from app.services.capacity_service import CapacityService
 from app.services.critical_path import (
     ScheduleNode,
     analyse,
@@ -29,7 +30,6 @@ from app.services.lead_time import assess_commitment, schedule_warning
 from app.services.work_package_dependency_service import (
     WorkPackageDependencyService,
 )
-from app.services.working_time_service import WorkingTimeService
 
 _NO_RESOURCE = UUID(int=0)
 
@@ -76,60 +76,46 @@ class ProjectOverviewService:
         wp_result = await self.session.execute(wp_stmt)
         work_packages = list(wp_result.scalars().all())
         wps_by_project: dict[UUID, list[WorkPackage]] = {}
-        wp_to_project: dict[UUID, UUID] = {}
         for wp in work_packages:
             wps_by_project.setdefault(wp.project_id, []).append(wp)
-            wp_to_project[wp.id] = wp.project_id
 
-        # Conflict count per project via ConflictAssignment → Assignment → WorkPackage.
+        # Scope link lookups in SQL, retaining distinct persisted conflicts per project.
         conflict_counts: dict[UUID, int] = {}
-        all_assignments: list[Assignment] = []
+        resources_by_project: dict[UUID, set[UUID]] = {}
         if work_packages:
-            # Load all conflicts with their assignments linked to these WPs.
-            ca_stmt = select(ConflictAssignment)
-            ca_result = await self.session.execute(ca_stmt)
-            all_conflict_assignments = list(ca_result.scalars().all())
+            counts = await self.session.execute(
+                select(WorkPackage.project_id, func.count(func.distinct(Conflict.id)))
+                .select_from(ConflictAssignment)
+                .join(Conflict, Conflict.id == ConflictAssignment.conflict_id)
+                .join(Assignment, Assignment.id == ConflictAssignment.assignment_id)
+                .join(WorkPackage, WorkPackage.id == Assignment.work_package_id)
+                .where(WorkPackage.project_id.in_(project_id_set))
+                .group_by(WorkPackage.project_id)
+            )
+            conflict_counts = dict(counts.all())
+            resources = await self.session.execute(
+                select(WorkPackage.project_id, Assignment.resource_id)
+                .join(Assignment, Assignment.work_package_id == WorkPackage.id)
+                .where(WorkPackage.project_id.in_(project_id_set))
+                .distinct()
+            )
+            for project_id, resource_id in resources:
+                resources_by_project.setdefault(project_id, set()).add(resource_id)
 
-            a_stmt = select(Assignment)
-            a_result = await self.session.execute(a_stmt)
-            all_assignments = list(a_result.scalars().all())
-            assignment_by_id: dict[UUID, Assignment] = {
-                a.id: a for a in all_assignments
-            }
-
-            # Build conflict_id -> set of project_ids involved.
-            conflict_projects: dict[UUID, set[UUID]] = {}
-            for ca in all_conflict_assignments:
-                assignment = assignment_by_id.get(ca.assignment_id)
-                if assignment is None:
-                    continue
-                project_id = wp_to_project.get(assignment.work_package_id)
-                if project_id is None or project_id not in project_id_set:
-                    continue
-                conflict_projects.setdefault(ca.conflict_id, set()).add(project_id)
-
-            # Only count conflicts that actually persist as Conflict rows.
-            c_stmt = select(Conflict).where(Conflict.id.in_(conflict_projects.keys()))
-            c_result = await self.session.execute(c_stmt)
-            existing_conflict_ids = {c.id for c in c_result.scalars().all()}
-
-            for conflict_id, affected_projects in conflict_projects.items():
-                if conflict_id not in existing_conflict_ids:
-                    continue
-                for project_id in affected_projects:
-                    conflict_counts[project_id] = conflict_counts.get(project_id, 0) + 1
-
-        # One working-time service for the whole overview. The lead-time check asks
-        # whether a PROCESS fits, not whether one person is free, so it runs against
-        # the default week profile and the site calendar rather than any resource's own
-        # contract.
-        working_time = WorkingTimeService(self.session)
+        # Share calendars and all bookings of involved resources across the overview.
+        # Lead times still use the default profile; utilization includes other projects.
         span_start = min(p.start_date for p in projects)
+        span_start -= timedelta(days=span_start.weekday())
         span_end = max(
             max((wp.end_date for wp in work_packages), default=span_start),
-            max(p.end_date for p in projects),
+            max(p.end_date for p in projects) + timedelta(days=6),
         )
-        await working_time.prepare([], span_start, span_end)
+        capacity_service = CapacityService(self.session)
+        working_time = await capacity_service.prepare(
+            {rid for ids in resources_by_project.values() for rid in ids},
+            span_start,
+            span_end,
+        )
 
         def _is_working_day(day: date) -> bool:
             """Whether the plant works on this date, per the default profile."""
@@ -168,9 +154,21 @@ class ProjectOverviewService:
         # Compute average resource utilization per project.
         # For each project: find all resource_ids assigned to its WPs, compute
         # their average weekly utilization over the project timeframe.
-        from app.services.capacity_service import CapacityService
+        utilization_by_window: dict[tuple[UUID, date, date], float | None] = {}
 
-        capacity_service = CapacityService(self.session)
+        async def resource_utilization(
+            rid: UUID, start: date, end: date
+        ) -> float | None:
+            # Shared resources in projects with identical windows need one calculation.
+            key = (rid, start, end)
+            if key not in utilization_by_window:
+                weeks = await capacity_service.get_weekly_utilization(rid, start, end)
+                available = sum(w.total_available for w in weeks)
+                assigned = sum(w.total_assigned for w in weeks)
+                utilization_by_window[key] = (
+                    assigned / available * 100 if available > 0 else None
+                )
+            return utilization_by_window[key]
 
         items: list[ProjectOverviewItem] = []
         for project in projects:
@@ -186,24 +184,17 @@ class ProjectOverviewService:
             )
 
             # Resource utilization for this project.
-            project_wp_ids = {wp.id for wp in project_wps}
-            project_resource_ids: set[UUID] = set()
-            for a in all_assignments:
-                if a.work_package_id in project_wp_ids:
-                    project_resource_ids.add(a.resource_id)
+            project_resource_ids = resources_by_project.get(project.id, set())
 
             avg_util: float | None = None
             if project_resource_ids:
                 utils: list[float] = []
                 for rid in project_resource_ids:
-                    weeks = await capacity_service.get_weekly_utilization(
+                    utilization = await resource_utilization(
                         rid, project.start_date, project.end_date
                     )
-                    if weeks:
-                        total_available = sum(w.total_available for w in weeks)
-                        total_assigned = sum(w.total_assigned for w in weeks)
-                        if total_available > 0:
-                            utils.append(total_assigned / total_available * 100)
+                    if utilization is not None:
+                        utils.append(utilization)
                 if utils:
                     avg_util = round(sum(utils) / len(utils), 1)
 

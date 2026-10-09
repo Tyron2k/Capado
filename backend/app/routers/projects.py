@@ -150,15 +150,8 @@ async def create_project(
         committed_delivery_date=data.committed_delivery_date,
         customer_id=data.customer_id,
         priority=data.priority,
+        scope_owner=current_user if current_user.role == UserRole.editor else None,
     )
-
-    # Auto-scope: add the new project to the editor's scope_project_ids
-    if current_user.role == UserRole.editor:
-        existing_ids = list(current_user.scope_project_ids or [])
-        existing_ids.append(project.id)
-        current_user.scope_project_ids = existing_ids
-        session.add(current_user)
-        await session.commit()
 
     return await enrich_project(session, project)
 

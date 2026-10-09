@@ -2,7 +2,7 @@
 
 *Capacity Done.*
 
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 [Deutsch](README.md) · **English**
 
@@ -175,5 +175,5 @@ Capado is **not for sale**. If you want to support the work, GitHub Sponsors is 
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions are licensed under the GPL-3.0 like the rest of
+See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions are licensed under the GPL-3.0-or-later like the rest of
 the project — there is no agreement to sign.

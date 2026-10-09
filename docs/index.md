@@ -5,7 +5,7 @@
 **English** · [Deutsch](index.de.md)
 
 Capacity planning for **people and machines** in one model, with skill matching. Self-hosted,
-GPL-3.0.
+GPL-3.0-or-later.
 
 ---
 
