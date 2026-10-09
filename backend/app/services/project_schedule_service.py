@@ -7,8 +7,8 @@ warnings and date assessments are returned for the planner to act on.
 from datetime import date
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.project import WorkPackage
 from app.schemas.project_overview import (

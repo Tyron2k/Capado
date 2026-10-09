@@ -1,14 +1,16 @@
-"""SQLModel entities for authentication: User and RefreshToken."""
+"""SQLAlchemy entities for authentication: User and RefreshToken."""
 
 from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column
+import sqlalchemy as sa
 from sqlalchemy import Enum as SAEnum
-from sqlmodel import Field, SQLModel
+from sqlalchemy.orm import Mapped, mapped_column
 
+from app.models.base import ORMModel
 from app.utils.pg_types import UUIDArray
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -24,7 +26,7 @@ class UserRole(StrEnum):
     viewer = "viewer"
 
 
-class User(SQLModel, table=True):
+class User(ORMModel, kw_only=True, eq=False):
     """Application user with role and optional editor scopes.
 
     The role determines the level of write access. Editors are further
@@ -38,58 +40,98 @@ class User(SQLModel, table=True):
     """
 
     __tablename__ = "users"
+    __table_args__ = (sa.Index("uq_users_resource_id", "resource_id", unique=True),)
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    email: str = Field(max_length=255, unique=True, nullable=False)
-    name: str = Field(max_length=255, nullable=False)
-    password_hash: str = Field(max_length=255, nullable=False)
-    role: str = Field(
-        default=UserRole.viewer,
-        sa_column=Column(
-            SAEnum(
-                "admin",
-                "editor",
-                "viewer",
-                name="userrole",
-                create_constraint=False,
-                create_type=False,
-            ),
-            nullable=False,
-            server_default="viewer",
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    email: Mapped[str] = mapped_column(sa.String(255), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    password_hash: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    role: Mapped[str] = mapped_column(
+        SAEnum(
+            "admin",
+            "editor",
+            "viewer",
+            name="userrole",
+            create_constraint=False,
+            create_type=False,
         ),
+        nullable=False,
+        server_default="viewer",
+        default=UserRole.viewer,
     )
-    scope_group_ids: list[UUID] | None = Field(
+    scope_group_ids: Mapped[list[UUID] | None] = mapped_column(
+        UUIDArray(), nullable=True, default=None
+    )
+    scope_project_ids: Mapped[list[UUID] | None] = mapped_column(
+        UUIDArray(), nullable=True, default=None
+    )
+    is_active: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=True)
+    must_change_password: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, default=True
+    )
+    external_id: Mapped[str | None] = mapped_column(
+        sa.String(255), nullable=True, default=None
+    )
+    resource_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "personal_resources.id",
+            name="fk_users_resource_id_personal_resources",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        unique=False,
         default=None,
-        sa_column=Column(UUIDArray(), nullable=True),
     )
-    scope_project_ids: list[UUID] | None = Field(
-        default=None,
-        sa_column=Column(UUIDArray(), nullable=True),
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        nullable=False,
+        index=True,
+        default_factory=_utcnow,
+        insert_default=_utcnow,
     )
-    is_active: bool = Field(default=True)
-    must_change_password: bool = Field(default=True)
-    external_id: str | None = Field(default=None, max_length=255)
-    resource_id: UUID | None = Field(
-        default=None,
-        foreign_key="personal_resources.id",
-        unique=True,
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
     )
-    created_at: datetime = Field(default_factory=_utcnow, index=True)
-    updated_at: datetime = Field(default_factory=_utcnow)
 
 
-class RefreshToken(SQLModel, table=True):
+class RefreshToken(ORMModel, kw_only=True, eq=False):
     """Hashed refresh token stored in the database for validation and revocation."""
 
     __tablename__ = "refresh_tokens"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    user_id: UUID = Field(foreign_key="users.id", nullable=False, index=True)
-    token_hash: str = Field(max_length=255, nullable=False, index=True)
-    expires_at: datetime = Field(nullable=False)
-    revoked_at: datetime | None = Field(default=None)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "users.id", name="refresh_tokens_user_id_fkey", ondelete="CASCADE"
+        ),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(sa.String(255), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime(), nullable=True, default=None
+    )
     # Set to the successor token's id when this token is rotated (not when it
     # is revoked via logout). Distinguishes a benign concurrent-refresh replay
     # from a logged-out/stolen token during reuse detection.
-    replaced_by_id: UUID | None = Field(default=None)
-    created_at: datetime = Field(default_factory=_utcnow)
+    replaced_by_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(), nullable=True, default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )

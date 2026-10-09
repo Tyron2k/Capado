@@ -102,6 +102,10 @@ describe('SettingsContext', () => {
   it('sets hasUploadedLogo from backend response', async () => {
     const { getTenantSettings } = await import('../../api/settings')
     vi.mocked(getTenantSettings).mockResolvedValueOnce({
+      digest_critical_days: 14,
+      digest_horizon_days: 90,
+      digest_max_findings: 100,
+      digest_warning_days: 45,
       company_name: 'Logo Corp',
       company_subtitle: '',
       logo_url: '',

@@ -1,8 +1,8 @@
 """Typed resource-group persistence, separate from API and CSV validation.
 
-The ORM pilot preserves the table, indexes, foreign keys and eager defaults.
+The mapping preserves the table, indexes, foreign keys and eager defaults.
 The parent relationship follows existing profile inheritance; sites remain a
-separate location axis. No other entity is converted as incidental work.
+separate location axis. All entities share the native SQLAlchemy registry.
 """
 
 from datetime import UTC, datetime
@@ -10,10 +10,10 @@ from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlmodel.sql.sqltypes import UTCDateTime
 
 from app.models.base import ORMModel
 from app.models.resource import ResourceType
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:

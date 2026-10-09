@@ -1,4 +1,4 @@
-"""SQLModel model for assignments (resource → work package).
+"""SQLAlchemy model for assignments (resource → work package).
 
 Two shapes share one table:
 
@@ -14,9 +14,12 @@ from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, Relationship, SQLModel
+import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.models.base import ORMModel
 from app.models.resource import ResourceType
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -27,7 +30,7 @@ if TYPE_CHECKING:
     from app.models.project import WorkPackage
 
 
-class Assignment(SQLModel, table=True):
+class Assignment(ORMModel, kw_only=True, eq=False):
     """Assignment of a resource to a work package.
 
     For ``resource_type == personal``, ``start_date``/``end_date`` and
@@ -38,21 +41,55 @@ class Assignment(SQLModel, table=True):
 
     __tablename__ = "assignments"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    resource_id: UUID = Field(index=True)
-    resource_type: ResourceType = Field(index=True)
-    work_package_id: UUID = Field(foreign_key="work_packages.id", index=True)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    resource_id: Mapped[UUID] = mapped_column(sa.Uuid(), nullable=False, index=True)
+    resource_type: Mapped[ResourceType] = mapped_column(
+        sa.Enum(
+            ResourceType,
+            name="resourcetype",
+            native_enum=True,
+            length=14,
+            create_constraint=False,
+        ),
+        nullable=False,
+        index=True,
+    )
+    work_package_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(), sa.ForeignKey("work_packages.id"), nullable=False, index=True
+    )
 
     # Personal-assignment fields (nullable; required when resource_type=personal)
-    start_date: date | None = Field(default=None, index=True)
-    end_date: date | None = Field(default=None, index=True)
-    allocation_percent: float | None = Field(default=None, gt=0, le=100)
+    start_date: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, index=True, default=None
+    )
+    end_date: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, index=True, default=None
+    )
+    allocation_percent: Mapped[float | None] = mapped_column(
+        sa.Float(), nullable=True, default=None
+    )
 
     # Infrastructure-assignment fields (nullable; required when resource_type=infrastructure)
-    start_at: datetime | None = Field(default=None)
-    end_at: datetime | None = Field(default=None)
+    start_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime(), nullable=True, default=None
+    )
+    end_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime(), nullable=True, default=None
+    )
 
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
-    work_package: Optional["WorkPackage"] = Relationship(back_populates="assignments")
+    work_package: Mapped[Optional["WorkPackage"]] = relationship(
+        back_populates="assignments", init=False, repr=False, compare=False
+    )

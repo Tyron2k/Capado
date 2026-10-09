@@ -1,9 +1,11 @@
 """Complete CSV export and import of working-time data."""
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app import models as m
+from app.schemas.transfer.calendar import HolidayTransfer, WorkWeekProfileTransfer
+from app.schemas.transfer.site import SiteTransfer
 
 from .common import ImportResult, resource_ids_for_groups
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -19,16 +21,20 @@ CSV_AREA = CsvArea(
     "working-time",
     (
         entity(
-            m.Site, "id name region_code is_default is_active created_at updated_at"
+            m.Site,
+            "id name region_code is_default is_active created_at updated_at",
+            validation_model=SiteTransfer,
         ),
         entity(
             m.WorkWeekProfile,
             "id name description monday_minutes tuesday_minutes wednesday_minutes thursday_minutes friday_minutes saturday_minutes sunday_minutes is_default created_at updated_at",
+            validation_model=WorkWeekProfileTransfer,
         ),
         entity(
             m.Holiday,
             "id site_id day name working_minutes created_at updated_at",
             existing_by_id=True,
+            validation_model=HolidayTransfer,
         ),
     ),
 )

@@ -1,4 +1,4 @@
-"""SQLModel table definitions re-exported for Alembic autogenerate discovery."""
+"""SQLAlchemy table definitions re-exported for Alembic autogenerate discovery."""
 
 from app.models.absence import Absence, AbsenceReason  # noqa: F401
 from app.models.assignment import Assignment  # noqa: F401

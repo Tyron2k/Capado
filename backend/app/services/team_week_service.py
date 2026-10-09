@@ -15,8 +15,8 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.assignment import Assignment, ResourceType
 from app.models.project import Project, WorkPackage

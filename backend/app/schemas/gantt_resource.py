@@ -2,10 +2,10 @@
 
 from uuid import UUID
 
-from pydantic import BaseModel
+from app.schemas import ResponseModel
 
 
-class InfraGroupOption(BaseModel):
+class InfraGroupOption(ResponseModel):
     """An active infrastructure group as a selection option for the resource perspective."""
 
     id: UUID
@@ -13,7 +13,7 @@ class InfraGroupOption(BaseModel):
     location: str
 
 
-class ResourceGanttBarSchema(BaseModel):
+class ResourceGanttBarSchema(ResponseModel):
     """A work package bar in the resource Gantt view."""
 
     id: UUID
@@ -26,7 +26,7 @@ class ResourceGanttBarSchema(BaseModel):
     has_conflict: bool
 
 
-class ResourceGanttProjectGroupSchema(BaseModel):
+class ResourceGanttProjectGroupSchema(ResponseModel):
     """A project group with associated work package bars."""
 
     project_id: UUID
@@ -34,7 +34,7 @@ class ResourceGanttProjectGroupSchema(BaseModel):
     work_packages: list[ResourceGanttBarSchema]
 
 
-class ResourceGanttResponseSchema(BaseModel):
+class ResourceGanttResponseSchema(ResponseModel):
     """Complete response for resource Gantt (infrastructure or department)."""
 
     resource_type: str  # "infrastructure" | "department"

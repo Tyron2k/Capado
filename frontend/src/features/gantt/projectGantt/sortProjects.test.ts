@@ -16,6 +16,11 @@ import type { Project } from '../../../types/project'
 
 function project(id: string, name: string, start: string, end: string): Project {
   return {
+    created_at: '2026-01-01T00:00:00Z',
+    customer_id: null,
+    customer_inherited: false,
+    customer_name: null,
+    updated_at: '2026-01-01T00:00:00Z',
     id,
     name,
     folder_id: null,

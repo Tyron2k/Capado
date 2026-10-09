@@ -40,8 +40,8 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.absence import Absence, AbsenceStatus
 from app.models.calendar import (

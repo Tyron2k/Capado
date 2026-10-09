@@ -65,7 +65,7 @@ describe('the skill catalogue', () => {
     const result = await getSkillsWithAttributes()
 
     expect(mocked.get).toHaveBeenCalledWith('/api/skills/with-attributes', {
-      params: { limit: 500 },
+      params: { limit: 500, offset: 0 },
     })
     // A catalogue is not paged in the UI: the picker shows all of it, so the wrapper unwraps `items`
     // and the caller never sees the envelope.
@@ -75,14 +75,14 @@ describe('the skill catalogue', () => {
   it('OMITS the resource type when none is given, rather than sending an empty one', async () => {
     await getSkillsWithAttributes()
     expect(mocked.get).toHaveBeenCalledWith('/api/skills/with-attributes', {
-      params: { limit: 500 },
+      params: { limit: 500, offset: 0 },
     })
   })
 
   it('sends the resource type when one is given', async () => {
     await getSkillsWithAttributes('personal')
     expect(mocked.get).toHaveBeenCalledWith('/api/skills/with-attributes', {
-      params: { limit: 500, resource_type: 'personal' },
+      params: { limit: 500, offset: 0, resource_type: 'personal' },
     })
   })
 

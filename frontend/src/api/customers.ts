@@ -1,3 +1,7 @@
+import type { ApiBody, ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * Customers.
  *
@@ -8,42 +12,36 @@
 
 import apiClient from './client'
 
-export interface Customer {
-  id: string
-  name: string
-  reference: string
-  note: string
-  is_active: boolean
-  /** Folders naming this customer. Everything inside them inherits it. */
-  folder_count: number
-  /** Projects naming it directly, folders aside. */
-  project_count: number
-}
+export type Customer = components['schemas']['CustomerResponse']
 
 export async function getCustomers(includeInactive = false): Promise<Customer[]> {
-  const response = await apiClient.get<Customer[]>('/api/customers', {
+  const response = await apiClient.get<ApiResponse<'/api/customers', 'get'>>('/api/customers', {
     params: includeInactive ? { include_inactive: true } : undefined,
   })
   return response.data
 }
 
-export async function createCustomer(data: {
-  name: string
-  reference?: string
-  note?: string
-}): Promise<Customer> {
-  const response = await apiClient.post<Customer>('/api/customers', data)
+export async function createCustomer(data: ApiBody<'/api/customers', 'post'>): Promise<Customer> {
+  const response = await apiClient.post<ApiResponse<'/api/customers', 'post'>>(
+    '/api/customers',
+    data,
+  )
   return response.data
 }
 
 export async function updateCustomer(
   id: string,
-  data: { name?: string; reference?: string; note?: string; is_active?: boolean },
+  data: ApiBody<'/api/customers/{customer_id}', 'patch'>,
 ): Promise<Customer> {
-  const response = await apiClient.patch<Customer>(`/api/customers/${id}`, data)
+  const response = await apiClient.patch<ApiResponse<'/api/customers/{customer_id}', 'patch'>>(
+    `/api/customers/${id}`,
+    data,
+  )
   return response.data
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
-  await apiClient.delete(`/api/customers/${id}`)
+  await apiClient.delete<ApiResponse<'/api/customers/{customer_id}', 'delete'>>(
+    `/api/customers/${id}`,
+  )
 }

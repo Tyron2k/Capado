@@ -1,7 +1,7 @@
 """AutocompleteService: Suche nach aktiven Ressourcen für Typeahead-Vorschläge."""
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.resource import InfrastructureResource, PersonalResource
 from app.schemas.autocomplete import AutocompleteResultResponse

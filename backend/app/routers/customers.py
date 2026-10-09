@@ -14,14 +14,15 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import func, select
 
 from app.database import get_session
 from app.models.customer import Customer
 from app.models.project import Project, ProjectFolder
 from app.models.user import User
+from app.schemas import ResponseModel
 from app.services.permissions import (
     EntityType,
     check_write_permission,
@@ -49,7 +50,7 @@ class CustomerUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class CustomerResponse(BaseModel):
+class CustomerResponse(ResponseModel):
     """A customer, with what depends on it."""
 
     id: UUID
@@ -82,8 +83,8 @@ async def _counts(session: AsyncSession) -> tuple[dict[UUID, int], dict[UUID, in
         .group_by(Project.customer_id)
     )
     return (
-        {row[0]: row[1] for row in folder_rows.all()},
-        {row[0]: row[1] for row in project_rows.all()},
+        {row[0]: row[1] for row in folder_rows.all() if row[0] is not None},
+        {row[0]: row[1] for row in project_rows.all() if row[0] is not None},
     )
 
 

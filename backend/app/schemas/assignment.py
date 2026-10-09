@@ -16,6 +16,8 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from app.models.conflict import ConflictCause
 from app.models.resource import ResourceType
+from app.schemas import ResponseModel
+from app.schemas.capacity import ConflictResponse
 
 
 class AssignmentCreate(BaseModel):
@@ -61,7 +63,7 @@ class AssignmentPreviewRequest(AssignmentCreate):
     assignment_id: UUID | None = None
 
 
-class PreviewConflict(BaseModel):
+class PreviewConflict(ResponseModel):
     """A conflict in one preview state."""
 
     cause: ConflictCause
@@ -71,7 +73,7 @@ class PreviewConflict(BaseModel):
     available_percent: float
 
 
-class PreviewCapacityDay(BaseModel):
+class PreviewCapacityDay(ResponseModel):
     """Personal-resource demand before and after the proposed change."""
 
     date: date
@@ -80,7 +82,7 @@ class PreviewCapacityDay(BaseModel):
     assigned_after_percent: float
 
 
-class PreviewResource(BaseModel):
+class PreviewResource(ResponseModel):
     """Impact on an affected resource, including the old one on reassignment."""
 
     resource_id: UUID
@@ -91,13 +93,13 @@ class PreviewResource(BaseModel):
     capacity_days: list[PreviewCapacityDay]
 
 
-class AssignmentPreviewResponse(BaseModel):
+class AssignmentPreviewResponse(ResponseModel):
     """Read-only what-if result; it does not reserve or save capacity."""
 
     resources: list[PreviewResource]
 
 
-class AssignmentResponse(BaseModel):
+class AssignmentResponse(ResponseModel):
     """Response schema for an assignment of either shape.
 
     Enriched with resolved names (``resource_name``, ``work_package_name``,
@@ -126,14 +128,14 @@ class AssignmentResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class AssignmentCreateResponse(BaseModel):
+class AssignmentCreateResponse(ResponseModel):
     """Response schema returned by POST/PUT (includes soft warnings)."""
 
     assignment: AssignmentResponse
     warnings: list[str] = []
 
 
-class ResourceSuggestion(BaseModel):
+class ResourceSuggestion(ResponseModel):
     """A suggested resource that could fill an unmet requirement.
 
     Suggestions are ranked by fewest overlapping assignments in the work
@@ -147,7 +149,7 @@ class ResourceSuggestion(BaseModel):
     overlapping_assignments: int = 0
 
 
-class UnmetRequirementResponse(BaseModel):
+class UnmetRequirementResponse(ResponseModel):
     """A single unmet skill requirement for a work package.
 
     Returned when a work package requires more resources with a specific
@@ -168,3 +170,11 @@ class UnmetRequirementResponse(BaseModel):
     assigned_quantity: float
     gap: float
     suggestions: list[ResourceSuggestion] = []
+
+
+class PlanningOverviewResponse(ResponseModel):
+    """Typed combined planning data without duplicating the three domain contracts."""
+
+    unmet_requirements: list[UnmetRequirementResponse]
+    conflicts: list[ConflictResponse]
+    mismatched_assignments: list[AssignmentResponse]

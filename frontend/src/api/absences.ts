@@ -1,3 +1,8 @@
+import { allPages } from './pagination'
+import type { ApiBody, ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * API functions for resource absences.
  */
@@ -5,7 +10,7 @@
 import apiClient from './client'
 
 /** Settled vs still a request. See the note on Absence.status. */
-export type AbsenceStatus = 'provisional' | 'confirmed'
+export type AbsenceStatus = components['schemas']['AbsenceStatus']
 
 /**
  * Whether an absence was foreseeable — the only distinction planning needs.
@@ -15,63 +20,29 @@ export type AbsenceStatus = 'provisional' | 'confirmed'
  * migration 013 collapsed it. `part_time` had already been dropped from the backend
  * with ADR-004 and only survived in this type.
  */
-export type AbsenceReason = 'planned' | 'unplanned'
+export type AbsenceReason = components['schemas']['AbsenceReason']
 
-export interface Absence {
-  id: string
-  resource_id: string
-  resource_type: 'personal' | 'infrastructure'
-  reason: AbsenceReason
-  start_date: string
-  end_date: string
-  allocation_percent: number
-  /**
-   * Whether the absence is settled or still a request.
-   *
-   * Both statuses reduce capacity IDENTICALLY. Counting a request as free capacity would plan
-   * work against a day likely to disappear; what the status buys is knowing which capacity
-   * gaps can still be renegotiated.
-   */
-  status: AbsenceStatus
-  note: string | null
-  created_at: string
-  updated_at: string
-}
-
-interface AbsenceCreate {
-  resource_id: string
-  resource_type: 'personal' | 'infrastructure'
-  reason: AbsenceReason
-  start_date: string
-  end_date: string
-  allocation_percent?: number
-  status?: AbsenceStatus
-  note?: string | null
-}
+export type Absence = components['schemas']['AbsenceResponse']
 
 /** Response shape for paginated absences. */
-interface AbsencesListResponse {
-  items: Absence[]
-  total: number
-  limit: number
-  offset: number
-}
 
 /** Fetch absences for a resource (paginated, returns all by default). */
 export async function getAbsences(resourceId: string): Promise<Absence[]> {
-  const response = await apiClient.get<AbsencesListResponse>('/api/absences', {
-    params: { resource_id: resourceId, limit: 500 },
+  return allPages(async (offset) => {
+    const response = await apiClient.get<ApiResponse<'/api/absences', 'get'>>('/api/absences', {
+      params: { resource_id: resourceId, limit: 500, offset },
+    })
+    return response.data
   })
-  return response.data.items
 }
 
 /** Create a new absence. */
-export async function createAbsence(data: AbsenceCreate): Promise<Absence> {
-  const response = await apiClient.post<Absence>('/api/absences', data)
+export async function createAbsence(data: ApiBody<'/api/absences', 'post'>): Promise<Absence> {
+  const response = await apiClient.post<ApiResponse<'/api/absences', 'post'>>('/api/absences', data)
   return response.data
 }
 
 /** Delete an absence. */
 export async function deleteAbsence(id: string): Promise<void> {
-  await apiClient.delete(`/api/absences/${id}`)
+  await apiClient.delete<ApiResponse<'/api/absences/{absence_id}', 'delete'>>(`/api/absences/${id}`)
 }

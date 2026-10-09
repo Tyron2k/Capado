@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models.user import User
+from app.schemas import ResponseModel
 from app.services.baseline_service import BaselineDiff, BaselineService, EntityDiff
 from app.services.permissions import get_current_user, require_admin
 
@@ -34,7 +35,7 @@ class BaselineCreate(BaseModel):
     make_current: bool = True
 
 
-class BaselineResponse(BaseModel):
+class BaselineResponse(ResponseModel):
     """Response schema for a baseline header."""
 
     id: UUID
@@ -53,7 +54,7 @@ class BaselineCreatedResponse(BaselineResponse):
     entry_count: int
 
 
-class EntityDiffResponse(BaseModel):
+class EntityDiffResponse(ResponseModel):
     """How one entity differs between the baseline and the live plan."""
 
     entity_type: str
@@ -61,7 +62,7 @@ class EntityDiffResponse(BaseModel):
     changes: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
-class BaselineDiffResponse(BaseModel):
+class BaselineDiffResponse(ResponseModel):
     """Drift of the live plan against one baseline.
 
     ``added`` and ``removed`` are not error states: work created after the freeze

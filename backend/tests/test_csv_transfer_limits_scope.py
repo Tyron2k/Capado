@@ -9,11 +9,11 @@ from uuid import uuid4
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event, func
-from sqlmodel import select
+from sqlalchemy import event, func, select
 
 from app import models as m
 from app.database import get_session
+from app.models.base import column_values
 from app.routers.import_export import router
 from app.services.import_export import DOMAIN_BY_NAME, csv_format, csv_storage
 from app.services.import_export import csv_transfer as transfer
@@ -25,7 +25,7 @@ from tests.test_csv_migration import source
 def test_export_and_import_share_utf8_field_boundaries(monkeypatch, character):
     monkeypatch.setattr(csv_format, "MAX_FIELD_BYTES", 64)
     count = 64 // len(character.encode("utf-8"))
-    record = m.Skill(name=character * count, resource_type="personal").model_dump()
+    record = column_values(m.Skill(name=character * count, resource_type="personal"))
     data = {"skills": [record], "skill_attributes": []}
     domain = DOMAIN_BY_NAME["skills"]
     content = domain.export_csv(data)
@@ -103,7 +103,7 @@ async def test_large_unrelated_history_does_not_block_small_skill_import(
         ]
     )
     await db_session.commit()
-    record = m.Skill(name="New skill", resource_type="personal").model_dump()
+    record = column_values(m.Skill(name="New skill", resource_type="personal"))
     content = DOMAIN_BY_NAME["skills"].export_csv(
         {"skills": [record], "skill_attributes": []}
     )
@@ -156,7 +156,7 @@ async def test_skill_attribute_edit_validates_existing_external_requirements(
         .scalars()
         .first()
     )
-    record = attribute.model_dump()
+    record = column_values(attribute)
     record["skill_id"] = other_skill.id
     content = DOMAIN_BY_NAME["skills"].export_csv(
         {"skills": [], "skill_attributes": [record]}
@@ -192,7 +192,7 @@ async def test_moved_assignment_refreshes_only_old_and_new_resources(
         .first()
     )
     old_resource = assignment.resource_id
-    record = assignment.model_dump()
+    record = column_values(assignment)
     record["resource_id"] = resource.id
     content = DOMAIN_BY_NAME["assignments"].export_csv({"assignments": [record]})
     refresh = AsyncMock(return_value=0)
@@ -225,7 +225,7 @@ async def test_calendar_refresh_scopes_explicit_bindings_and_shared_defaults(
                 select(m.WorkWeekProfile).where(m.WorkWeekProfile.is_default.is_(True))
             )
         ).scalar_one()
-    record = profile.model_dump()
+    record = column_values(profile)
     record["monday_minutes"] = 123
     content = DOMAIN_BY_NAME["working-time"].export_csv(
         {"sites": [], "work_week_profiles": [record], "holidays": []}
@@ -249,7 +249,7 @@ async def test_semantic_error_names_the_file_row_and_field(db_session, source):
         .scalars()
         .first()
     )
-    record = assignment.model_dump()
+    record = column_values(assignment)
     record["resource_id"] = uuid4()
     content = DOMAIN_BY_NAME["assignments"].export_csv({"assignments": [record]})
     result = await transfer.import_area_rows(
@@ -283,7 +283,7 @@ async def test_constraint_error_names_input_fields_without_echoing_values(db_ses
     skill = m.Skill(name="PRIVATE_INPUT_VALUE", resource_type="personal")
     db_session.add(skill)
     await db_session.commit()
-    duplicate = skill.model_dump()
+    duplicate = column_values(skill)
     duplicate["id"] = uuid4()
     content = DOMAIN_BY_NAME["skills"].export_csv(
         {"skills": [duplicate], "skill_attributes": []}
@@ -323,7 +323,7 @@ async def test_default_site_holiday_refreshes_resources_without_explicit_site(
         working_minutes=0,
     )
     content = DOMAIN_BY_NAME["working-time"].export_csv(
-        {"sites": [], "work_week_profiles": [], "holidays": [holiday.model_dump()]}
+        {"sites": [], "work_week_profiles": [], "holidays": [column_values(holiday)]}
     )
     refresh = AsyncMock(return_value=0)
     monkeypatch.setattr("app.services.import_export.common.refresh_resources", refresh)

@@ -149,17 +149,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --all-groups
 
-      # ONE mypy run, not two. The script invokes mypy with attr-defined enabled and reports
-      # every finding except the closed set of SQLAlchemy column operators, which are the only
-      # false positives that code produces under SQLModel. Running plain `mypy` alongside it
-      # would spend twice the CI minutes to learn the same thing.
-      #
-      # attr-defined is off in pyproject.toml for a good reason — ~150 findings of pure operator
-      # noise — and switching it off cost three shipped bugs in one afternoon: a typo'd dataclass
-      # field, a field read from the wrong model, and a wrong column name. All three passed a
-      # plain mypy run. See backend/scripts/check_attr_defined.py.
-      - name: mypy (incl. attr-defined)
-        run: uv run python scripts/check_attr_defined.py
+      # Native Mapped columns allow the full checker without legacy operator filters.
+      - name: mypy
+        run: uv run mypy
 
   backend-tests:
     name: Backend tests (Python ${{ matrix.python-version }})

@@ -1195,5 +1195,20 @@
     "running": "Prüfung läuft",
     "importFailed": "Import gespeichert. Die anschließende Konfliktprüfung ist fehlgeschlagen. Der regelmäßige Abgleich prüft erneut, sofern aktiviert.",
     "importResult": "Konfliktprüfung abgeschlossen: {count} Belegungskonflikte bei den geprüften Ressourcen"
+  },
+  "tables": {
+    "columns": "Spalten",
+    "selectRow": "{name} auswählen",
+    "selectVisible": "Sichtbare Zeilen auswählen",
+    "selectedCount": "{count} ausgewählt",
+    "showSelected": "Nur Auswahl anzeigen",
+    "clearSelection": "Auswahl aufheben",
+    "noFilterMatch": "Keine passenden Einträge",
+    "groupFilter": "Nach Gruppe filtern",
+    "siteFilter": "Nach Standort filtern",
+    "noSite": "Kein Standort",
+    "missingGroup": "Gruppe nicht mehr vorhanden",
+    "conflictsOnly": "Nur mit Konflikten",
+    "openConflicts": "Konflikte von {name} öffnen"
   }
 }

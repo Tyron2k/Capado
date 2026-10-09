@@ -28,6 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models.user import User
+from app.schemas.absence import AbsenceResponse
+from app.schemas.assignment import AssignmentResponse
 from app.schemas.me import MyPlanResponse
 from app.services.absence_service import AbsenceService
 from app.services.assignment_service import AssignmentService
@@ -99,9 +101,9 @@ async def get_my_plan(
 
     return MyPlanResponse(
         resource_id=resource_id,
-        assignments=assignments,
+        assignments=[AssignmentResponse.model_validate(row) for row in assignments],
         assignment_total=assignment_total,
-        absences=absences,
+        absences=[AbsenceResponse.model_validate(row) for row in absences],
         absence_total=absence_total,
         skills=skills,
     )

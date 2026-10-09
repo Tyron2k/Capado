@@ -1,12 +1,15 @@
-"""SQLModel models for conflicts and the junction table Conflict ↔ Assignment."""
+"""SQLAlchemy models for conflicts and the junction table Conflict ↔ Assignment."""
 
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, Relationship, SQLModel
+import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.models.base import ORMModel
 from app.models.resource import ResourceType
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -33,18 +36,24 @@ class ConflictCause(StrEnum):
     """Infrastructure: a booking falls outside every availability window."""
 
 
-class ConflictAssignment(SQLModel, table=True):
+class ConflictAssignment(ORMModel, kw_only=True, eq=False):
     """Junction table: which assignments are involved in a conflict."""
 
     __tablename__ = "conflict_assignments"
 
-    conflict_id: UUID = Field(foreign_key="conflicts.id", primary_key=True)
-    assignment_id: UUID = Field(
-        foreign_key="assignments.id", primary_key=True, index=True
+    conflict_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(), sa.ForeignKey("conflicts.id"), nullable=False, primary_key=True
+    )
+    assignment_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey("assignments.id"),
+        nullable=False,
+        primary_key=True,
+        index=True,
     )
 
 
-class Conflict(SQLModel, table=True):
+class Conflict(ORMModel, kw_only=True, eq=False):
     """Detected capacity conflict for a resource in a time period.
 
     Personal conflicts occur when the minutes demanded by assignments exceed the
@@ -59,14 +68,44 @@ class Conflict(SQLModel, table=True):
 
     __tablename__ = "conflicts"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    resource_id: UUID = Field(index=True)
-    resource_type: ResourceType
-    cause: ConflictCause = Field(default=ConflictCause.over_allocation, index=True)
-    start_date: date = Field(index=True)
-    end_date: date = Field(index=True)
-    total_assigned_percent: float
-    available_percent: float
-    detected_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    resource_id: Mapped[UUID] = mapped_column(sa.Uuid(), nullable=False, index=True)
+    resource_type: Mapped[ResourceType] = mapped_column(
+        sa.Enum(
+            ResourceType,
+            name="resourcetype",
+            native_enum=True,
+            length=14,
+            create_constraint=False,
+        ),
+        nullable=False,
+    )
+    cause: Mapped[ConflictCause] = mapped_column(
+        sa.Enum(
+            ConflictCause,
+            name="conflictcause",
+            native_enum=True,
+            length=20,
+            create_constraint=False,
+        ),
+        nullable=False,
+        index=True,
+        default=ConflictCause.over_allocation,
+    )
+    start_date: Mapped[date] = mapped_column(sa.Date(), nullable=False, index=True)
+    end_date: Mapped[date] = mapped_column(sa.Date(), nullable=False, index=True)
+    total_assigned_percent: Mapped[float] = mapped_column(sa.Float(), nullable=False)
+    available_percent: Mapped[float] = mapped_column(sa.Float(), nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
-    assignments: list["ConflictAssignment"] = Relationship()
+    assignments: Mapped[list["ConflictAssignment"]] = relationship(
+        init=False, repr=False, compare=False
+    )

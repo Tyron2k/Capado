@@ -1,3 +1,7 @@
+import type { ApiBody, ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * API client for plan baselines.
  *
@@ -11,27 +15,12 @@
 
 import apiClient from './client'
 
-export interface Baseline {
-  id: string
-  name: string
-  note: string | null
-  created_by: string | null
-  /** Whether this is the baseline the plan is compared against by default. */
-  is_current: boolean
-  created_at: string
-}
+export type Baseline = components['schemas']['BaselineResponse']
 
-interface BaselineCreated extends Baseline {
-  /** How many rows the freeze captured — projects, work packages and assignments. */
-  entry_count: number
-}
+type BaselineCreated = components['schemas']['BaselineCreatedResponse']
 
 /** How one entity differs from its frozen state. `changes` maps field to before/after. */
-export interface EntityDiff {
-  entity_type: string
-  entity_id: string
-  changes: Record<string, { before?: unknown; after?: unknown }>
-}
+export type EntityDiff = components['schemas']['EntityDiffResponse']
 
 /**
  * Drift of the live plan against a baseline.
@@ -39,26 +28,23 @@ export interface EntityDiff {
  * `added` and `removed` are not error states: work created after the freeze is
  * genuinely new, and work deleted is work that went away.
  */
-export interface BaselineDiff {
-  baseline_id: string
-  has_drift: boolean
-  added: EntityDiff[]
-  removed: EntityDiff[]
-  changed: EntityDiff[]
-}
+export type BaselineDiff = components['schemas']['BaselineDiffResponse']
 
 export async function getBaselines(signal?: AbortSignal): Promise<Baseline[]> {
-  const { data } = await apiClient.get<Baseline[]>('/api/baselines', { signal })
+  const { data } = await apiClient.get<ApiResponse<'/api/baselines', 'get'>>('/api/baselines', {
+    signal,
+  })
   return data
 }
 
 /** Freeze the current plan. Admin only. */
-export async function createBaseline(input: {
-  name: string
-  note?: string | null
-  make_current?: boolean
-}): Promise<BaselineCreated> {
-  const { data } = await apiClient.post<BaselineCreated>('/api/baselines', input)
+export async function createBaseline(
+  input: ApiBody<'/api/baselines', 'post'>,
+): Promise<BaselineCreated> {
+  const { data } = await apiClient.post<ApiResponse<'/api/baselines', 'post'>>(
+    '/api/baselines',
+    input,
+  )
   return data
 }
 
@@ -66,13 +52,18 @@ export async function getBaselineDiff(
   baselineId: string,
   signal?: AbortSignal,
 ): Promise<BaselineDiff> {
-  const { data } = await apiClient.get<BaselineDiff>(`/api/baselines/${baselineId}/diff`, {
-    signal,
-  })
+  const { data } = await apiClient.get<ApiResponse<'/api/baselines/{baseline_id}/diff', 'get'>>(
+    `/api/baselines/${baselineId}/diff`,
+    {
+      signal,
+    },
+  )
   return data
 }
 
 /** Delete a baseline. Admin only. The live plan is untouched. */
 export async function deleteBaseline(baselineId: string): Promise<void> {
-  await apiClient.delete(`/api/baselines/${baselineId}`)
+  await apiClient.delete<ApiResponse<'/api/baselines/{baseline_id}', 'delete'>>(
+    `/api/baselines/${baselineId}`,
+  )
 }

@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import models as m
+from app.schemas.transfer.skill import SkillAttributeTransfer, SkillTransfer
 
 from .common import ImportResult
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -15,7 +16,9 @@ from .csv_storage import (
 CSV_AREA = CsvArea(
     "skills",
     (
-        entity(m.Skill, "id name resource_type created_at"),
+        entity(
+            m.Skill, "id name resource_type created_at", validation_model=SkillTransfer
+        ),
         entity(
             m.SkillAttribute,
             "id skill_id name created_at",
@@ -23,6 +26,7 @@ CSV_AREA = CsvArea(
                 "work_package_requirements",
                 "work_package_template_requirements",
             ),
+            validation_model=SkillAttributeTransfer,
         ),
     ),
 )

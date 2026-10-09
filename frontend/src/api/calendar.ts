@@ -1,3 +1,7 @@
+import type { ApiBody, ApiQuery, ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * API functions for the working-time configuration: sites, calendar exceptions,
  * week profiles, their bindings, and infrastructure availability windows.
@@ -13,42 +17,35 @@ import apiClient from './client'
 // Sites
 // ---------------------------------------------------------------------------
 
-export interface Site {
-  id: string
-  name: string
-  region_code: string | null
-  is_default: boolean
-  is_active: boolean
-}
+export type Site = components['schemas']['SiteResponse']
 
-export interface SiteInput {
-  name: string
-  region_code?: string | null
-  is_default?: boolean
-}
+export type SiteInput = components['schemas']['SiteCreate']
 
 export async function listSites(includeInactive = false): Promise<Site[]> {
-  const { data } = await apiClient.get<Site[]>('/api/sites', {
+  const { data } = await apiClient.get<ApiResponse<'/api/sites', 'get'>>('/api/sites', {
     params: { include_inactive: includeInactive },
   })
   return data
 }
 
-export async function createSite(input: SiteInput): Promise<Site> {
-  const { data } = await apiClient.post<Site>('/api/sites', input)
+export async function createSite(input: ApiBody<'/api/sites', 'post'>): Promise<Site> {
+  const { data } = await apiClient.post<ApiResponse<'/api/sites', 'post'>>('/api/sites', input)
   return data
 }
 
 export async function updateSite(
   id: string,
-  input: Partial<SiteInput> & { is_active?: boolean },
+  input: ApiBody<'/api/sites/{site_id}', 'put'>,
 ): Promise<Site> {
-  const { data } = await apiClient.put<Site>(`/api/sites/${id}`, input)
+  const { data } = await apiClient.put<ApiResponse<'/api/sites/{site_id}', 'put'>>(
+    `/api/sites/${id}`,
+    input,
+  )
   return data
 }
 
 export async function deactivateSite(id: string): Promise<void> {
-  await apiClient.delete(`/api/sites/${id}`)
+  await apiClient.delete<ApiResponse<'/api/sites/{site_id}', 'delete'>>(`/api/sites/${id}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -64,90 +61,75 @@ export async function deactivateSite(id: string): Promise<void> {
  * December in most German firms), and a value above zero on a day the profile
  * calls free is a designated working Saturday.
  */
-export interface Holiday {
-  id: string
-  site_id: string
-  day: string
-  name: string
-  working_minutes: number
-}
+export type Holiday = components['schemas']['HolidayResponse']
 
-interface HolidayInput {
-  site_id: string
-  day: string
-  name: string
-  working_minutes?: number
-}
-
-export async function listHolidays(params: {
-  site_id?: string
-  from?: string
-  to?: string
-}): Promise<Holiday[]> {
-  const { data } = await apiClient.get<Holiday[]>('/api/holidays', { params })
+export async function listHolidays(params: ApiQuery<'/api/holidays', 'get'>): Promise<Holiday[]> {
+  const { data } = await apiClient.get<ApiResponse<'/api/holidays', 'get'>>('/api/holidays', {
+    params,
+  })
   return data
 }
 
-export async function createHoliday(input: HolidayInput): Promise<Holiday> {
-  const { data } = await apiClient.post<Holiday>('/api/holidays', input)
+export async function createHoliday(input: ApiBody<'/api/holidays', 'post'>): Promise<Holiday> {
+  const { data } = await apiClient.post<ApiResponse<'/api/holidays', 'post'>>(
+    '/api/holidays',
+    input,
+  )
   return data
 }
 
 export async function updateHoliday(
   id: string,
-  input: { name?: string; working_minutes?: number },
+  input: ApiBody<'/api/holidays/{holiday_id}', 'put'>,
 ): Promise<Holiday> {
-  const { data } = await apiClient.put<Holiday>(`/api/holidays/${id}`, input)
+  const { data } = await apiClient.put<ApiResponse<'/api/holidays/{holiday_id}', 'put'>>(
+    `/api/holidays/${id}`,
+    input,
+  )
   return data
 }
 
 export async function deleteHoliday(id: string): Promise<void> {
-  await apiClient.delete(`/api/holidays/${id}`)
+  await apiClient.delete<ApiResponse<'/api/holidays/{holiday_id}', 'delete'>>(`/api/holidays/${id}`)
 }
 
 // ---------------------------------------------------------------------------
 // Week profiles
 // ---------------------------------------------------------------------------
 
-export interface WorkWeekProfile {
-  id: string
-  name: string
-  description: string | null
-  monday_minutes: number
-  tuesday_minutes: number
-  wednesday_minutes: number
-  thursday_minutes: number
-  friday_minutes: number
-  saturday_minutes: number
-  sunday_minutes: number
-  is_default: boolean
-  weekly_minutes: number
-}
-
-type WorkWeekProfileInput = Omit<WorkWeekProfile, 'id' | 'weekly_minutes'>
+export type WorkWeekProfile = components['schemas']['WorkWeekProfileResponse']
 
 export async function listWorkWeekProfiles(): Promise<WorkWeekProfile[]> {
-  const { data } = await apiClient.get<WorkWeekProfile[]>('/api/work-week-profiles')
+  const { data } =
+    await apiClient.get<ApiResponse<'/api/work-week-profiles', 'get'>>('/api/work-week-profiles')
   return data
 }
 
 export async function createWorkWeekProfile(
-  input: Partial<WorkWeekProfileInput> & { name: string },
+  input: ApiBody<'/api/work-week-profiles', 'post'>,
 ): Promise<WorkWeekProfile> {
-  const { data } = await apiClient.post<WorkWeekProfile>('/api/work-week-profiles', input)
+  const { data } = await apiClient.post<ApiResponse<'/api/work-week-profiles', 'post'>>(
+    '/api/work-week-profiles',
+    input,
+  )
   return data
 }
 
 export async function updateWorkWeekProfile(
   id: string,
-  input: Partial<WorkWeekProfileInput>,
+  input: ApiBody<'/api/work-week-profiles/{profile_id}', 'put'>,
 ): Promise<WorkWeekProfile> {
-  const { data } = await apiClient.put<WorkWeekProfile>(`/api/work-week-profiles/${id}`, input)
+  const { data } = await apiClient.put<ApiResponse<'/api/work-week-profiles/{profile_id}', 'put'>>(
+    `/api/work-week-profiles/${id}`,
+    input,
+  )
   return data
 }
 
 export async function deleteWorkWeekProfile(id: string): Promise<void> {
-  await apiClient.delete(`/api/work-week-profiles/${id}`)
+  await apiClient.delete<ApiResponse<'/api/work-week-profiles/{profile_id}', 'delete'>>(
+    `/api/work-week-profiles/${id}`,
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -161,36 +143,22 @@ export async function deleteWorkWeekProfile(id: string): Promise<void> {
  * individual binding overrides it, which is how the one part-time employee is
  * handled without giving all 1600 people a row of their own.
  */
-export interface ResourceWorkProfileBinding {
-  id: string
-  resource_id: string | null
-  group_id: string | null
-  profile_id: string
-  valid_from: string
-  valid_until: string | null
-}
+export type ResourceWorkProfileBinding = components['schemas']['ResourceWorkProfileResponse']
 
-interface BindingInput {
-  profile_id: string
-  valid_from: string
-  valid_until?: string | null
-  resource_id?: string | null
-  group_id?: string | null
-}
-
-export async function listBindings(params: {
-  resource_id?: string
-  group_id?: string
-}): Promise<ResourceWorkProfileBinding[]> {
-  const { data } = await apiClient.get<ResourceWorkProfileBinding[]>(
+export async function listBindings(
+  params: ApiQuery<'/api/resource-work-profiles', 'get'>,
+): Promise<ResourceWorkProfileBinding[]> {
+  const { data } = await apiClient.get<ApiResponse<'/api/resource-work-profiles', 'get'>>(
     '/api/resource-work-profiles',
     { params },
   )
   return data
 }
 
-export async function createBinding(input: BindingInput): Promise<ResourceWorkProfileBinding> {
-  const { data } = await apiClient.post<ResourceWorkProfileBinding>(
+export async function createBinding(
+  input: ApiBody<'/api/resource-work-profiles', 'post'>,
+): Promise<ResourceWorkProfileBinding> {
+  const { data } = await apiClient.post<ApiResponse<'/api/resource-work-profiles', 'post'>>(
     '/api/resource-work-profiles',
     input,
   )
@@ -198,7 +166,9 @@ export async function createBinding(input: BindingInput): Promise<ResourceWorkPr
 }
 
 export async function deleteBinding(id: string): Promise<void> {
-  await apiClient.delete(`/api/resource-work-profiles/${id}`)
+  await apiClient.delete<ApiResponse<'/api/resource-work-profiles/{binding_id}', 'delete'>>(
+    `/api/resource-work-profiles/${id}`,
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -214,37 +184,29 @@ export async function deleteBinding(id: string): Promise<void> {
  *
  * A resource with no windows at all is available around the clock.
  */
-export interface AvailabilityWindow {
-  id: string
-  resource_id: string
-  weekday: number
-  start_time: string
-  end_time: string
-}
-
-interface AvailabilityWindowInput {
-  resource_id: string
-  weekday: number
-  start_time: string
-  end_time: string
-}
+export type AvailabilityWindow = components['schemas']['AvailabilityWindowResponse']
 
 export async function listAvailabilityWindows(resourceId: string): Promise<AvailabilityWindow[]> {
-  const { data } = await apiClient.get<AvailabilityWindow[]>(
-    `/api/infrastructure/${resourceId}/windows`,
-  )
+  const { data } = await apiClient.get<
+    ApiResponse<'/api/infrastructure/{resource_id}/windows', 'get'>
+  >(`/api/infrastructure/${resourceId}/windows`)
   return data
 }
 
 export async function createAvailabilityWindow(
-  input: AvailabilityWindowInput,
+  input: ApiBody<'/api/infrastructure-windows', 'post'>,
 ): Promise<AvailabilityWindow> {
-  const { data } = await apiClient.post<AvailabilityWindow>('/api/infrastructure-windows', input)
+  const { data } = await apiClient.post<ApiResponse<'/api/infrastructure-windows', 'post'>>(
+    '/api/infrastructure-windows',
+    input,
+  )
   return data
 }
 
 export async function deleteAvailabilityWindow(id: string): Promise<void> {
-  await apiClient.delete(`/api/infrastructure-windows/${id}`)
+  await apiClient.delete<ApiResponse<'/api/infrastructure-windows/{window_id}', 'delete'>>(
+    `/api/infrastructure-windows/${id}`,
+  )
 }
 
 // ---------------------------------------------------------------------------

@@ -11,12 +11,12 @@ from io import BytesIO
 import pytest
 import pytest_asyncio
 from fastapi import UploadFile
-from sqlalchemy import event
+from sqlalchemy import event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, select
 
 from app.models.assignment import Assignment
+from app.models.base import ORMModel
 from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource
 from app.models.resource_group import ResourceGroup
@@ -60,7 +60,7 @@ async def empty_target():
         cursor.close()
 
     async with engine.begin() as connection:
-        await connection.run_sync(SQLModel.metadata.create_all)
+        await connection.run_sync(ORMModel.metadata.create_all)
     async with async_sessionmaker(engine, expire_on_commit=False)() as session:
         yield session
     await engine.dispose()

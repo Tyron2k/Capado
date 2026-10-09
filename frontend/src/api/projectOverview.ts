@@ -1,3 +1,5 @@
+import type { ApiResponse } from './contracts'
+
 /** HTTP contract and client for the aggregated project overview. */
 import apiClient from './client'
 import type { components } from './generated/schema'
@@ -11,8 +13,11 @@ export async function getProjectOverview(projectIds?: string[]): Promise<Project
     projectIds !== undefined && projectIds.length > 0
       ? { project_ids: projectIds.join(',') }
       : undefined
-  const response = await apiClient.get<ProjectOverviewResponse>('/api/projects/overview', {
-    params,
-  })
+  const response = await apiClient.get<ApiResponse<'/api/projects/overview', 'get'>>(
+    '/api/projects/overview',
+    {
+      params,
+    },
+  )
   return response.data
 }

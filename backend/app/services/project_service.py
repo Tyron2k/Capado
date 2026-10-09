@@ -4,8 +4,8 @@ from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.project import Project, ProjectFolder, ProjectPriority
@@ -126,7 +126,7 @@ class ProjectService:
         a folder view wants one folder, a cleanup view wants the unfiled ones, and an
         export wants all of them regardless of grouping.
         """
-        from sqlmodel import func
+        from sqlalchemy import func
 
         def _apply(statement):
             if folder_filter == "unfiled":

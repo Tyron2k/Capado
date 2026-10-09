@@ -40,7 +40,7 @@ HTTP Request
                │
                ▼
 ┌─────────────────────────────────────┐
-│  Model (app/models/)                │  SQLModel entities: define DB schema,
+│  Model (app/models/)                │  SQLAlchemy entities: define DB schema,
 │  - Table definitions                │  relationships, constraints
 │  - Relationships                    │
 └──────────────┬──────────────────────┘

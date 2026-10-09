@@ -6,9 +6,8 @@ The "tree" endpoints now return flat lists with group_name and conflict_count.
 
 from uuid import UUID
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.conflict import Conflict
 from app.models.resource import (

@@ -8,8 +8,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.database import get_session
 from app.models.project import WorkPackage
@@ -23,6 +23,7 @@ from app.models.work_package_template import (
     WorkPackageTemplate,
     WorkPackageTemplateRequirement,
 )
+from app.schemas import ResponseModel
 from app.services.permissions import (
     EntityType,
     check_write_permission,
@@ -45,7 +46,7 @@ class WorkPackageRequirementCreate(BaseModel):
     min_allocation_percent: float = Field(default=100.0, gt=0, le=100)
 
 
-class WorkPackageRequirementResponse(BaseModel):
+class WorkPackageRequirementResponse(ResponseModel):
     """Response schema for a work package requirement with resolved names."""
 
     id: UUID

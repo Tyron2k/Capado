@@ -17,7 +17,7 @@ from datetime import date
 from typing import Any, Literal
 from uuid import UUID
 
-from sqlmodel import select
+from sqlalchemy import select
 
 from app.exceptions import InputValidationError, NotFoundError
 from app.models.skill import (

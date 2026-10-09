@@ -47,9 +47,9 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel
 
-import app.models  # noqa: F401  — registers every table on SQLModel.metadata
+import app.models  # noqa: F401  — registers every table on ORMModel.metadata
+from app.models.base import ORMModel
 
 
 @pytest_asyncio.fixture
@@ -79,7 +79,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         cursor.close()
 
     async with engine.begin() as connection:
-        await connection.run_sync(SQLModel.metadata.create_all)
+        await connection.run_sync(ORMModel.metadata.create_all)
 
     maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with maker() as session:

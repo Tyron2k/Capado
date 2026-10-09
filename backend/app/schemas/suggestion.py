@@ -1,11 +1,16 @@
 """Pydantic schemas for resource suggestions (response models)."""
 
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas import ResponseModel
+
+AvailabilityStatus = Literal["available", "partially_available", "unavailable"]
 
 
-class ResourceSuggestionResponse(BaseModel):
+class ResourceSuggestionResponse(ResponseModel):
     """Response schema for a resource suggestion."""
 
     resource_id: UUID = Field(..., description="ID of the suggested resource")
@@ -19,7 +24,7 @@ class ResourceSuggestionResponse(BaseModel):
         ),
     )
     department: str = Field(..., description="Department of the resource")
-    availability_status: str = Field(
+    availability_status: AvailabilityStatus = Field(
         ...,
         description="Availability status: available, partially_available, unavailable",
     )

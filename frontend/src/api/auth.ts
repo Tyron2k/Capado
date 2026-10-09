@@ -1,3 +1,7 @@
+import type { ApiBody, ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * API client functions for authentication endpoints.
  * These use a separate Axios instance to avoid circular dependencies
@@ -16,28 +20,11 @@ const authClient = axios.create({
   },
 })
 
-interface UserScopes {
-  scope_group_ids: string[] | null
-  scope_project_ids: string[] | null
-}
+export type UserInfo = components['schemas']['UserInfo']
 
-export interface UserInfo {
-  id: string
-  email: string
-  name: string
-  role: string
-  must_change_password: boolean
-  scopes: UserScopes
-}
+export type LoginResponse = components['schemas']['LoginResponse']
 
-export interface LoginResponse {
-  access_token: string
-  user: UserInfo
-}
-
-interface RefreshResponse {
-  access_token: string
-}
+type RefreshResponse = components['schemas']['RefreshResponse']
 
 /**
  * Authenticate a user with email and password.
@@ -45,7 +32,10 @@ interface RefreshResponse {
  * server as an httpOnly cookie.
  */
 export async function postLogin(email: string, password: string): Promise<LoginResponse> {
-  const response = await authClient.post<LoginResponse>('auth/login', { email, password })
+  const response = await authClient.post<ApiResponse<'/api/auth/login', 'post'>>('auth/login', {
+    email,
+    password,
+  } satisfies ApiBody<'/api/auth/login', 'post'>)
   return response.data
 }
 
@@ -54,7 +44,7 @@ export async function postLogin(email: string, password: string): Promise<LoginR
  * cookie by the server and rotated into a fresh cookie.
  */
 export async function postRefresh(): Promise<RefreshResponse> {
-  const response = await authClient.post<RefreshResponse>('auth/refresh')
+  const response = await authClient.post<ApiResponse<'/api/auth/refresh', 'post'>>('auth/refresh')
   return response.data
 }
 
@@ -66,9 +56,12 @@ export async function postChangePassword(
   newPassword: string,
   accessToken: string,
 ): Promise<void> {
-  await authClient.post(
+  await authClient.post<ApiResponse<'/api/auth/change-password', 'post'>>(
     'auth/change-password',
-    { old_password: oldPassword, new_password: newPassword },
+    { old_password: oldPassword, new_password: newPassword } satisfies ApiBody<
+      '/api/auth/change-password',
+      'post'
+    >,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   )
 }

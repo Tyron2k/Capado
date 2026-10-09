@@ -7,11 +7,12 @@ from dataclasses import dataclass, field
 from typing import Never
 from uuid import UUID
 
-from sqlalchemy import Index, insert, text
+from sqlalchemy import Index, insert, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.schema import ColumnCollectionConstraint
-from sqlmodel import SQLModel, select
+
+from app.models.base import ORMModel
 
 from .common import ImportResult
 from .csv_format import MAX_ROWS, CsvBatch, CsvEntity
@@ -64,7 +65,7 @@ class ImportContext:
         match = re.search(r"Key \(([^)]+)\)=", message)
         if match:
             fields.update(part.strip().strip('"') for part in match.group(1).split(","))
-        name = getattr(error.orig.__cause__, "constraint_name", None)
+        name = getattr(getattr(error.orig, "__cause__", None), "constraint_name", None)
         if name:
             for constraint in (*entity.table.constraints, *entity.table.indexes):
                 if (
@@ -160,7 +161,7 @@ async def _lock_destination(
         tables = (
             {entity.name for entity in entities}
             if entities is not None
-            else set(SQLModel.metadata.tables)
+            else set(ORMModel.metadata.tables)
         )
         if entities is None or tables & {
             "audit_log",

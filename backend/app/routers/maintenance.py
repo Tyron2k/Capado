@@ -12,26 +12,27 @@ did it remove" is what turns the number in the compliance document from a claim 
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.database import get_session
-from app.models.scheduled_job_run import ScheduledJobRun
+from app.models.scheduled_job_run import JobRunStatus, ScheduledJobRun
 from app.models.user import User
+from app.schemas import ResponseModel
 from app.services.permissions import require_admin
 
 # main.py adds the /api prefix.
 router = APIRouter(prefix="/maintenance", tags=["maintenance"])
 
 
-class JobRunResponse(BaseModel):
+class JobRunResponse(ResponseModel):
     """One recorded run."""
 
     job_name: str
     started_at: datetime
     finished_at: datetime | None
-    status: str
+    status: JobRunStatus
     items_affected: int | None = Field(
         default=None,
         description="Rows the job touched. 0 means nothing was old enough yet; null means "

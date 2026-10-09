@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.assignment import Assignment
 from app.models.conflict import ConflictAssignment

@@ -7,7 +7,7 @@ semantics are checked separately; SQLite does not exercise advisory locks.
 from datetime import date, datetime, timedelta
 
 import pytest
-from sqlmodel import select
+from sqlalchemy import select
 
 from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment

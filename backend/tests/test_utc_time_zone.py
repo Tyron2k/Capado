@@ -3,15 +3,16 @@
 import importlib.util
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
-from sqlmodel import SQLModel
-from sqlmodel.sql.sqltypes import UTCDateTime
 
 import app.models  # noqa: F401
 from app.models.assignment import Assignment
+from app.models.base import ORMModel
+from app.models.resource import ResourceType
 from app.schemas.assignment import AssignmentCreate
 from app.schemas.settings import OrganizationSettingsUpdate
 from app.services.conflict_suggestion_service import _shift_booking
@@ -24,6 +25,7 @@ from app.services.time_zone import (
     local_day_bounds,
     local_wall_time_to_utc,
 )
+from app.utils.utc_datetime import UTCDateTime
 
 
 @pytest.mark.parametrize(
@@ -35,6 +37,9 @@ from app.services.time_zone import (
 )
 def test_booking_shift_uses_planning_calendar(start: str, expected: str) -> None:
     booking = Assignment(
+        resource_id=UUID(int=1),
+        resource_type=ResourceType.infrastructure,
+        work_package_id=UUID(int=2),
         start_at=datetime.fromisoformat(start),
         end_at=datetime.fromisoformat(start) + timedelta(hours=2),
     )
@@ -50,6 +55,9 @@ def test_booking_shift_uses_planning_calendar(start: str, expected: str) -> None
 )
 def test_booking_shift_never_guesses_a_target_offset(start: str) -> None:
     booking = Assignment(
+        resource_id=UUID(int=1),
+        resource_type=ResourceType.infrastructure,
+        work_package_id=UUID(int=2),
         start_at=datetime.fromisoformat(start),
         end_at=datetime.fromisoformat(start) + timedelta(hours=2),
     )
@@ -129,7 +137,7 @@ def test_migration_covers_every_utc_datetime_column() -> None:
     spec.loader.exec_module(migration)
     model_columns = {
         (table.name, column.name)
-        for table in SQLModel.metadata.tables.values()
+        for table in ORMModel.metadata.tables.values()
         for column in table.columns
         if isinstance(column.type, UTCDateTime)
     }

@@ -85,7 +85,7 @@ def write_header(ws: Worksheet, columns: Sequence[Column], row: int) -> int:
 def write_row(
     ws: Worksheet,
     columns: Sequence[Column],
-    values: Sequence[object],
+    values: Sequence[str | int | float | bool | date | datetime | None],
     row: int,
 ) -> int:
     """Write one data row with the column's number format applied. Returns the next row.

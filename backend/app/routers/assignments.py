@@ -21,8 +21,8 @@ from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.database import get_session
 from app.models.assignment import Assignment
@@ -36,6 +36,7 @@ from app.schemas.assignment import (
     AssignmentPreviewResponse,
     AssignmentResponse,
     AssignmentUpdate,
+    PlanningOverviewResponse,
     UnmetRequirementResponse,
 )
 from app.schemas.pagination import PaginatedResponse
@@ -182,7 +183,9 @@ async def _enrich_one(
     # Resolve resource name
     resource_name: str | None = None
     if assignment.resource_type == ResourceType.personal:
-        res = await session.get(PersonalResource, assignment.resource_id)
+        res: PersonalResource | InfrastructureResource | None = await session.get(
+            PersonalResource, assignment.resource_id
+        )
         if res:
             resource_name = res.name
     else:
@@ -472,6 +475,7 @@ async def list_unmet_requirements(
 
 @router.get(
     "/planning/overview",
+    response_model=PlanningOverviewResponse,
     summary="Combined planning overview (unmet + conflicts + mismatches)",
 )
 async def get_planning_overview(

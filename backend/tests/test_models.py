@@ -29,6 +29,9 @@ from app.models import (
     ResourceType,
     WorkPackage,
 )
+from app.schemas.transfer.assignment import AssignmentTransfer
+from app.schemas.transfer.project import ProjectTransfer
+from app.schemas.transfer.resource import PersonalResourceTransfer
 
 
 class TestPersonalResource:
@@ -49,7 +52,7 @@ class TestPersonalResource:
 
     def test_name_required(self):
         with pytest.raises(ValidationError):
-            PersonalResource.model_validate(
+            PersonalResourceTransfer.model_validate(
                 {
                     "group_id": "00000000-0000-0000-0000-000000000001",
                 }
@@ -87,7 +90,7 @@ class TestProject:
 
     def test_name_required(self):
         with pytest.raises(ValidationError):
-            Project.model_validate(
+            ProjectTransfer.model_validate(
                 {
                     "start_date": "2025-01-01",
                     "end_date": "2025-12-31",
@@ -142,7 +145,7 @@ class TestAssignment:
 
     def test_allocation_must_be_positive(self):
         with pytest.raises(ValidationError):
-            Assignment.model_validate(
+            AssignmentTransfer.model_validate(
                 {
                     "resource_id": "00000000-0000-0000-0000-000000000001",
                     "resource_type": "personal",

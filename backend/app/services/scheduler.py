@@ -27,9 +27,8 @@ from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
-from sqlmodel import select
 
 from app.models.organization_settings import OrganizationSettings
 from app.models.scheduled_job_run import JobRunStatus, ScheduledJobRun

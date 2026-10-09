@@ -33,6 +33,11 @@ Navigate to *Projects* and click "New Project". Enter name and time range.
 
 Open the project and create work packages with start and end dates.
 
+The people and infrastructure overviews support search by name, group and site, sorting by column,
+group/site filters, conflict-only display and column selection. Selection applies to the current
+filtered rows; it can focus the view and be cleared. Row actions still open qualifications, absences,
+week profiles or operating hours, and editing according to your permissions.
+
 ### 4. Assign resources
 
 Under *Planning*, assign resources to work packages via drag & drop or the assignment form.

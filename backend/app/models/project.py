@@ -1,12 +1,16 @@
-"""SQLModel models for projects and work packages."""
+"""SQLAlchemy models for projects and work packages."""
 
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
+import sqlalchemy as sa
 from sqlalchemy import UniqueConstraint
-from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 
 class ProjectPriority(StrEnum):
@@ -35,7 +39,7 @@ if TYPE_CHECKING:
     from app.models.assignment import Assignment
 
 
-class ProjectFolder(SQLModel, table=True):
+class ProjectFolder(ORMModel, kw_only=True, eq=False):
     """A folder that projects can be grouped under. Optional by design.
 
     A folder is deliberately NOT a project. An earlier version made ``Project``
@@ -64,23 +68,47 @@ class ProjectFolder(SQLModel, table=True):
 
     __tablename__ = "project_folders"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=255)
-    parent_id: UUID | None = Field(
-        default=None, foreign_key="project_folders.id", index=True
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
     )
-    position: int = Field(default=0, index=True)
-    external_ref: str | None = Field(default=None, max_length=128, index=True)
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    parent_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey("project_folders.id"),
+        nullable=True,
+        index=True,
+        default=None,
+    )
+    position: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, index=True, default=0
+    )
+    external_ref: Mapped[str | None] = mapped_column(
+        sa.String(128), nullable=True, index=True, default=None
+    )
     # The customer for everything below this folder. Inherited by the projects inside it and by
     # sub-folders that name nobody — see app/services/customer_resolution.py for the rule.
-    customer_id: UUID | None = Field(
-        default=None, foreign_key="customers.id", index=True
+    customer_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "customers.id", name="project_folders_customer_id_fkey", ondelete="SET NULL"
+        ),
+        nullable=True,
+        index=True,
+        default=None,
     )
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
 
-class Project(SQLModel, table=True):
+class Project(ORMModel, kw_only=True, eq=False):
     """A planned unit: whatever the plant actually schedules work against.
 
     Attributes:
@@ -115,30 +143,69 @@ class Project(SQLModel, table=True):
 
     __tablename__ = "projects"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=255)
-    folder_id: UUID | None = Field(
-        default=None, foreign_key="project_folders.id", index=True
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
     )
-    position: int = Field(default=0, index=True)
-    external_ref: str | None = Field(default=None, max_length=128, index=True)
-    committed_delivery_date: date | None = Field(default=None, index=True)
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    folder_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey("project_folders.id"),
+        nullable=True,
+        index=True,
+        default=None,
+    )
+    position: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, index=True, default=0
+    )
+    external_ref: Mapped[str | None] = mapped_column(
+        sa.String(128), nullable=True, index=True, default=None
+    )
+    committed_delivery_date: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, index=True, default=None
+    )
     # Overrides the folder's customer when set. Read it through resolve_customer_id, never
     # directly: a project that inherits from its folder has NULL here, and that is the normal
     # case rather than the exception.
-    customer_id: UUID | None = Field(
-        default=None, foreign_key="customers.id", index=True
+    customer_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "customers.id", name="projects_customer_id_fkey", ondelete="SET NULL"
+        ),
+        nullable=True,
+        index=True,
+        default=None,
     )
-    priority: ProjectPriority = Field(default=ProjectPriority.normal, index=True)
-    start_date: date
-    end_date: date
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    priority: Mapped[ProjectPriority] = mapped_column(
+        sa.Enum(
+            ProjectPriority,
+            name="projectpriority",
+            native_enum=True,
+            length=8,
+            create_constraint=False,
+        ),
+        nullable=False,
+        index=True,
+        default=ProjectPriority.normal,
+    )
+    start_date: Mapped[date] = mapped_column(sa.Date(), nullable=False)
+    end_date: Mapped[date] = mapped_column(sa.Date(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
-    work_packages: list["WorkPackage"] = Relationship(back_populates="project")
+    work_packages: Mapped[list["WorkPackage"]] = relationship(
+        back_populates="project", init=False, repr=False, compare=False
+    )
 
 
-class WorkPackage(SQLModel, table=True):
+class WorkPackage(ORMModel, kw_only=True, eq=False):
     """Work package within a project.
 
     Skill requirements are stored directly on the work package
@@ -157,23 +224,43 @@ class WorkPackage(SQLModel, table=True):
 
     __tablename__ = "work_packages"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    project_id: UUID = Field(foreign_key="projects.id", index=True)
-    name: str = Field(max_length=255)
-    start_date: date
-    end_date: date
-    completed_at: datetime | None = Field(default=None, index=True)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(), sa.ForeignKey("projects.id"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    start_date: Mapped[date] = mapped_column(sa.Date(), nullable=False)
+    end_date: Mapped[date] = mapped_column(sa.Date(), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime(), nullable=True, index=True, default=None
+    )
     # Copied from the template when one is applied, so a later template edit does
     # not silently restate what an in-flight work package promised.
-    lead_time_working_days: int | None = Field(default=None, ge=1)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    lead_time_working_days: Mapped[int | None] = mapped_column(
+        sa.Integer(), nullable=True, default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
-    project: Project | None = Relationship(back_populates="work_packages")
-    assignments: list["Assignment"] = Relationship(back_populates="work_package")
+    project: Mapped[Project | None] = relationship(
+        back_populates="work_packages", init=False, repr=False, compare=False
+    )
+    assignments: Mapped[list["Assignment"]] = relationship(
+        back_populates="work_package", init=False, repr=False, compare=False
+    )
 
 
-class WorkPackageDependency(SQLModel, table=True):
+class WorkPackageDependency(ORMModel, kw_only=True, eq=False):
     """A finish-to-start link between two work packages, with an optional lag.
 
     One relationship type on purpose. Start-to-start and finish-to-finish are
@@ -205,9 +292,39 @@ class WorkPackageDependency(SQLModel, table=True):
         ),
     )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    predecessor_id: UUID = Field(foreign_key="work_packages.id", index=True)
-    successor_id: UUID = Field(foreign_key="work_packages.id", index=True)
-    lag_working_days: int = Field(default=0, ge=0)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    predecessor_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "work_packages.id",
+            name="work_package_dependencies_predecessor_id_fkey",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+    successor_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "work_packages.id",
+            name="work_package_dependencies_successor_id_fkey",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+    lag_working_days: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )

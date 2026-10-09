@@ -145,7 +145,7 @@ async def test_original_page_routes_download_the_exact_zip_csvs_and_accept_atomi
 ):
     from zipfile import ZipFile
 
-    from sqlmodel import select
+    from sqlalchemy import select
 
     from app.models.resource import PersonalResource
     from app.models.resource_group import ResourceGroup

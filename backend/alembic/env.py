@@ -10,9 +10,9 @@ from logging.config import fileConfig
 from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from sqlmodel import SQLModel
 
 from alembic import context
+from app.models.base import ORMModel
 
 # Arbitrary constant key for the Postgres advisory lock that serializes
 # concurrent migration runs (e.g. multiple uvicorn workers each running
@@ -27,11 +27,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# SQLModel-Metadaten für Autogenerate
+# SQLAlchemy-Metadaten für Autogenerate
 # Alle Models müssen hier importiert werden, damit sie in den Metadaten registriert sind.
 from app.models import *  # noqa: F401, F403
 
-target_metadata = SQLModel.metadata
+target_metadata = ORMModel.metadata
 
 # DATABASE_URL aus Umgebungsvariable (async-Variante für asyncpg)
 DATABASE_URL = os.getenv(

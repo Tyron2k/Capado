@@ -1,4 +1,4 @@
-"""SQLModel models for working-time capacity: calendars, week profiles, windows.
+"""SQLAlchemy models for working-time capacity: calendars, week profiles, windows.
 
 Supply side of the capacity model (ADR-004, ADR-005). Demand lives on
 ``Assignment.allocation_percent``, which is a share of a normative working day
@@ -13,7 +13,11 @@ from datetime import UTC, date, datetime, time
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-from sqlmodel import Column, Field, SQLModel, UniqueConstraint
+from sqlalchemy import UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 MINUTES_PER_DAY = 1440
 
@@ -23,7 +27,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class Holiday(SQLModel, table=True):
+class Holiday(ORMModel, kw_only=True, eq=False):
     """A calendar exception for one site on one date.
 
     Despite the name this covers every deviation from the week profile, which
@@ -42,16 +46,30 @@ class Holiday(SQLModel, table=True):
     __tablename__ = "holidays"
     __table_args__ = (UniqueConstraint("site_id", "day", name="uq_holidays_site_day"),)
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    site_id: UUID = Field(foreign_key="sites.id", index=True)
-    day: date = Field(index=True)
-    name: str = Field(max_length=255)
-    working_minutes: int = Field(default=0, ge=0, le=MINUTES_PER_DAY)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    site_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(), sa.ForeignKey("sites.id"), nullable=False, index=True
+    )
+    day: Mapped[date] = mapped_column(sa.Date(), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    working_minutes: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
 
-class WorkWeekProfile(SQLModel, table=True):
+class WorkWeekProfile(ORMModel, kw_only=True, eq=False):
     """A reusable weekly availability pattern, in minutes per weekday.
 
     Named and shared rather than per-resource, because a plant has a handful
@@ -67,19 +85,45 @@ class WorkWeekProfile(SQLModel, table=True):
     __tablename__ = "work_week_profiles"
     __table_args__ = (UniqueConstraint("name", name="uq_work_week_profiles_name"),)
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=255)
-    description: str | None = Field(default=None, max_length=1000)
-    monday_minutes: int = Field(default=480, ge=0, le=MINUTES_PER_DAY)
-    tuesday_minutes: int = Field(default=480, ge=0, le=MINUTES_PER_DAY)
-    wednesday_minutes: int = Field(default=480, ge=0, le=MINUTES_PER_DAY)
-    thursday_minutes: int = Field(default=480, ge=0, le=MINUTES_PER_DAY)
-    friday_minutes: int = Field(default=480, ge=0, le=MINUTES_PER_DAY)
-    saturday_minutes: int = Field(default=0, ge=0, le=MINUTES_PER_DAY)
-    sunday_minutes: int = Field(default=0, ge=0, le=MINUTES_PER_DAY)
-    is_default: bool = Field(default=False, index=True)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(
+        sa.String(1000), nullable=True, default=None
+    )
+    monday_minutes: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=480
+    )
+    tuesday_minutes: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=480
+    )
+    wednesday_minutes: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=480
+    )
+    thursday_minutes: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=480
+    )
+    friday_minutes: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=480
+    )
+    saturday_minutes: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
+    sunday_minutes: Mapped[int] = mapped_column(sa.Integer(), nullable=False, default=0)
+    is_default: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, index=True, default=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
     def minutes_for_weekday(self, weekday: int) -> int:
         """Available minutes for a weekday, Monday = 0 through Sunday = 6."""
@@ -94,7 +138,7 @@ class WorkWeekProfile(SQLModel, table=True):
         )[weekday]
 
 
-class ResourceWorkProfile(SQLModel, table=True):
+class ResourceWorkProfile(ORMModel, kw_only=True, eq=False):
     """Binds a week profile to a resource or to a resource group, for a period.
 
     Exactly one of ``resource_id`` and ``group_id`` is set. A group binding is
@@ -113,16 +157,36 @@ class ResourceWorkProfile(SQLModel, table=True):
 
     __tablename__ = "resource_work_profiles"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    resource_id: UUID | None = Field(default=None, index=True)
-    group_id: UUID | None = Field(
-        default=None, foreign_key="resource_groups.id", index=True
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
     )
-    profile_id: UUID = Field(foreign_key="work_week_profiles.id", index=True)
-    valid_from: date = Field(index=True)
-    valid_until: date | None = Field(default=None, index=True)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    resource_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(), nullable=True, index=True, default=None
+    )
+    group_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey("resource_groups.id"),
+        nullable=True,
+        index=True,
+        default=None,
+    )
+    profile_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(), sa.ForeignKey("work_week_profiles.id"), nullable=False, index=True
+    )
+    valid_from: Mapped[date] = mapped_column(sa.Date(), nullable=False, index=True)
+    valid_until: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, index=True, default=None
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
     def covers(self, day: date) -> bool:
         """Whether this binding is in force on a date."""
@@ -131,7 +195,7 @@ class ResourceWorkProfile(SQLModel, table=True):
         )
 
 
-class InfrastructureAvailabilityWindow(SQLModel, table=True):
+class InfrastructureAvailabilityWindow(ORMModel, kw_only=True, eq=False):
     """A clock window on one weekday during which a resource may be booked.
 
     Several rows per weekday express a multi-shift operation (06:00–14:00 and
@@ -151,11 +215,30 @@ class InfrastructureAvailabilityWindow(SQLModel, table=True):
     """
 
     __tablename__ = "infrastructure_availability_windows"
+    __table_args__ = (
+        sa.Index("ix_infra_windows_resource_id", "resource_id"),
+        sa.Index("ix_infra_windows_weekday", "weekday"),
+    )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    resource_id: UUID = Field(foreign_key="infrastructure_resources.id", index=True)
-    weekday: int = Field(ge=0, le=6, index=True)
-    start_time: time = Field(sa_column=Column(sa.Time, nullable=False))
-    end_time: time = Field(sa_column=Column(sa.Time, nullable=False))
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    resource_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey("infrastructure_resources.id"),
+        nullable=False,
+        index=False,
+    )
+    weekday: Mapped[int] = mapped_column(sa.Integer(), nullable=False, index=False)
+    start_time: Mapped[time] = mapped_column(sa.Time, nullable=False)
+    end_time: Mapped[time] = mapped_column(sa.Time, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )

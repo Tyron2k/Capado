@@ -3,8 +3,8 @@
 from datetime import date
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.models.assignment import Assignment
@@ -134,7 +134,9 @@ class AssignmentPreviewService:
             if resource_id != data.resource_id and existing is not None:
                 resource_type = existing.resource_type
             if resource_type == ResourceType.personal:
-                resource = await self.session.get(PersonalResource, resource_id)
+                resource: (
+                    PersonalResource | InfrastructureResource | None
+                ) = await self.session.get(PersonalResource, resource_id)
             else:
                 resource = await self.session.get(InfrastructureResource, resource_id)
             if resource is None:
@@ -158,6 +160,10 @@ class AssignmentPreviewService:
             if resource_type == ResourceType.personal:
                 days: dict[date, PreviewCapacityDay] = {}
                 for window in windows:
+                    if window.start is None or window.end is None:
+                        raise BusinessRuleError(
+                            "A complete assignment period is required."
+                        )
                     # The two windows may be far apart: calculate each independently.
                     before_days = (
                         await capacity_service.calculate_utilization_for_assignments(

@@ -42,11 +42,19 @@ const dateRangeArb = fc
 
 /** Generates a conflict assignment info. */
 const assignmentInfoArb = fc.record({
+  allocation_percent: fc.constant(null),
+  end_at: fc.constant(null),
+  end_date: fc.constant(null),
+  resource_id: fc.constant(null),
+  resource_name: fc.constant(null),
+  skill_mismatch: fc.constant(false),
+  start_at: fc.constant(null),
+  start_date: fc.constant(null),
   assignment_id: fc.uuid(),
-  work_package_id: fc.option(fc.uuid(), { nil: undefined }),
-  work_package_name: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
-  project_id: fc.option(fc.uuid(), { nil: undefined }),
-  project_name: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
+  work_package_id: fc.option(fc.uuid(), { nil: null }),
+  work_package_name: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: null }),
+  project_id: fc.option(fc.uuid(), { nil: null }),
+  project_name: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: null }),
 })
 
 /** Generates a single conflict. */

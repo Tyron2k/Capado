@@ -7,10 +7,10 @@ from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
-from sqlalchemy import func
-from sqlmodel import SQLModel, select
+from sqlalchemy import func, select
 
 from app import models as m
+from app.models.base import ORMModel
 from app.models.project import ProjectFolder, WorkPackageDependency
 from app.services.baseline_service import snapshot_payload
 from app.services.capacity_service import CapacityService
@@ -509,7 +509,7 @@ async def test_export_never_contains_credentials_even_in_old_history(
 
 def test_every_table_and_column_has_an_explicit_migration_decision():
     assert {entity.name for entity in ENTITIES} | EXCLUDED_TABLES == set(
-        SQLModel.metadata.tables
+        ORMModel.metadata.tables
     )
     omitted = {
         "users": {"password_hash", "external_id", "must_change_password"},
@@ -582,7 +582,7 @@ async def test_late_domain_failure_rolls_back_the_entire_bundle(
 
         user = context.existing["users"][0]
         await session.execute(
-            insert(SQLModel.metadata.tables["users"]).values(
+            insert(ORMModel.metadata.tables["users"]).values(
                 id=uuid4(),
                 email=user["email"],
                 name="Duplicate",

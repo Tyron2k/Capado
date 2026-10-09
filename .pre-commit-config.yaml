@@ -1,7 +1,7 @@
 # Pre-commit configuration for the Capado monorepo.
 #
 # Scope:
-#   - backend/ (Python, FastAPI, SQLModel): ruff (lint + autofix + format)
+#   - backend/ (Python, FastAPI, SQLAlchemy): ruff (lint + autofix + format)
 #   - frontend/ (TypeScript, React, Mantine): eslint (local) + prettier
 #   - repo-wide hygiene: trailing whitespace, EOF newline, YAML/JSON/TOML
 #     validity, merge conflict markers, oversized files.

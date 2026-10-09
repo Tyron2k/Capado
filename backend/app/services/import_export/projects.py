@@ -10,13 +10,22 @@ import io
 from uuid import UUID
 
 from openpyxl import Workbook
-from sqlalchemy import func
+from openpyxl.cell.cell import Cell, MergedCell
+from openpyxl.worksheet.worksheet import Worksheet
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app import models as m
 from app.models.project import ProjectFolder, WorkPackageDependency
 from app.models.skill import Skill, SkillAttribute
+from app.schemas.transfer.customer import CustomerTransfer
+from app.schemas.transfer.project import (
+    ProjectFolderTransfer,
+    ProjectTransfer,
+    WorkPackageDependencyTransfer,
+    WorkPackageTransfer,
+)
+from app.schemas.transfer.work_package_requirement import WorkPackageRequirementTransfer
 
 from .common import ImportResult, _parse_header
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -84,6 +93,7 @@ def _build_projects_xlsx(rows: list[tuple]) -> bytes:
 
     wb = Workbook()
     ws = wb.active
+    assert isinstance(ws, Worksheet)
     ws.title = "Projects"
 
     headers = [
@@ -126,7 +136,7 @@ def _build_projects_xlsx(rows: list[tuple]) -> bytes:
     # --- Header row ---
     ws.row_dimensions[1].height = 22
     for col_idx, header in enumerate(headers, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell: Cell | MergedCell = ws.cell(row=1, column=col_idx, value=header)
         cell.font = font_header
         cell.fill = fill_header
         cell.alignment = align_center
@@ -427,26 +437,35 @@ async def import_projects(session: AsyncSession, rows: list[tuple]) -> ImportRes
 CSV_AREA = CsvArea(
     "projects",
     (
-        entity(m.Customer, "id name reference note is_active created_at updated_at"),
+        entity(
+            m.Customer,
+            "id name reference note is_active created_at updated_at",
+            validation_model=CustomerTransfer,
+        ),
         entity(
             ProjectFolder,
             "id name parent_id position external_ref customer_id created_at updated_at",
+            validation_model=ProjectFolderTransfer,
         ),
         entity(
             m.Project,
             "id name folder_id position external_ref committed_delivery_date customer_id priority start_date end_date created_at updated_at",
+            validation_model=ProjectTransfer,
         ),
         entity(
             m.WorkPackage,
             "id project_id name start_date end_date completed_at lead_time_working_days created_at updated_at",
+            validation_model=WorkPackageTransfer,
         ),
         entity(
             m.WorkPackageRequirement,
             "id work_package_id skill_id skill_attribute_id quantity requirement_mode min_allocation_percent min_level created_at",
+            validation_model=WorkPackageRequirementTransfer,
         ),
         entity(
             WorkPackageDependency,
             "id predecessor_id successor_id lag_working_days created_at updated_at",
+            validation_model=WorkPackageDependencyTransfer,
         ),
     ),
 )

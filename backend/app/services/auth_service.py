@@ -3,6 +3,7 @@
 import hashlib
 import logging
 import secrets
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -95,7 +96,7 @@ def _prepare_password(plain_password: str) -> bytes:
 def create_access_token(
     user_id: UUID,
     role: str,
-    scopes: dict[str, list[str] | list[UUID] | None],
+    scopes: Mapping[str, list[str] | list[UUID] | None],
     *,
     email: str | None = None,
     name: str | None = None,

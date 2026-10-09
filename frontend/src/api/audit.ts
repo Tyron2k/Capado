@@ -1,3 +1,7 @@
+import type { ApiQuery, ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * API client for the audit trail (admin only).
  *
@@ -9,7 +13,7 @@
 
 import apiClient from './client'
 
-export type AuditAction = 'created' | 'updated' | 'deleted'
+export type AuditAction = components['schemas']['AuditAction']
 
 /**
  * One recorded change.
@@ -20,37 +24,16 @@ export type AuditAction = 'created' | 'updated' | 'deleted'
  * a timestamp moved alongside the field that changed doubles every entry for no
  * information.
  */
-export interface AuditEntry {
-  id: string
-  entity_type: string
-  entity_id: string
-  action: AuditAction
-  /** Null for changes with no authenticated actor: setup, scripts, token refresh. */
-  actor_id: string | null
-  reason: string | null
-  changes: Record<string, unknown>
-  recorded_at: string
-}
+export type AuditEntry = components['schemas']['AuditEntryResponse']
 
-interface AuditQuery {
-  entity_type?: string
-  entity_id?: string
-  actor_id?: string
-  action?: AuditAction
-  /** ISO timestamp, inclusive lower bound. */
-  from?: string
-  /** ISO timestamp, inclusive upper bound. */
-  to?: string
-  limit?: number
-  offset?: number
-}
+type AuditQuery = ApiQuery<'/api/audit', 'get'>
 
 /** List recorded changes, newest first. */
 export async function getAuditEntries(
   query: AuditQuery = {},
   signal?: AbortSignal,
 ): Promise<AuditEntry[]> {
-  const { data } = await apiClient.get<AuditEntry[]>('/api/audit', {
+  const { data } = await apiClient.get<ApiResponse<'/api/audit', 'get'>>('/api/audit', {
     params: query,
     signal,
   })
@@ -64,9 +47,12 @@ export async function getEntityHistory(
   limit = 50,
   signal?: AbortSignal,
 ): Promise<AuditEntry[]> {
-  const { data } = await apiClient.get<AuditEntry[]>(`/api/audit/${entityType}/${entityId}`, {
-    params: { limit },
-    signal,
-  })
+  const { data } = await apiClient.get<ApiResponse<'/api/audit/{entity_type}/{entity_id}', 'get'>>(
+    `/api/audit/${entityType}/${entityId}`,
+    {
+      params: { limit },
+      signal,
+    },
+  )
   return data
 }

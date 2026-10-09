@@ -1,4 +1,4 @@
-"""SQLModel model for sites (Betriebsstätten).
+"""SQLAlchemy model for sites (Betriebsstätten).
 
 A site is the top organizational level inside the one organization this
 deployment serves (see ADR-003). It owns the working-time calendar, because
@@ -9,7 +9,11 @@ arithmetic rather than just a label.
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, SQLModel
+import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -17,7 +21,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class Site(SQLModel, table=True):
+class Site(ORMModel, kw_only=True, eq=False):
     """A plant or physical location.
 
     Attributes:
@@ -33,10 +37,26 @@ class Site(SQLModel, table=True):
 
     __tablename__ = "sites"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=255)
-    region_code: str | None = Field(default=None, max_length=16)
-    is_default: bool = Field(default=False, index=True)
-    is_active: bool = Field(default=True, index=True)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    region_code: Mapped[str | None] = mapped_column(
+        sa.String(16), nullable=True, default=None
+    )
+    is_default: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, index=True, default=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, index=True, default=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )

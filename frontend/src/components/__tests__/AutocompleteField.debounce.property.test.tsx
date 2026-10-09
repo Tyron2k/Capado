@@ -156,10 +156,7 @@ describe('Feature: ressourcen-hierarchien-und-autocomplete, Property 9: Debounce
         // The request should use the final input value (all keystrokes combined)
         const finalValue = keystrokes.join('')
         expect(mockedSearchAutocomplete).toHaveBeenCalledWith(
-          expect.objectContaining({
-            q: finalValue,
-            type: 'personal',
-          }),
+          expect.objectContaining({ q: finalValue, type: 'personal' }),
         )
 
         unmount()

@@ -1,3 +1,5 @@
+import type { ApiQuery, ApiResponse } from './contracts'
+
 /**
  * API functions for autocomplete/typeahead search.
  */
@@ -5,11 +7,7 @@
 import apiClient from './client'
 import type { AutocompleteResult } from '../types/resource'
 
-interface SearchAutocompleteParams {
-  q: string
-  type: 'personal' | 'infrastructure'
-  signal?: AbortSignal
-}
+type SearchAutocompleteParams = ApiQuery<'/api/autocomplete', 'get'> & { signal?: AbortSignal }
 
 /**
  * Search for resources for autocomplete suggestions.
@@ -20,12 +18,15 @@ export async function searchAutocomplete(
 ): Promise<AutocompleteResult[]> {
   const { q, type, signal } = params
 
-  const queryParams: Record<string, string> = { q, type }
+  const queryParams = { q, type } satisfies ApiQuery<'/api/autocomplete', 'get'>
 
-  const response = await apiClient.get<AutocompleteResult[]>('/api/autocomplete', {
-    params: queryParams,
-    signal,
-  })
+  const response = await apiClient.get<ApiResponse<'/api/autocomplete', 'get'>>(
+    '/api/autocomplete',
+    {
+      params: queryParams,
+      signal,
+    },
+  )
 
   return response.data
 }

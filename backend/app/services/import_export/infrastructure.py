@@ -7,14 +7,20 @@ inline skill assignments.
 
 import asyncio
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app import models as m
 from app.models.resource import InfrastructureResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.site import Site
 from app.models.skill import InfrastructureResourceSkill, Skill, SkillAttribute
+from app.schemas.transfer.calendar import InfrastructureAvailabilityWindowTransfer
+from app.schemas.transfer.resource import (
+    InfrastructureResourceTransfer,
+    PersonalResourceTransfer,
+)
+from app.schemas.transfer.skill import InfrastructureResourceSkillTransfer
 
 from .common import (
     RESOURCE_GROUP_CSV,
@@ -136,17 +142,20 @@ CSV_AREA = CsvArea(
         entity(
             m.InfrastructureResource,
             "id name group_id site_id is_active created_at updated_at",
+            validation_model=InfrastructureResourceTransfer,
         ),
         entity(
             m.InfrastructureResourceSkill,
             "id resource_id skill_attribute_id valid_from valid_until level created_at",
             existing_by_id=True,
+            validation_model=InfrastructureResourceSkillTransfer,
         ),
         RESOURCE_WORK_PROFILE_CSV,
         entity(
             m.InfrastructureAvailabilityWindow,
             "id resource_id weekday start_time end_time created_at updated_at",
             existing_by_id=True,
+            validation_model=InfrastructureAvailabilityWindowTransfer,
         ),
     ),
 )
@@ -161,6 +170,7 @@ async def load_export(session: AsyncSession) -> dict[str, list[dict]]:
             entity(
                 m.PersonalResource,
                 "id name group_id site_id is_active created_at updated_at",
+                validation_model=PersonalResourceTransfer,
             ),
         ),
     )

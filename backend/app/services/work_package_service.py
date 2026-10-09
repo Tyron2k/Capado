@@ -3,8 +3,8 @@
 from datetime import UTC, date, datetime
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.assignment import Assignment
@@ -127,7 +127,7 @@ class WorkPackageService:
             NotFoundError: If the project does not exist.
 
         """
-        from sqlmodel import func
+        from sqlalchemy import func
 
         # Verify project exists
         project = await self.session.get(Project, project_id)

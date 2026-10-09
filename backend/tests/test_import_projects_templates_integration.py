@@ -25,8 +25,8 @@ from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import func, select
 
 from app.models.project import Project, WorkPackage
 from app.models.skill import Skill, SkillAttribute

@@ -10,8 +10,8 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.project import WorkPackage, WorkPackageDependency

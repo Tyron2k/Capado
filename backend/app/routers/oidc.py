@@ -8,12 +8,13 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.config import settings
 from app.database import get_session
 from app.models.user import RefreshToken, User, UserRole
+from app.schemas.auth import OIDCStatusResponse
 from app.services.auth_service import create_access_token, create_refresh_token
 from app.services.oidc_service import (
     FRONTEND_URL,
@@ -99,7 +100,7 @@ def _verify_state(signed: str, expected_state: str) -> bool:
 @router.get(
     "/enabled",
     summary="Check if OIDC login is available",
-    response_model=dict,
+    response_model=OIDCStatusResponse,
 )
 async def oidc_status() -> dict:
     """Return whether OIDC login is configured and available.
