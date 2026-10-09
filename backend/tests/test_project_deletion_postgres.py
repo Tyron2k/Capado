@@ -1,6 +1,6 @@
 """Project/work-package deletion preserves history and reconciles live planning atomically."""
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -17,7 +17,9 @@ from tests.test_resource_group_orm import resource_database  # noqa: F401
 from tests.test_utc_migration_postgres import legacy_database  # noqa: F401
 
 
-async def graph(engine, *, packages=True, bookings=True):
+async def graph(
+    engine, *, packages=True, bookings=True, infrastructure=False, adjacent=False
+):
     async with AsyncSession(engine, expire_on_commit=False) as session:
         own = m.Project(
             name="Delete own", start_date=date(2026, 1, 5), end_date=date(2026, 1, 9)
@@ -45,8 +47,11 @@ async def graph(engine, *, packages=True, bookings=True):
             role="editor",
             scope_project_ids=[other.id],
         )
-        group = m.ResourceGroup(name="Deletion people")
-        skill = m.Skill(name="Deletion skill")
+        group = m.ResourceGroup(
+            name="Deletion resources",
+            resource_type="infrastructure" if infrastructure else "personal",
+        )
+        skill = m.Skill(name="Deletion skill", resource_type=group.resource_type)
         session.add_all(
             [
                 own,
@@ -60,7 +65,11 @@ async def graph(engine, *, packages=True, bookings=True):
             ]
         )
         await session.flush()
-        person = m.PersonalResource(name="Shared person", group_id=group.id)
+        person = (
+            m.InfrastructureResource(name="Shared machine", group_id=group.id)
+            if infrastructure
+            else m.PersonalResource(name="Shared person", group_id=group.id)
+        )
         session.add(person)
         baseline = m.Baseline(name="Frozen before delete")
         session.add(baseline)
@@ -93,17 +102,38 @@ async def graph(engine, *, packages=True, bookings=True):
             session.add_all([requirement, *dependencies])
             await session.flush()
             if bookings:
-                assignments = [
-                    m.Assignment(
-                        resource_id=person.id,
-                        resource_type="personal",
-                        work_package_id=wp.id,
-                        start_date=wp.start_date,
-                        end_date=wp.end_date,
-                        allocation_percent=100 if i == 0 else 60,
-                    )
-                    for i, wp in enumerate(wps)
-                ]
+                if infrastructure:
+                    start = datetime(2026, 1, 5, 8, tzinfo=UTC)
+                    intervals = [
+                        (start, start + timedelta(hours=4)),
+                        (start, start + timedelta(hours=2)),
+                        (
+                            start + timedelta(hours=2 if adjacent else 1),
+                            start + timedelta(hours=4),
+                        ),
+                    ]
+                    assignments = [
+                        m.Assignment(
+                            resource_id=person.id,
+                            resource_type="infrastructure",
+                            work_package_id=wp.id,
+                            start_at=begin,
+                            end_at=end,
+                        )
+                        for wp, (begin, end) in zip(wps, intervals, strict=True)
+                    ]
+                else:
+                    assignments = [
+                        m.Assignment(
+                            resource_id=person.id,
+                            resource_type="personal",
+                            work_package_id=wp.id,
+                            start_date=wp.start_date,
+                            end_date=wp.end_date,
+                            allocation_percent=100 if i == 0 else 60,
+                        )
+                        for i, wp in enumerate(wps)
+                    ]
                 session.add_all(assignments)
                 await session.flush()
                 entities.append(assignments[0])
@@ -119,7 +149,12 @@ async def graph(engine, *, packages=True, bookings=True):
             snapshots.append((entry.id, entry.payload))
         await session.commit()
         if assignments:
-            await ConflictService(session).refresh_conflicts(person.id)
+            initial_conflicts = await ConflictService(session).refresh_conflicts(
+                person.id
+            )
+            assert initial_conflicts, (
+                "Fixture must include persisted conflicts before deletion"
+            )
         return SimpleNamespace(
             own=own.id,
             other=other.id,
@@ -133,6 +168,7 @@ async def graph(engine, *, packages=True, bookings=True):
             person=person.id,
             baseline=baseline.id,
             snapshots=snapshots,
+            kept_bookings=[(a.id, snapshot_payload(a)) for a in assignments[1:]],
         )
 
 
@@ -150,12 +186,25 @@ async def assert_kept(engine, data):
 
 
 @pytest.mark.parametrize(
-    "packages,bookings", [(False, False), (True, False), (True, True)]
+    "packages,bookings,infrastructure,adjacent",
+    [
+        (False, False, False, False),
+        (True, False, False, False),
+        (True, True, False, False),
+        (True, True, True, False),
+        (True, True, True, True),
+    ],
 )
 async def test_project_delete_cleans_live_graph_and_preserves_snapshots(
-    resource_database, packages, bookings
+    resource_database, packages, bookings, infrastructure, adjacent
 ):
-    data = await graph(resource_database, packages=packages, bookings=bookings)
+    data = await graph(
+        resource_database,
+        packages=packages,
+        bookings=bookings,
+        infrastructure=infrastructure,
+        adjacent=adjacent,
+    )
     async with client_for(resource_database, data.admin) as client:
         response = await client.delete(f"/api/projects/{data.own}")
     assert response.status_code == 204, response.text
@@ -187,15 +236,43 @@ async def test_project_delete_cleans_live_graph_and_preserves_snapshots(
                     sa.select(m.Conflict).where(m.Conflict.resource_id == data.person)
                 )
             ).all()
-            assert len(conflicts) == 1 and conflicts[0].total_assigned_percent == 120
-            links = (
-                await session.scalars(
-                    sa.select(m.ConflictAssignment).where(
-                        m.ConflictAssignment.conflict_id == conflicts[0].id
-                    )
+            if infrastructure and adjacent:
+                assert conflicts == []
+            else:
+                assert len(conflicts) == 1
+                assert conflicts[0].total_assigned_percent == (
+                    200 if infrastructure else 120
                 )
-            ).all()
-            assert {link.assignment_id for link in links} == set(data.assignments[1:])
+                if infrastructure:
+                    assert conflicts[0].start_at == datetime(2026, 1, 5, 9, tzinfo=UTC)
+                    assert conflicts[0].end_at == datetime(2026, 1, 5, 10, tzinfo=UTC)
+                links = (
+                    await session.scalars(
+                        sa.select(m.ConflictAssignment).where(
+                            m.ConflictAssignment.conflict_id == conflicts[0].id
+                        )
+                    )
+                ).all()
+                assert {link.assignment_id for link in links} == set(
+                    data.assignments[1:]
+                )
+            # Every surviving booking and historical snapshot retains its exact values.
+            for aid, (_eid, payload) in zip(
+                data.assignments[1:], data.kept_bookings, strict=True
+            ):
+                assert snapshot_payload(await session.get(m.Assignment, aid)) == payload
+            orphaned = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(m.ConflictAssignment)
+                .outerjoin(
+                    m.Conflict, m.Conflict.id == m.ConflictAssignment.conflict_id
+                )
+                .outerjoin(
+                    m.Assignment, m.Assignment.id == m.ConflictAssignment.assignment_id
+                )
+                .where(sa.or_(m.Conflict.id.is_(None), m.Assignment.id.is_(None)))
+            )
+            assert orphaned == 0
 
 
 async def test_work_package_delete_uses_same_audited_cleanup(resource_database):
@@ -214,10 +291,12 @@ async def test_work_package_delete_uses_same_audited_cleanup(resource_database):
             assert await session.get(WorkPackageDependency, eid) is None
 
 
+@pytest.mark.parametrize("infrastructure", [False, True])
 async def test_failed_delete_rolls_back_plan_scope_conflicts_and_audit(
     resource_database,
+    infrastructure,
 ):
-    data = await graph(resource_database)
+    data = await graph(resource_database, infrastructure=infrastructure)
     async with AsyncSession(resource_database) as session:
         before = list(
             (
@@ -227,6 +306,15 @@ async def test_failed_delete_rolls_back_plan_scope_conflicts_and_audit(
             ).all()
         )
         conflict_ids = {c.id for c in before}
+        before_links = {
+            (link.conflict_id, link.assignment_id)
+            for link in (await session.scalars(sa.select(m.ConflictAssignment))).all()
+        }
+        before_bookings = {
+            a.id: snapshot_payload(a)
+            for a in (await session.scalars(sa.select(m.Assignment))).all()
+        }
+        before_audit = set((await session.scalars(sa.select(m.AuditLog.id))).all())
 
     def fail_after_flush(session, *_):
         project = session.info.get("delete_fault")
@@ -258,6 +346,20 @@ async def test_failed_delete_rolls_back_plan_scope_conflicts_and_audit(
             data.other,
         ]
         assert await session.get(m.Assignment, data.assignments[0]) is not None
+        assert {
+            a.id: snapshot_payload(a)
+            for a in (await session.scalars(sa.select(m.Assignment))).all()
+        } == before_bookings
+        assert {
+            (link.conflict_id, link.assignment_id)
+            for link in (await session.scalars(sa.select(m.ConflictAssignment))).all()
+        } == before_links
+        assert (
+            set((await session.scalars(sa.select(m.AuditLog.id))).all()) == before_audit
+        )
+        for dependency in data.dependencies:
+            assert await session.get(WorkPackageDependency, dependency) is not None
+        assert await session.get(m.WorkPackageRequirement, data.requirement) is not None
         assert (
             set(
                 (
