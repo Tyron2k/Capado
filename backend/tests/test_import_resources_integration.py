@@ -32,8 +32,8 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import func, select
 
 from app.models.resource import PersonalResource
 from app.models.resource_group import ResourceGroup

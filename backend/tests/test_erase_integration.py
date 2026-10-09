@@ -20,8 +20,8 @@ from datetime import UTC, date, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import func, select
 
 from app.models.absence import Absence, AbsenceReason, AbsenceStatus
 from app.models.assignment import Assignment
@@ -99,7 +99,7 @@ async def _seed_person(
             entity_id=person.id,
             action="updated",
             changes={"name": {"from": "Old", "to": name}},
-            created_at=_now(),
+            recorded_at=_now(),
         )
     )
     await session.flush()

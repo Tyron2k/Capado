@@ -14,14 +14,15 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.absence import Absence
 from app.models.assignment import Assignment
 from app.models.resource import PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.skill import PersonalResourceSkill, Skill, SkillAttribute
+from app.schemas.suggestion import AvailabilityStatus
 from app.services.capacity_service import BASE_CAPACITY_PERCENT
 
 
@@ -33,7 +34,9 @@ class ResourceSuggestion:
     resource_name: str
     qualification_summary: str
     department: str
-    availability_status: str  # "available" | "partially_available" | "unavailable"
+    availability_status: (
+        AvailabilityStatus  # "available" | "partially_available" | "unavailable"
+    )
     average_free_capacity: float  # Average free percent/day
     reason: str  # Explanation of suitability
 
@@ -302,7 +305,7 @@ class SuggestionService:
         self,
         daily_free_capacities: list[float],
         allocation_percent: float,
-    ) -> str:
+    ) -> AvailabilityStatus:
         """Classify the availability status based on daily free capacity.
 
         Args:

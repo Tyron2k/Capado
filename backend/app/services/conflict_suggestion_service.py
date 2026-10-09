@@ -12,12 +12,13 @@ from datetime import date, datetime, time, timedelta
 from typing import cast
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment, ConflictCause
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.schemas.conflict_suggestion import SuggestionType
 from app.services.time_zone import (
     local_date,
     local_time,
@@ -35,7 +36,7 @@ from app.services.working_time_service import (
 class ResolutionSuggestion:
     """A single suggestion for resolving a conflict."""
 
-    type: str
+    type: SuggestionType
     """One of: shift_forward, shift_backward, reduce_allocation, swap_resource,
     shift_into_window."""
 
@@ -78,9 +79,9 @@ def _shift_booking(
 class ConflictSuggestionService:
     """Generate resolution suggestions for a conflict."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession | None):
         """Initialize with a database session and empty preload caches."""
-        self.session = session
+        self._session = session
         self._preloaded = False
         self._wp_name_cache: dict[UUID, str] = {}
         self._preloaded_conflict: Conflict | None = None
@@ -92,6 +93,15 @@ class ConflictSuggestionService:
         self._preloaded_wp_requirements: dict[UUID, set[UUID]] | None = None
         self._preloaded_resource_skills: dict[UUID, set[UUID]] | None = None
         self._preloaded_candidate_assignments: list[Assignment] | None = None
+
+    @property
+    def session(self) -> AsyncSession:
+        """Require a database only for queries, keeping preloaded calculations independent."""
+        if self._session is None:
+            raise RuntimeError(
+                "A preloaded suggestion service cannot query the database"
+            )
+        return self._session
 
     @classmethod
     def from_data(
@@ -223,7 +233,7 @@ class ConflictSuggestionService:
         skills_by_resource: dict[UUID, set[UUID]] = {
             cid: set() for cid in candidate_ids
         }
-        # Cast rather than annotate: scalars() genuinely returns Sequence[SQLModel] here,
+        # Cast rather than annotate: scalars() genuinely returns a typed resource sequence here,
         # because the select was built from a union of two model classes and the checker cannot
         # narrow it. Annotating it as the concrete union is a false statement that mypy rejects;
         # the cast says "I know more than the checker does" in the one place that is true, and
@@ -669,7 +679,7 @@ class ConflictSuggestionService:
             WorkPackageRequirement.skill_attribute_id.is_not(None),
         )
         result = await self.session.execute(stmt)
-        wp_skills = {row[0] for row in result.all()}
+        wp_skills = {row[0] for row in result.all() if row[0] is not None}
         if wp_skills:
             return wp_skills
 

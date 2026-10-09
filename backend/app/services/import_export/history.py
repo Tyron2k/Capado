@@ -6,6 +6,9 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import models as m
+from app.schemas.transfer.audit import AuditLogTransfer
+from app.schemas.transfer.baseline import BaselineEntryTransfer, BaselineTransfer
+from app.schemas.transfer.user import UserTransfer
 
 from .common import ImportResult
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -19,18 +22,24 @@ from .csv_storage import (
 CSV_AREA = CsvArea(
     "history",
     (
-        entity(m.Baseline, "id name note created_by is_current created_at"),
+        entity(
+            m.Baseline,
+            "id name note created_by is_current created_at",
+            validation_model=BaselineTransfer,
+        ),
         entity(
             m.BaselineEntry,
             "id baseline_id entity_type entity_id payload",
             json_columns=("payload",),
             existing_by_id=True,
+            validation_model=BaselineEntryTransfer,
         ),
         entity(
             m.AuditLog,
             "id entity_type entity_id action actor_id reason changes recorded_at",
             json_columns=("changes",),
             existing_by_id=True,
+            validation_model=AuditLogTransfer,
         ),
     ),
     ("Author Email", "Actor Email"),
@@ -39,7 +48,11 @@ CSV_AREA = CsvArea(
 
 async def load_export(session: AsyncSession) -> dict[str, list[dict]]:
     """Read this area's approved data and the references needed by its exporter."""
-    return await load_data(session, CSV_AREA.entities + (entity(m.User, "id email"),))
+    return await load_data(
+        session,
+        CSV_AREA.entities
+        + (entity(m.User, "id email", validation_model=UserTransfer),),
+    )
 
 
 def export_csv(data: dict[str, list[dict]]) -> bytes:
@@ -220,7 +233,8 @@ def validate_source_references(batches: tuple[CsvBatch, ...]) -> None:
 async def write_import_marker(session: AsyncSession, context: ImportContext) -> None:
     """Record the successful transfer inside its owning transaction."""
     from sqlalchemy import insert
-    from sqlmodel import SQLModel
+
+    from app.models.base import ORMModel, column_values
 
     marker = m.AuditLog(
         entity_type="csv_migration" if context.complete else "csv_import",
@@ -232,5 +246,5 @@ async def write_import_marker(session: AsyncSession, context: ImportContext) -> 
         else "CSV-Datenbereich vollständig geprüft und übernommen.",
     )
     await session.execute(
-        insert(SQLModel.metadata.tables["audit_log"]).values(**marker.model_dump())
+        insert(ORMModel.metadata.tables["audit_log"]).values(**column_values(marker))
     )

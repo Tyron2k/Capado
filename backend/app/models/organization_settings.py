@@ -1,4 +1,4 @@
-"""SQLModel entity for organization-wide application settings (branding).
+"""SQLAlchemy entity for organization-wide application settings (branding).
 
 Renamed from ``TenantSettings`` per ADR-003: this deployment serves exactly
 one organization, and the old name implied a multi-tenancy model the project
@@ -9,7 +9,11 @@ from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-from sqlmodel import Column, Field, SQLModel, UniqueConstraint
+from sqlalchemy import UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -17,7 +21,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class OrganizationSettings(SQLModel, table=True):
+class OrganizationSettings(ORMModel, kw_only=True, eq=False):
     """Single-row table holding organization-wide branding settings.
 
     Enforced as a singleton via a unique constraint on ``singleton_key``
@@ -79,61 +83,110 @@ class OrganizationSettings(SQLModel, table=True):
         UniqueConstraint("singleton_key", name="uq_organization_settings_singleton"),
     )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    company_name: str = Field(default="Capado", max_length=255, nullable=False)
-    company_subtitle: str = Field(default="", max_length=255, nullable=False)
-    logo_url: str = Field(default="", max_length=1024, nullable=False)
-    primary_color: str = Field(default="blue", max_length=50, nullable=False)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    company_name: Mapped[str] = mapped_column(
+        sa.String(255), nullable=False, default="Capado"
+    )
+    company_subtitle: Mapped[str] = mapped_column(
+        sa.String(255), nullable=False, default=""
+    )
+    logo_url: Mapped[str] = mapped_column(sa.String(1024), nullable=False, default="")
+    primary_color: Mapped[str] = mapped_column(
+        sa.String(50), nullable=False, default="blue"
+    )
     # Organization-wide IANA zone for displayed and entered timestamps. The
     # historic availability calendars remain Europe/Berlin local-clock rules.
     # Instants in the database are stored in UTC independently of this setting.
-    time_zone: str = Field(default="Europe/Berlin", max_length=64, nullable=False)
+    time_zone: Mapped[str] = mapped_column(
+        sa.String(64), nullable=False, default="Europe/Berlin"
+    )
     # 24 months as the default: long enough to settle a dispute about who promised
     # what, short enough not to accumulate behavioural data indefinitely. Capped at
     # 600 to keep "effectively forever" expressed as 0 rather than as a huge number.
-    audit_retention_months: int = Field(default=24, ge=0, le=600, nullable=False)
+    audit_retention_months: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=24
+    )
     # DISABLED by default, unlike the audit log. An audit entry accumulates as a side
     # effect of working; a baseline is something somebody deliberately froze because
     # that state mattered. Losing the state a commitment was measured against by
     # omission would be worse than keeping it (see baseline_retention).
-    baseline_retention_months: int = Field(default=0, ge=0, le=600, nullable=False)
+    baseline_retention_months: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=0
+    )
     # Digest thresholds. Configurable because the right numbers depend on the operation:
     # a rail workshop planning in quarters and a job shop planning in days do not want the
     # same horizon, and hard-coding either would make the digest useless for the other.
-    digest_horizon_days: int = Field(default=90, ge=1, le=730, nullable=False)
-    digest_critical_days: int = Field(default=14, ge=0, le=365, nullable=False)
-    digest_warning_days: int = Field(default=45, ge=0, le=730, nullable=False)
+    digest_horizon_days: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=90
+    )
+    digest_critical_days: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=14
+    )
+    digest_warning_days: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=45
+    )
     # A digest nobody finishes reading is a digest nobody reads. The excess is reported as
     # a count rather than silently dropped.
-    digest_max_findings: int = Field(default=100, ge=1, le=1000, nullable=False)
+    digest_max_findings: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=100
+    )
     # First still-editable day. NULL means no freeze. EXCLUSIVE by name and by behaviour:
     # "before" rather than "until", because "until" reads inclusive to most people and an
     # off-by-one in a permission check surfaces as an argument, not as an error.
-    planning_freeze_before: date | None = Field(default=None, nullable=True)
+    planning_freeze_before: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, default=None
+    )
     # ON by default, unlike most new behaviour here. The setting it makes real (audit
     # retention) is already configured and already promised in the compliance document;
     # leaving the scheduler off by default would preserve the exact discrepancy being fixed.
-    scheduler_enabled: bool = Field(default=True, nullable=False)
+    scheduler_enabled: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, default=True
+    )
     # Hour after which maintenance may run, in the PROCESS clock — normally UTC in a
     # container. No timezone setting pretends otherwise; an operator wanting 02:00 local has
     # to account for the offset.
-    maintenance_hour: int = Field(default=2, ge=0, le=23, nullable=False)
+    maintenance_hour: Mapped[int] = mapped_column(
+        sa.Integer(), nullable=False, default=2
+    )
     # Mail path for pushing the digest. OFF by default: a configuration that starts sending the
     # moment it is saved would send a first digest to whatever is in the recipient field.
-    smtp_enabled: bool = Field(default=False, nullable=False)
-    smtp_host: str = Field(default="", max_length=255, nullable=False)
-    smtp_port: int = Field(default=587, ge=1, le=65535, nullable=False)
-    smtp_use_tls: bool = Field(default=True, nullable=False)
-    smtp_username: str = Field(default="", max_length=255, nullable=False)
+    smtp_enabled: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, default=False
+    )
+    smtp_host: Mapped[str] = mapped_column(sa.String(255), nullable=False, default="")
+    smtp_port: Mapped[int] = mapped_column(sa.Integer(), nullable=False, default=587)
+    smtp_use_tls: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, default=True
+    )
+    smtp_username: Mapped[str] = mapped_column(
+        sa.String(255), nullable=False, default=""
+    )
     # NEVER returned by the API — the read schema exposes a boolean instead. Stored in plaintext
     # as a documented decision, see migration 024 for the alternatives that were rejected.
-    smtp_password: str = Field(default="", max_length=512, nullable=False)
-    smtp_from_address: str = Field(default="", max_length=255, nullable=False)
-    digest_recipients: str = Field(default="", max_length=2000, nullable=False)
-    logo_data: bytes | None = Field(
-        default=None,
-        sa_column=Column(sa.LargeBinary, nullable=True),
+    smtp_password: Mapped[str] = mapped_column(
+        sa.String(512), nullable=False, default=""
     )
-    logo_mime_type: str | None = Field(default=None, max_length=100, nullable=True)
-    singleton_key: str = Field(default="default", max_length=10, nullable=False)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    smtp_from_address: Mapped[str] = mapped_column(
+        sa.String(255), nullable=False, default=""
+    )
+    digest_recipients: Mapped[str] = mapped_column(
+        sa.String(2000), nullable=False, default=""
+    )
+    logo_data: Mapped[bytes | None] = mapped_column(
+        sa.LargeBinary, nullable=True, default=None
+    )
+    logo_mime_type: Mapped[str | None] = mapped_column(
+        sa.String(100), nullable=True, default=None
+    )
+    singleton_key: Mapped[str] = mapped_column(
+        sa.String(10), nullable=False, default="default"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )

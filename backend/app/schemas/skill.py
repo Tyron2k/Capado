@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas import ResponseModel
+
 # --- Skill Schemas ---
 
 
@@ -19,7 +21,7 @@ class SkillCreate(BaseModel):
     )
 
 
-class SkillResponse(BaseModel):
+class SkillResponse(ResponseModel):
     """Response schema for a skill."""
 
     id: UUID
@@ -29,7 +31,7 @@ class SkillResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class SkillWithAttributesResponse(BaseModel):
+class SkillWithAttributesResponse(ResponseModel):
     """Response schema for a skill including its attributes."""
 
     id: UUID
@@ -51,7 +53,7 @@ class SkillAttributeCreate(BaseModel):
     )
 
 
-class SkillAttributeResponse(BaseModel):
+class SkillAttributeResponse(ResponseModel):
     """Response schema for a skill attribute."""
 
     id: UUID
@@ -75,7 +77,7 @@ class ResourceSkillAssignmentCreate(BaseModel):
     level: int | None = Field(default=None, ge=1, le=5)
 
 
-class ResourceSkillAssignmentResponse(BaseModel):
+class ResourceSkillAssignmentResponse(ResponseModel):
     """Response schema for a resource skill assignment."""
 
     id: UUID
@@ -135,7 +137,7 @@ class ResourceSkillBulkUpdate(BaseModel):
 # --- Resource Search Schemas ---
 
 
-class ResourceSearchResult(BaseModel):
+class ResourceSearchResult(ResponseModel):
     """Response schema for a resource in the skill-based search."""
 
     id: UUID

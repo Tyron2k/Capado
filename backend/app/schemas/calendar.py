@@ -14,6 +14,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
+from app.schemas import ResponseModel
+
 MINUTES_PER_DAY = 1440
 
 
@@ -34,7 +36,7 @@ class SiteUpdate(BaseModel):
     is_active: bool | None = None
 
 
-class SiteResponse(BaseModel):
+class SiteResponse(ResponseModel):
     """Response schema for a site."""
 
     id: UUID
@@ -67,7 +69,7 @@ class HolidayUpdate(BaseModel):
     working_minutes: int | None = Field(default=None, ge=0, le=MINUTES_PER_DAY)
 
 
-class HolidayResponse(BaseModel):
+class HolidayResponse(ResponseModel):
     """Response schema for a calendar exception."""
 
     id: UUID
@@ -113,7 +115,7 @@ class WorkWeekProfileUpdate(BaseModel):
     is_default: bool | None = None
 
 
-class WorkWeekProfileResponse(BaseModel):
+class WorkWeekProfileResponse(ResponseModel):
     """Response schema for a week profile."""
 
     id: UUID
@@ -156,7 +158,7 @@ class ResourceWorkProfileCreate(BaseModel):
         return self
 
 
-class ResourceWorkProfileResponse(BaseModel):
+class ResourceWorkProfileResponse(ResponseModel):
     """Response schema for a profile binding."""
 
     id: UUID
@@ -204,7 +206,7 @@ class AvailabilityWindowCreate(BaseModel):
         return self
 
 
-class AvailabilityWindowResponse(BaseModel):
+class AvailabilityWindowResponse(ResponseModel):
     """Response schema for an availability window."""
 
     id: UUID

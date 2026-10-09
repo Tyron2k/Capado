@@ -44,6 +44,10 @@ beforeAll(() => {
 })
 
 const assignment = {
+  project_id: null,
+  project_name: null,
+  resource_name: null,
+  work_package_name: null,
   id: 'a1',
   resource_id: 'r1',
   resource_type: 'personal' as const,
@@ -89,6 +93,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(getConflictSuggestions).mockResolvedValue([
     {
+      new_allocation_percent: null,
+      new_end_at: null,
+      new_start_at: null,
+      target_resource_id: null,
+      target_resource_name: null,
       type: 'shift_forward',
       assignment_id: 'a1',
       description: 'shift',

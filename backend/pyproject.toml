@@ -12,7 +12,6 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.143.0",
     "uvicorn[standard]==0.54.0",  # CLI entry point: uv run uvicorn app.main:app
-    "sqlmodel==0.0.48",
     "asyncpg==0.32.0",  # Engine driver loaded via postgresql+asyncpg:// URI
     "sqlalchemy[asyncio]==2.1.4",
     "alembic==1.20.0",
@@ -106,35 +105,6 @@ warn_unused_ignores = true
 no_implicit_optional = true
 check_untyped_defs = true
 
-# These five codes are switched off because SQLModel annotates a column as its
-# PYTHON type rather than as an InstrumentedAttribute. `Assignment.start_date`
-# is therefore `date | None` to a checker, so every query expression built from
-# it looks invalid:
-#
-#     Assignment.resource_id.in_(ids)      -> "UUID" has no attribute "in_"
-#     Assignment.start_date <= end         -> unsupported operand date/None
-#     Field(..., sa_column=Column(...))    -> no matching overload
-#
-# This is a consequence of the modelling style, not a gap in the tool: pyright
-# and ty report the same, because the annotation genuinely says `date | None`.
-# The only real fix is migrating the models to SQLAlchemy 2.0 `Mapped[...]` /
-# `mapped_column(...)`, which means giving up SQLModel's field syntax across 24
-# models — a deliberate decision, not a side effect of adding a linter.
-#
-# Measured cost of switching them off: 246 findings drop to 35, and of those 35
-# roughly a third were genuine (a WorkPackage | None assigned to a WorkPackage,
-# an Ellipsis sentinel with no matching annotation, several variables reused for
-# two different resource types). Everything the codes below still catch —
-# call-arg, assignment, var-annotated, return-value, name-defined, unreachable —
-# fires on real code rather than on the ORM.
-disable_error_code = [
-    "attr-defined",
-    "arg-type",
-    "call-overload",
-    "union-attr",
-    "operator",
-]
-
 [[tool.mypy.overrides]]
 # Alembic migrations are excluded from ruff too (see .pre-commit-config.yaml);
 # they are generated-then-edited scripts, not application code.
@@ -159,8 +129,3 @@ dev = [
     "mypy==2.4.0",  # Type check — runs as its own CI job, see .github/workflows/ci.yml
     "types-openpyxl>=3.1.5",  # Stubs for the import/export workbook writers
 ]
-
-# Typed ORM pilot: legacy SQLModel operator exceptions do not apply here.
-[[tool.mypy.overrides]]
-module = ["app.models.base", "app.models.resource_group"]
-enable_error_code = ["attr-defined", "arg-type", "call-overload", "union-attr", "operator"]

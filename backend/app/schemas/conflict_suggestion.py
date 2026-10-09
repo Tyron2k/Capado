@@ -1,15 +1,24 @@
 """Pydantic schemas for conflict resolution suggestions."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from app.schemas import ResponseModel
+
+SuggestionType = Literal[
+    "shift_forward",
+    "shift_backward",
+    "shift_into_window",
+    "reduce_allocation",
+    "swap_resource",
+]
 
 
-class ConflictSuggestionResponse(BaseModel):
+class ConflictSuggestionResponse(ResponseModel):
     """A single resolution suggestion for a conflict."""
 
-    type: str  # shift_forward, shift_backward, shift_into_window, reduce_allocation, swap_resource
+    type: SuggestionType
     assignment_id: UUID
     description: str
     shift_days: int | None = None

@@ -40,6 +40,12 @@ Navigieren Sie zu *Projekte* und klicken Sie auf "Neues Projekt". Geben Sie Name
 
 Öffnen Sie das Projekt und erstellen Sie Arbeitspakete mit Start- und Enddatum.
 
+Die Übersichten für Personen und Infrastruktur bieten Suche nach Name, Gruppe und Standort,
+Sortierung, Gruppen- und Standortfilter, eine Ansicht nur mit Konflikten sowie eine Spaltenauswahl.
+Die Auswahl gilt für die aktuell gefilterten Zeilen und kann die Ansicht einschränken oder aufgehoben
+werden. Die Zeilenaktionen öffnen weiterhin Qualifikationen, Abwesenheiten, Wochenprofile bzw.
+Betriebszeiten und erlauben Änderungen entsprechend deinen Berechtigungen.
+
 ### 4. Ressourcen zuweisen
 
 Unter *Planung* können Sie Ressourcen per Drag & Drop oder über das Formular Arbeitspaketen zuweisen.

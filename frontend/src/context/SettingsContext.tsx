@@ -68,6 +68,10 @@ const DEFAULT_PREFS: UserPreferences = {
 
 const DEFAULT_BRANDING: TenantSettings = {
   company_name: 'Capado',
+  digest_horizon_days: 90,
+  digest_critical_days: 14,
+  digest_warning_days: 45,
+  digest_max_findings: 100,
   company_subtitle: '',
   logo_url: '',
   primary_color: 'blue',

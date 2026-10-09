@@ -3,8 +3,8 @@
 from datetime import date, datetime
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.assignment import Assignment
 from app.models.calendar import WorkWeekProfile

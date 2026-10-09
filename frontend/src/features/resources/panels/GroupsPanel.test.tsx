@@ -62,7 +62,14 @@ beforeAll(() => {
 })
 
 function group(id: string, name: string): ResourceGroup {
-  return { id, name, resource_type: 'personal', parent_id: null } as ResourceGroup
+  return {
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    id,
+    name,
+    resource_type: 'personal',
+    parent_id: null,
+  } as ResourceGroup
 }
 
 function renderPanel() {

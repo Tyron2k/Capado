@@ -1,3 +1,7 @@
+import type { ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * What the signed-in person may read about themselves.
  *
@@ -7,18 +11,8 @@
  */
 
 import apiClient from './client'
-import type { Absence } from './absences'
-import type { Assignment } from '../types/assignment'
-import type { ResourceSkillAssignment } from '../types/skill'
 
-export interface MyPlan {
-  resource_id: string
-  assignments: Assignment[]
-  assignment_total: number
-  absences: Absence[]
-  absence_total: number
-  skills: ResourceSkillAssignment[]
-}
+export type MyPlan = components['schemas']['MyPlanResponse']
 
 /** Raised when the account is not linked to a scheduled person (HTTP 409). */
 export class NoLinkedResourceError extends Error {
@@ -41,7 +35,7 @@ export async function getMyPlan(): Promise<MyPlan> {
     // real URL. Without it the request is caught by the frontend's catch-all route, which answers 200
     // with index.html — a "successful" response whose body has none of these fields, so the page
     // crashes on plan.assignments.length instead of failing visibly.
-    const response = await apiClient.get<MyPlan>('/api/me/plan')
+    const response = await apiClient.get<ApiResponse<'/api/me/plan', 'get'>>('/api/me/plan')
     return response.data
   } catch (error) {
     if (

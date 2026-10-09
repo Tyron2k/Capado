@@ -2,17 +2,18 @@
 
 import math
 from datetime import UTC, date, datetime
+from typing import NotRequired, TypedDict
 from uuid import UUID
 
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app import models as m
 from app.models.assignment import Assignment
 from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
+from app.schemas.transfer.assignment import AssignmentTransfer
 from app.services.time_zone import local_date, local_wall_time_to_utc, planning_zone
 
 from .common import ImportResult, _parse_header, check_import_conflicts
@@ -23,6 +24,17 @@ from .csv_storage import (
     validate_ranges,
     write_area,
 )
+
+
+class AssignmentFields(TypedDict):
+    """Only the five supported interval fields can reach persistence."""
+
+    start_date: NotRequired[date]
+    end_date: NotRequired[date]
+    allocation_percent: NotRequired[float]
+    start_at: NotRequired[datetime]
+    end_at: NotRequired[datetime]
+
 
 _HEADERS = (
     "Project",
@@ -220,7 +232,7 @@ async def import_assignments(session: AsyncSession, rows: list[tuple]) -> Import
             continue
         resource, resource_type = candidates[0]
 
-        fields: dict[str, date | datetime | float]
+        fields: AssignmentFields
         try:
             if resource_type == ResourceType.infrastructure:
                 start_at = _infrastructure_time(cell("start"), hour=6)
@@ -314,6 +326,7 @@ CSV_AREA = CsvArea(
             "id resource_id resource_type work_package_id start_date end_date allocation_percent start_at end_at created_at updated_at",
             reference_tables=("personal_resources", "infrastructure_resources"),
             existing_by_id=True,
+            validation_model=AssignmentTransfer,
         ),
     ),
 )

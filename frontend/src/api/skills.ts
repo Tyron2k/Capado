@@ -1,3 +1,6 @@
+import { allPages } from './pagination'
+import type { ApiBody, ApiQuery, ApiResponse } from './contracts'
+
 /**
  * API client for the unified skill system (skills, attributes, assignments, search).
  */
@@ -12,43 +15,45 @@ import type {
 } from '../types/skill'
 
 /** Response shape for paginated skills with attributes. */
-interface SkillsWithAttributesResponse {
-  items: SkillWithAttributes[]
-  total: number
-  limit: number
-  offset: number
-}
 
 // --- Skills ---
 
 /** Fetch all skills with their attributes (paginated, returns all by default). */
 export async function getSkillsWithAttributes(
-  resourceType?: string,
+  resourceType?: ApiQuery<'/api/skills/with-attributes', 'get'>['resource_type'],
 ): Promise<SkillWithAttributes[]> {
-  const params: Record<string, string | number> = { limit: 500 }
-  if (resourceType) params.resource_type = resourceType
-  const response = await apiClient.get<SkillsWithAttributesResponse>(
-    '/api/skills/with-attributes',
-    { params },
-  )
-  return response.data.items
+  return allPages(async (offset) => {
+    const params: ApiQuery<'/api/skills/with-attributes', 'get'> = { limit: 500, offset }
+    if (resourceType) params.resource_type = resourceType
+    const response = await apiClient.get<ApiResponse<'/api/skills/with-attributes', 'get'>>(
+      '/api/skills/with-attributes',
+      { params },
+    )
+    return response.data
+  })
 }
 
 /** Create a new skill. */
-export async function createSkill(data: { name: string; resource_type?: string }): Promise<Skill> {
-  const response = await apiClient.post<Skill>('/api/skills', data)
+export async function createSkill(data: ApiBody<'/api/skills', 'post'>): Promise<Skill> {
+  const response = await apiClient.post<ApiResponse<'/api/skills', 'post'>>('/api/skills', data)
   return response.data
 }
 
 /** Update an existing skill. */
-export async function updateSkill(id: string, data: { name: string }): Promise<Skill> {
-  const response = await apiClient.put<Skill>(`/api/skills/${id}`, data)
+export async function updateSkill(
+  id: string,
+  data: ApiBody<'/api/skills/{skill_id}', 'put'>,
+): Promise<Skill> {
+  const response = await apiClient.put<ApiResponse<'/api/skills/{skill_id}', 'put'>>(
+    `/api/skills/${id}`,
+    data,
+  )
   return response.data
 }
 
 /** Delete a skill. */
 export async function deleteSkill(id: string): Promise<void> {
-  await apiClient.delete(`/api/skills/${id}`)
+  await apiClient.delete<ApiResponse<'/api/skills/{skill_id}', 'delete'>>(`/api/skills/${id}`)
 }
 
 // --- Skill Attributes ---
@@ -56,18 +61,21 @@ export async function deleteSkill(id: string): Promise<void> {
 /** Create a new attribute for a skill. */
 export async function createSkillAttribute(
   skillId: string,
-  data: { name: string },
+  data: ApiBody<'/api/skills/{skill_id}/attributes', 'post'>,
 ): Promise<SkillAttribute> {
-  const response = await apiClient.post<SkillAttribute>(`/api/skills/${skillId}/attributes`, data)
+  const response = await apiClient.post<ApiResponse<'/api/skills/{skill_id}/attributes', 'post'>>(
+    `/api/skills/${skillId}/attributes`,
+    data,
+  )
   return response.data
 }
 
 /** Update an existing skill attribute. */
 export async function updateSkillAttribute(
   attributeId: string,
-  data: { name: string },
+  data: ApiBody<'/api/skills/attributes/{attribute_id}', 'put'>,
 ): Promise<SkillAttribute> {
-  const response = await apiClient.put<SkillAttribute>(
+  const response = await apiClient.put<ApiResponse<'/api/skills/attributes/{attribute_id}', 'put'>>(
     `/api/skills/attributes/${attributeId}`,
     data,
   )
@@ -76,7 +84,9 @@ export async function updateSkillAttribute(
 
 /** Delete a skill attribute. */
 export async function deleteSkillAttribute(attributeId: string): Promise<void> {
-  await apiClient.delete(`/api/skills/attributes/${attributeId}`)
+  await apiClient.delete<ApiResponse<'/api/skills/attributes/{attribute_id}', 'delete'>>(
+    `/api/skills/attributes/${attributeId}`,
+  )
 }
 
 // --- Personal Resource Skills ---
@@ -85,28 +95,22 @@ export async function deleteSkillAttribute(attributeId: string): Promise<void> {
 export async function getPersonalResourceSkills(
   resourceId: string,
 ): Promise<ResourceSkillAssignment[]> {
-  const response = await apiClient.get<ResourceSkillAssignment[]>(
-    `/api/personal-resources/${resourceId}/skills`,
-  )
+  const response = await apiClient.get<
+    ApiResponse<'/api/personal-resources/{resource_id}/skills', 'get'>
+  >(`/api/personal-resources/${resourceId}/skills`)
   return response.data
 }
 
 /** Assign a skill attribute to a personal resource. */
 /** Optional bounds sent when a qualification is added. */
-interface QualificationBounds {
-  valid_from?: string | null
-  valid_until?: string | null
-  level?: number | null
-}
 
 export async function addPersonalResourceSkill(
   resourceId: string,
-  data: { skill_attribute_id: string } & QualificationBounds,
+  data: ApiBody<'/api/personal-resources/{resource_id}/skills', 'post'>,
 ): Promise<ResourceSkillAssignment> {
-  const response = await apiClient.post<ResourceSkillAssignment>(
-    `/api/personal-resources/${resourceId}/skills`,
-    data,
-  )
+  const response = await apiClient.post<
+    ApiResponse<'/api/personal-resources/{resource_id}/skills', 'post'>
+  >(`/api/personal-resources/${resourceId}/skills`, data)
   return response.data
 }
 
@@ -115,7 +119,9 @@ export async function removePersonalResourceSkill(
   resourceId: string,
   assignmentId: string,
 ): Promise<void> {
-  await apiClient.delete(`/api/personal-resources/${resourceId}/skills/${assignmentId}`)
+  await apiClient.delete<
+    ApiResponse<'/api/personal-resources/{resource_id}/skills/{assignment_id}', 'delete'>
+  >(`/api/personal-resources/${resourceId}/skills/${assignmentId}`)
 }
 
 // --- Infrastructure Resource Skills ---
@@ -124,21 +130,20 @@ export async function removePersonalResourceSkill(
 export async function getInfrastructureResourceSkills(
   resourceId: string,
 ): Promise<ResourceSkillAssignment[]> {
-  const response = await apiClient.get<ResourceSkillAssignment[]>(
-    `/api/infrastructure-resources/${resourceId}/skills`,
-  )
+  const response = await apiClient.get<
+    ApiResponse<'/api/infrastructure-resources/{resource_id}/skills', 'get'>
+  >(`/api/infrastructure-resources/${resourceId}/skills`)
   return response.data
 }
 
 /** Assign a skill attribute to an infrastructure resource. */
 export async function addInfrastructureResourceSkill(
   resourceId: string,
-  data: { skill_attribute_id: string } & QualificationBounds,
+  data: ApiBody<'/api/infrastructure-resources/{resource_id}/skills', 'post'>,
 ): Promise<ResourceSkillAssignment> {
-  const response = await apiClient.post<ResourceSkillAssignment>(
-    `/api/infrastructure-resources/${resourceId}/skills`,
-    data,
-  )
+  const response = await apiClient.post<
+    ApiResponse<'/api/infrastructure-resources/{resource_id}/skills', 'post'>
+  >(`/api/infrastructure-resources/${resourceId}/skills`, data)
   return response.data
 }
 
@@ -147,17 +152,18 @@ export async function removeInfrastructureResourceSkill(
   resourceId: string,
   assignmentId: string,
 ): Promise<void> {
-  await apiClient.delete(`/api/infrastructure-resources/${resourceId}/skills/${assignmentId}`)
+  await apiClient.delete<
+    ApiResponse<'/api/infrastructure-resources/{resource_id}/skills/{assignment_id}', 'delete'>
+  >(`/api/infrastructure-resources/${resourceId}/skills/${assignmentId}`)
 }
 
 // --- Resource Search ---
 
 /** Search personal resources by skill qualification. */
-export async function searchByQualification(params: {
-  skill_id?: string
-  skill_attribute_id?: string
-}): Promise<PersonalResourceSearchResult[]> {
-  const response = await apiClient.get<PersonalResourceSearchResult[]>(
+export async function searchByQualification(
+  params: ApiQuery<'/api/personal-resources/search', 'get'>,
+): Promise<PersonalResourceSearchResult[]> {
+  const response = await apiClient.get<ApiResponse<'/api/personal-resources/search', 'get'>>(
     '/api/personal-resources/search',
     { params },
   )
@@ -174,23 +180,21 @@ export async function searchByQualification(params: {
 export async function updatePersonalResourceSkill(
   resourceId: string,
   assignmentId: string,
-  data: QualificationBounds,
+  data: ApiBody<'/api/personal-resources/{resource_id}/skills/{assignment_id}', 'patch'>,
 ): Promise<ResourceSkillAssignment> {
-  const response = await apiClient.patch<ResourceSkillAssignment>(
-    `/api/personal-resources/${resourceId}/skills/${assignmentId}`,
-    data,
-  )
+  const response = await apiClient.patch<
+    ApiResponse<'/api/personal-resources/{resource_id}/skills/{assignment_id}', 'patch'>
+  >(`/api/personal-resources/${resourceId}/skills/${assignmentId}`, data)
   return response.data
 }
 
 export async function updateInfrastructureResourceSkill(
   resourceId: string,
   assignmentId: string,
-  data: QualificationBounds,
+  data: ApiBody<'/api/infrastructure-resources/{resource_id}/skills/{assignment_id}', 'patch'>,
 ): Promise<ResourceSkillAssignment> {
-  const response = await apiClient.patch<ResourceSkillAssignment>(
-    `/api/infrastructure-resources/${resourceId}/skills/${assignmentId}`,
-    data,
-  )
+  const response = await apiClient.patch<
+    ApiResponse<'/api/infrastructure-resources/{resource_id}/skills/{assignment_id}', 'patch'>
+  >(`/api/infrastructure-resources/${resourceId}/skills/${assignmentId}`, data)
   return response.data
 }

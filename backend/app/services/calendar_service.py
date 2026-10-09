@@ -16,12 +16,13 @@ hold no matter who writes:
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.calendar import (
@@ -208,11 +209,34 @@ class CalendarService:
             raise NotFoundError("WorkWeekProfile", profile_id)
         return profile
 
-    async def create_profile(self, **fields: object) -> WorkWeekProfile:
+    async def create_profile(
+        self,
+        name: str,
+        description: str | None = None,
+        monday_minutes: int = 480,
+        tuesday_minutes: int = 480,
+        wednesday_minutes: int = 480,
+        thursday_minutes: int = 480,
+        friday_minutes: int = 480,
+        saturday_minutes: int = 0,
+        sunday_minutes: int = 0,
+        is_default: bool = False,
+    ) -> WorkWeekProfile:
         """Create a week profile, clearing any previous default when claimed."""
-        if fields.get("is_default") is True:
+        if is_default:
             await self._clear_default_profile()
-        profile = WorkWeekProfile(**fields)
+        profile = WorkWeekProfile(
+            name=name,
+            description=description,
+            monday_minutes=monday_minutes,
+            tuesday_minutes=tuesday_minutes,
+            wednesday_minutes=wednesday_minutes,
+            thursday_minutes=thursday_minutes,
+            friday_minutes=friday_minutes,
+            saturday_minutes=saturday_minutes,
+            sunday_minutes=sunday_minutes,
+            is_default=is_default,
+        )
         self.session.add(profile)
         await self.session.commit()
         await refresh_resources(self.session)
@@ -356,7 +380,7 @@ class CalendarService:
         return list(result.scalars().all())
 
     async def create_window(
-        self, resource_id: UUID, weekday: int, start_time: object, end_time: object
+        self, resource_id: UUID, weekday: int, start_time: time, end_time: time
     ) -> InfrastructureAvailabilityWindow:
         """Add an availability window to an infrastructure resource."""
         window = InfrastructureAvailabilityWindow(
@@ -400,4 +424,4 @@ class CalendarService:
         await refresh_resources(
             self.session, [resource_id] if resource_id is not None else None
         )
-        return int(result.rowcount or 0)
+        return int(cast(CursorResult[Any], result).rowcount or 0)

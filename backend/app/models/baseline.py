@@ -1,4 +1,4 @@
-"""SQLModel entities for plan baselines.
+"""SQLAlchemy entities for plan baselines.
 
 A baseline is a frozen snapshot of the schedule — projects, work packages and
 assignments — against which the live plan can be compared. It answers "what did we
@@ -10,7 +10,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-from sqlmodel import Column, Field, SQLModel
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 # What a baseline captures. Absences and working-time configuration are
 # deliberately absent: they are facts about the world rather than statements about
@@ -29,7 +32,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class Baseline(SQLModel, table=True):
+class Baseline(ORMModel, kw_only=True, eq=False):
     """A named, frozen state of the plan.
 
     Creating one does not lock anything. A hard freeze on a live production plan
@@ -48,15 +51,33 @@ class Baseline(SQLModel, table=True):
 
     __tablename__ = "baselines"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=255)
-    note: str | None = Field(default=None, max_length=1000)
-    created_by: UUID | None = Field(default=None, foreign_key="users.id", index=True)
-    is_current: bool = Field(default=False, index=True)
-    created_at: datetime = Field(default_factory=_utcnow, index=True)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    note: Mapped[str | None] = mapped_column(
+        sa.String(1000), nullable=True, default=None
+    )
+    created_by: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(), sa.ForeignKey("users.id"), nullable=True, index=True, default=None
+    )
+    is_current: Mapped[bool] = mapped_column(
+        sa.Boolean(), nullable=False, index=True, default=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        nullable=False,
+        index=True,
+        default_factory=_utcnow,
+        insert_default=_utcnow,
+    )
 
 
-class BaselineEntry(SQLModel, table=True):
+class BaselineEntry(ORMModel, kw_only=True, eq=False):
     """One captured entity inside a baseline.
 
     Rows are immutable. Nothing edits a snapshot: a wrong baseline is superseded by
@@ -72,11 +93,29 @@ class BaselineEntry(SQLModel, table=True):
     """
 
     __tablename__ = "baseline_entries"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "baseline_id", "entity_type", "entity_id", name="uq_baseline_entries_entity"
+        ),
+    )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    baseline_id: UUID = Field(foreign_key="baselines.id", index=True)
-    entity_type: str = Field(max_length=64, index=True)
-    entity_id: UUID = Field(index=True)
-    payload: dict[str, Any] = Field(
-        default_factory=dict, sa_column=Column(sa.JSON, nullable=False)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    baseline_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "baselines.id", name="baseline_entries_baseline_id_fkey", ondelete="CASCADE"
+        ),
+        nullable=False,
+        index=True,
+    )
+    entity_type: Mapped[str] = mapped_column(sa.String(64), nullable=False, index=True)
+    entity_id: Mapped[UUID] = mapped_column(sa.Uuid(), nullable=False, index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        sa.JSON, nullable=False, default_factory=dict, insert_default=dict
     )

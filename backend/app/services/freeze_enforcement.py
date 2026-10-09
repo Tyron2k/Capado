@@ -15,8 +15,8 @@ from __future__ import annotations
 from datetime import date
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.assignment import Assignment
 from app.models.organization_settings import OrganizationSettings

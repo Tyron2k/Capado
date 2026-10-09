@@ -1,9 +1,9 @@
 """Pydantic response schemas for import/export endpoints."""
 
-from pydantic import BaseModel
+from app.schemas import ResponseModel
 
 
-class ImportResultResponse(BaseModel):
+class ImportResultResponse(ResponseModel):
     """Response schema for import operations."""
 
     created: int

@@ -45,6 +45,8 @@ beforeAll(() => {
 })
 
 const assignment = {
+  project_id: null,
+  project_name: null,
   id: 'a1',
   resource_id: 'r1',
   resource_name: 'Original Resource',
@@ -66,7 +68,23 @@ const bucket: ProblemBucket = {
   resource_id: 'r1',
   resource_name: 'Original Resource',
   resource_type: 'personal',
-  assignments: [{ assignment_id: 'a1', work_package_name: 'Test Package' }],
+  assignments: [
+    {
+      allocation_percent: null,
+      end_at: null,
+      end_date: null,
+      project_id: null,
+      project_name: null,
+      resource_id: null,
+      resource_name: null,
+      skill_mismatch: false,
+      start_at: null,
+      start_date: null,
+      work_package_id: null,
+      assignment_id: 'a1',
+      work_package_name: 'Test Package',
+    },
+  ],
   rawAssignments: [assignment],
 }
 
@@ -134,10 +152,7 @@ describe('skill-conflict resource swap', () => {
     fireEvent.click(previewButton)
     expect(await screen.findByText('Konflikte: 0 → 0')).toBeInTheDocument()
     expect(previewAssignment).toHaveBeenCalledWith(
-      expect.objectContaining({
-        assignment_id: 'a1',
-        resource_id: 'r2',
-      }),
+      expect.objectContaining({ assignment_id: 'a1', resource_id: 'r2' }),
     )
     expect(updateAssignment).not.toHaveBeenCalled()
 

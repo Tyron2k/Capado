@@ -3582,7 +3582,7 @@ export interface components {
              * Warnings
              * @default []
              */
-            warnings?: string[];
+            warnings: string[];
         };
         /**
          * AssignmentPreviewRequest
@@ -3632,42 +3632,42 @@ export interface components {
          */
         AssignmentResponse: {
             /** Allocation Percent */
-            allocation_percent?: number | null;
+            allocation_percent: number | null;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
             /** End At */
-            end_at?: string | null;
+            end_at: string | null;
             /** End Date */
-            end_date?: string | null;
+            end_date: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
             /** Project Id */
-            project_id?: string | null;
+            project_id: string | null;
             /** Project Name */
-            project_name?: string | null;
+            project_name: string | null;
             /**
              * Resource Id
              * Format: uuid
              */
             resource_id: string;
             /** Resource Name */
-            resource_name?: string | null;
+            resource_name: string | null;
             resource_type: components["schemas"]["ResourceType"];
             /**
              * Skill Mismatch
              * @default false
              */
-            skill_mismatch?: boolean;
+            skill_mismatch: boolean;
             /** Start At */
-            start_at?: string | null;
+            start_at: string | null;
             /** Start Date */
-            start_date?: string | null;
+            start_date: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -3679,7 +3679,7 @@ export interface components {
              */
             work_package_id: string;
             /** Work Package Name */
-            work_package_name?: string | null;
+            work_package_name: string | null;
         };
         /**
          * AssignmentUpdate
@@ -4038,37 +4038,37 @@ export interface components {
          */
         ConflictAssignmentInfo: {
             /** Allocation Percent */
-            allocation_percent?: number | null;
+            allocation_percent: number | null;
             /**
              * Assignment Id
              * Format: uuid
              */
             assignment_id: string;
             /** End At */
-            end_at?: string | null;
+            end_at: string | null;
             /** End Date */
-            end_date?: string | null;
+            end_date: string | null;
             /** Project Id */
-            project_id?: string | null;
+            project_id: string | null;
             /** Project Name */
-            project_name?: string | null;
+            project_name: string | null;
             /** Resource Id */
-            resource_id?: string | null;
+            resource_id: string | null;
             /** Resource Name */
-            resource_name?: string | null;
+            resource_name: string | null;
             /**
              * Skill Mismatch
              * @default false
              */
-            skill_mismatch?: boolean;
+            skill_mismatch: boolean;
             /** Start At */
-            start_at?: string | null;
+            start_at: string | null;
             /** Start Date */
-            start_date?: string | null;
+            start_date: string | null;
             /** Work Package Id */
-            work_package_id?: string | null;
+            work_package_id: string | null;
             /** Work Package Name */
-            work_package_name?: string | null;
+            work_package_name: string | null;
         };
         /**
          * ConflictCause
@@ -4095,7 +4095,7 @@ export interface components {
              * Assignments
              * @default []
              */
-            assignments?: components["schemas"]["ConflictAssignmentInfo"][];
+            assignments: components["schemas"]["ConflictAssignmentInfo"][];
             /** Available Percent */
             available_percent: number;
             /**
@@ -4114,14 +4114,14 @@ export interface components {
              */
             id: string;
             /** Overload Ratio */
-            overload_ratio?: number | null;
+            overload_ratio: number | null;
             /**
              * Resource Id
              * Format: uuid
              */
             resource_id: string;
             /** Resource Name */
-            resource_name?: string | null;
+            resource_name: string | null;
             resource_type: components["schemas"]["ResourceType"];
             /**
              * Severity
@@ -4149,19 +4149,22 @@ export interface components {
             /** Description */
             description: string;
             /** New Allocation Percent */
-            new_allocation_percent?: number | null;
+            new_allocation_percent: number | null;
             /** New End At */
-            new_end_at?: string | null;
+            new_end_at: string | null;
             /** New Start At */
-            new_start_at?: string | null;
+            new_start_at: string | null;
             /** Shift Days */
-            shift_days?: number | null;
+            shift_days: number | null;
             /** Target Resource Id */
-            target_resource_id?: string | null;
+            target_resource_id: string | null;
             /** Target Resource Name */
-            target_resource_name?: string | null;
-            /** Type */
-            type: string;
+            target_resource_name: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "shift_forward" | "shift_backward" | "shift_into_window" | "reduce_allocation" | "swap_resource";
         };
         /**
          * CustomerCreate
@@ -4191,7 +4194,7 @@ export interface components {
              * @description Folders naming this customer. Shown before a delete, because deleting one clears the link on every folder and project that pointed at it.
              * @default 0
              */
-            folder_count?: number;
+            folder_count: number;
             /**
              * Id
              * Format: uuid
@@ -4208,7 +4211,7 @@ export interface components {
              * @description Projects naming this customer directly, folders aside.
              * @default 0
              */
-            project_count?: number;
+            project_count: number;
             /** Reference */
             reference: string;
         };
@@ -4367,7 +4370,7 @@ export interface components {
          */
         EntityDiffResponse: {
             /** Changes */
-            changes?: {
+            changes: {
                 [key: string]: {
                     [key: string]: unknown;
                 };
@@ -4415,6 +4418,12 @@ export interface components {
             work_profiles: number;
         };
         /**
+         * FindingKind
+         * @description What kind of problem a finding describes.
+         * @enum {string}
+         */
+        FindingKind: "qualification_expiring" | "qualification_expired" | "commitment_at_risk" | "dependency_violated" | "requirement_uncovered";
+        /**
          * FindingResponse
          * @description One finding as sent to the client.
          *
@@ -4429,8 +4438,7 @@ export interface components {
              * Format: date
              */
             due: string;
-            /** Kind */
-            kind: string;
+            kind: components["schemas"]["FindingKind"];
             /**
              * Params
              * @description Substitution values for the sentence selected by 'kind'. Dates are ISO so the client can format them for its own locale.
@@ -4439,13 +4447,12 @@ export interface components {
                 [key: string]: string;
             };
             /** Project Id */
-            project_id?: string | null;
+            project_id: string | null;
             /** Resource Id */
-            resource_id?: string | null;
-            /** Severity */
-            severity: string;
+            resource_id: string | null;
+            severity: components["schemas"]["Severity"];
             /** Work Package Id */
-            work_package_id?: string | null;
+            work_package_id: string | null;
         };
         /**
          * GanttResourceAssignmentSchema
@@ -4599,14 +4606,14 @@ export interface components {
              * Atomic
              * @default false
              */
-            atomic?: boolean;
+            atomic: boolean;
             /**
              * Conflict Check Failed
              * @default false
              */
-            conflict_check_failed?: boolean;
+            conflict_check_failed: boolean;
             /** Conflicts Found */
-            conflicts_found?: number | null;
+            conflicts_found: number | null;
             /** Created */
             created: number;
             /** Errors */
@@ -4646,7 +4653,7 @@ export interface components {
              * Items Affected
              * @description Rows the job touched. 0 means nothing was old enough yet; null means the job did not get far enough to know, which is not the same statement.
              */
-            items_affected?: number | null;
+            items_affected: number | null;
             /** Job Name */
             job_name: string;
             /**
@@ -4654,9 +4661,17 @@ export interface components {
              * Format: date-time
              */
             started_at: string;
-            /** Status */
-            status: string;
+            status: components["schemas"]["JobRunStatus"];
         };
+        /**
+         * JobRunStatus
+         * @description Outcome of one scheduled run.
+         *
+         *     ``running`` is a real persisted state, not a transient one: it is what a killed container
+         *     leaves behind, and treating it as impossible is how a hung job becomes invisible.
+         * @enum {string}
+         */
+        JobRunStatus: "running" | "succeeded" | "failed" | "skipped";
         /**
          * LateWorkPackage
          * @description A work package whose working-day lead time overruns its end date.
@@ -4748,6 +4763,14 @@ export interface components {
             skills: components["schemas"]["ResourceSkillAssignmentResponse"][];
         };
         /**
+         * OIDCStatusResponse
+         * @description Whether the configured identity provider is available for login.
+         */
+        OIDCStatusResponse: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
          * OrganizationSettingsResponse
          * @description Response shape for tenant branding settings (GET /api/settings).
          *
@@ -4781,11 +4804,11 @@ export interface components {
              * Mail Config Errors
              * @default []
              */
-            mail_config_errors?: string[];
+            mail_config_errors: string[];
             /** Maintenance Hour */
             maintenance_hour: number;
             /** Planning Freeze Before */
-            planning_freeze_before?: string | null;
+            planning_freeze_before: string | null;
             /** Primary Color */
             primary_color: string;
             /** Scheduler Enabled */
@@ -4800,7 +4823,7 @@ export interface components {
              * Smtp Password Set
              * @default false
              */
-            smtp_password_set?: boolean;
+            smtp_password_set: boolean;
             /** Smtp Port */
             smtp_port: number;
             /** Smtp Use Tls */
@@ -4991,6 +5014,18 @@ export interface components {
              * Format: uuid
              */
             resource_id: string;
+        };
+        /**
+         * PlanningOverviewResponse
+         * @description Typed combined planning data without duplicating the three domain contracts.
+         */
+        PlanningOverviewResponse: {
+            /** Conflicts */
+            conflicts: components["schemas"]["ConflictResponse"][];
+            /** Mismatched Assignments */
+            mismatched_assignments: components["schemas"]["AssignmentResponse"][];
+            /** Unmet Requirements */
+            unmet_requirements: components["schemas"]["UnmetRequirementResponse"][];
         };
         /**
          * PreviewCapacityDay
@@ -5424,9 +5459,9 @@ export interface components {
             /** Quantity */
             quantity: number;
             /** Skill Attribute Id */
-            skill_attribute_id?: string | null;
+            skill_attribute_id: string | null;
             /** Skill Attribute Name */
-            skill_attribute_name?: string | null;
+            skill_attribute_name: string | null;
             /**
              * Skill Id
              * Format: uuid
@@ -5568,7 +5603,7 @@ export interface components {
             /** Name */
             name: string;
             /** Parent Id */
-            parent_id?: string | null;
+            parent_id: string | null;
             /** Resource Type */
             resource_type: string;
             /**
@@ -5596,7 +5631,7 @@ export interface components {
              * Conflict Count
              * @default 0
              */
-            conflict_count?: number;
+            conflict_count: number;
             /**
              * Group Id
              * Format: uuid
@@ -5606,7 +5641,7 @@ export interface components {
              * Group Name
              * @default
              */
-            group_name?: string;
+            group_name: string;
             /**
              * Id
              * Format: uuid
@@ -5617,12 +5652,12 @@ export interface components {
             /** Name */
             name: string;
             /** Site Id */
-            site_id?: string | null;
+            site_id: string | null;
             /**
              * Site Name
              * @default
              */
-            site_name?: string;
+            site_name: string;
         };
         /**
          * ResourceOverviewItem
@@ -5661,7 +5696,7 @@ export interface components {
              * Group Name
              * @default
              */
-            group_name?: string;
+            group_name: string;
             /**
              * Id
              * Format: uuid
@@ -5672,12 +5707,12 @@ export interface components {
             /** Name */
             name: string;
             /** Site Id */
-            site_id?: string | null;
+            site_id: string | null;
             /**
              * Site Name
              * @default
              */
-            site_name?: string;
+            site_name: string;
             /**
              * Updated At
              * Format: date-time
@@ -5732,7 +5767,7 @@ export interface components {
              */
             id: string;
             /** Level */
-            level?: number | null;
+            level: number | null;
             /**
              * Skill Attribute Id
              * Format: uuid
@@ -5746,9 +5781,9 @@ export interface components {
             /** Skill Name */
             skill_name: string;
             /** Valid From */
-            valid_from?: string | null;
+            valid_from: string | null;
             /** Valid Until */
-            valid_until?: string | null;
+            valid_until: string | null;
         };
         /**
          * ResourceSkillBoundsUpdate
@@ -5811,12 +5846,12 @@ export interface components {
          */
         ResourceSuggestion: {
             /** Group Name */
-            group_name?: string | null;
+            group_name: string | null;
             /**
              * Overlapping Assignments
              * @default 0
              */
-            overlapping_assignments?: number;
+            overlapping_assignments: number;
             /**
              * Resource Id
              * Format: uuid
@@ -5835,8 +5870,9 @@ export interface components {
             /**
              * Availability Status
              * @description Availability status: available, partially_available, unavailable
+             * @enum {string}
              */
-            availability_status: string;
+            availability_status: "available" | "partially_available" | "unavailable";
             /**
              * Average Free Capacity
              * @description Average free capacity as percentage
@@ -6018,6 +6054,15 @@ export interface components {
             required: boolean;
         };
         /**
+         * Severity
+         * @description How urgently a finding needs attention.
+         *
+         *     Derived from how soon it bites, never from the kind of problem — see the module
+         *     docstring.
+         * @enum {string}
+         */
+        Severity: "critical" | "warning" | "info";
+        /**
          * SiteCreate
          * @description Request body for creating a site.
          */
@@ -6183,7 +6228,7 @@ export interface components {
              */
             created_at: string;
             /** Description */
-            description?: string | null;
+            description: string | null;
             /**
              * Id
              * Format: uuid
@@ -6195,7 +6240,7 @@ export interface components {
              * Requirement Count
              * @default 0
              */
-            requirement_count?: number;
+            requirement_count: number;
         };
         /**
          * TemplateResponse
@@ -6208,7 +6253,7 @@ export interface components {
              */
             created_at: string;
             /** Description */
-            description?: string | null;
+            description: string | null;
             /**
              * Id
              * Format: uuid
@@ -6220,7 +6265,7 @@ export interface components {
              * Requirements
              * @default []
              */
-            requirements?: components["schemas"]["RequirementResponse"][];
+            requirements: components["schemas"]["RequirementResponse"][];
             /**
              * Updated At
              * Format: date-time
@@ -6249,7 +6294,7 @@ export interface components {
             /** Assigned Quantity */
             assigned_quantity: number;
             /** Attribute Name */
-            attribute_name?: string | null;
+            attribute_name: string | null;
             /**
              * End Date
              * Format: date
@@ -6279,7 +6324,7 @@ export interface components {
              * Suggestions
              * @default []
              */
-            suggestions?: components["schemas"]["ResourceSuggestion"][];
+            suggestions: components["schemas"]["ResourceSuggestion"][];
             /**
              * Work Package Id
              * Format: uuid
@@ -6341,7 +6386,7 @@ export interface components {
              * Must Change Password
              * @default false
              */
-            must_change_password?: boolean;
+            must_change_password: boolean;
             /** Name */
             name: string;
             /** Role */
@@ -6382,13 +6427,13 @@ export interface components {
             /** Name */
             name: string;
             /** Resource Id */
-            resource_id?: string | null;
+            resource_id: string | null;
             /** Role */
             role: string;
             /** Scope Group Ids */
-            scope_group_ids?: string[] | null;
+            scope_group_ids: string[] | null;
             /** Scope Project Ids */
-            scope_project_ids?: string[] | null;
+            scope_project_ids: string[] | null;
             /**
              * Updated At
              * Format: date-time
@@ -6401,9 +6446,9 @@ export interface components {
          */
         UserScopes: {
             /** Scope Group Ids */
-            scope_group_ids?: string[] | null;
+            scope_group_ids: string[] | null;
             /** Scope Project Ids */
-            scope_project_ids?: string[] | null;
+            scope_project_ids: string[] | null;
         };
         /**
          * UserUpdateRequest
@@ -6755,7 +6800,7 @@ export interface components {
              * Weekly Minutes
              * @default 0
              */
-            weekly_minutes?: number;
+            weekly_minutes: number;
         };
         /**
          * WorkWeekProfileUpdate
@@ -7114,7 +7159,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PlanningOverviewResponse"];
                 };
             };
         };
@@ -7526,9 +7571,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["OIDCStatusResponse"];
                 };
             };
         };

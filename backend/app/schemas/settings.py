@@ -5,8 +5,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas import ResponseModel
 
-class OrganizationSettingsResponse(BaseModel):
+
+class OrganizationSettingsResponse(ResponseModel):
     """Response shape for tenant branding settings (GET /api/settings).
 
     Includes a boolean indicating whether an uploaded logo exists in the DB,

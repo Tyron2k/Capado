@@ -1,21 +1,14 @@
+import type { ApiBody, ApiResponse } from './contracts'
+
 /**
  * API functions for projects and project folders (CRUD).
  */
 
 import apiClient from './client'
-import type { components, paths } from './generated/schema'
-import type {
-  Project,
-  ProjectCreate,
-  ProjectFolder,
-  ProjectFolderCreate,
-  ProjectFolderDeleteResult,
-  ProjectFolderUpdate,
-  ProjectUpdate,
-} from '../types/project'
+import type { components } from './generated/schema'
+import type { Project, ProjectFolder, ProjectFolderDeleteResult } from '../types/project'
 
 const BASE_PATH = '/api/projects'
-type ProjectsPage = paths['/api/projects']['get']['responses'][200]['content']['application/json']
 
 const FOLDERS_PATH = '/api/project-folders'
 
@@ -33,7 +26,7 @@ export async function getProjects(
   const projects: Project[] = []
   let total: number
   do {
-    const { data } = await apiClient.get<ProjectsPage>(BASE_PATH, {
+    const { data } = await apiClient.get<ApiResponse<'/api/projects', 'get'>>(BASE_PATH, {
       signal,
       params: { limit: 500, offset: projects.length, ...(folderId ? { folder_id: folderId } : {}) },
     })
@@ -47,20 +40,26 @@ export async function getProjects(
 }
 
 /** Create a new project. */
-export async function createProject(data: ProjectCreate): Promise<Project> {
-  const response = await apiClient.post<Project>(BASE_PATH, data)
+export async function createProject(data: ApiBody<'/api/projects', 'post'>): Promise<Project> {
+  const response = await apiClient.post<ApiResponse<'/api/projects', 'post'>>(BASE_PATH, data)
   return response.data
 }
 
 /** Update a project. */
-export async function updateProject(id: string, data: ProjectUpdate): Promise<Project> {
-  const response = await apiClient.put<Project>(`${BASE_PATH}/${id}`, data)
+export async function updateProject(
+  id: string,
+  data: ApiBody<'/api/projects/{project_id}', 'put'>,
+): Promise<Project> {
+  const response = await apiClient.put<ApiResponse<'/api/projects/{project_id}', 'put'>>(
+    `${BASE_PATH}/${id}`,
+    data,
+  )
   return response.data
 }
 
 /** Delete a project. */
 export async function deleteProject(id: string): Promise<void> {
-  await apiClient.delete(`${BASE_PATH}/${id}`)
+  await apiClient.delete<ApiResponse<'/api/projects/{project_id}', 'delete'>>(`${BASE_PATH}/${id}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -69,13 +68,20 @@ export async function deleteProject(id: string): Promise<void> {
 
 /** Fetch every folder. Unpaginated: a tree cannot be rendered one page at a time. */
 export async function getProjectFolders(signal?: AbortSignal): Promise<ProjectFolder[]> {
-  const response = await apiClient.get<ProjectFolder[]>(FOLDERS_PATH, { signal })
+  const response = await apiClient.get<ApiResponse<'/api/project-folders', 'get'>>(FOLDERS_PATH, {
+    signal,
+  })
   return response.data
 }
 
 /** Create a folder, optionally inside another. */
-export async function createProjectFolder(data: ProjectFolderCreate): Promise<ProjectFolder> {
-  const response = await apiClient.post<ProjectFolder>(FOLDERS_PATH, data)
+export async function createProjectFolder(
+  data: ApiBody<'/api/project-folders', 'post'>,
+): Promise<ProjectFolder> {
+  const response = await apiClient.post<ApiResponse<'/api/project-folders', 'post'>>(
+    FOLDERS_PATH,
+    data,
+  )
   return response.data
 }
 
@@ -87,9 +93,12 @@ export async function createProjectFolder(data: ProjectFolderCreate): Promise<Pr
  */
 export async function updateProjectFolder(
   id: string,
-  data: ProjectFolderUpdate,
+  data: ApiBody<'/api/project-folders/{folder_id}', 'put'>,
 ): Promise<ProjectFolder> {
-  const response = await apiClient.put<ProjectFolder>(`${FOLDERS_PATH}/${id}`, data)
+  const response = await apiClient.put<ApiResponse<'/api/project-folders/{folder_id}', 'put'>>(
+    `${FOLDERS_PATH}/${id}`,
+    data,
+  )
   return response.data
 }
 
@@ -98,7 +107,9 @@ export async function updateProjectFolder(
  * nothing is deleted along with it.
  */
 export async function deleteProjectFolder(id: string): Promise<ProjectFolderDeleteResult> {
-  const response = await apiClient.delete<ProjectFolderDeleteResult>(`${FOLDERS_PATH}/${id}`)
+  const response = await apiClient.delete<
+    ApiResponse<'/api/project-folders/{folder_id}', 'delete'>
+  >(`${FOLDERS_PATH}/${id}`)
   return response.data
 }
 
@@ -113,8 +124,11 @@ export async function getProjectSchedule(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<ProjectSchedule> {
-  const { data } = await apiClient.get<ProjectSchedule>(`${BASE_PATH}/${projectId}/schedule`, {
-    signal,
-  })
+  const { data } = await apiClient.get<ApiResponse<'/api/projects/{project_id}/schedule', 'get'>>(
+    `${BASE_PATH}/${projectId}/schedule`,
+    {
+      signal,
+    },
+  )
   return data
 }

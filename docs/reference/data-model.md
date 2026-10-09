@@ -780,5 +780,5 @@ This invariant is enforced at the service layer, not via DB constraints.
 
 ## Authoritative Source
 
-The SQLModel classes in `backend/app/models/` are the single source of truth.
+The SQLAlchemy classes in `backend/app/models/` are the single source of truth.
 Alembic auto-generates migrations from these definitions.

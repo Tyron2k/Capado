@@ -12,11 +12,12 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.assignment import Assignment
+from app.models.base import column_values
 from app.models.baseline import BASELINE_ENTITY_TYPES, Baseline, BaselineEntry
 from app.models.project import Project, WorkPackage
 
@@ -67,7 +68,7 @@ def _jsonable(value: Any) -> Any:
 def snapshot_payload(obj: Any) -> dict[str, Any]:
     """The field values of one entity, reduced for storage and comparison."""
     payload: dict[str, Any] = {}
-    for name in type(obj).model_fields:
+    for name in column_values(obj):
         if name in IGNORED_FIELDS:
             continue
         payload[name] = _jsonable(getattr(obj, name, None))
@@ -143,7 +144,7 @@ class BaselineService:
         """Read the current plan in the shape a baseline stores it."""
         snapshot: dict[tuple[str, UUID], dict[str, Any]] = {}
         # Each query is issued separately rather than looping over a list of model classes.
-        # The loop reads obj.id, and a list of classes types that as the SQLModel base — which
+        # The loop reads obj.id, and a list of classes types that as the shared declarative base — which
         # has no id, so the attribute access goes unchecked and a renamed primary key would
         # reach runtime. Three lines of repetition buys the check back.
         for entity_type, rows in (

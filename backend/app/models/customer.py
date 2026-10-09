@@ -11,7 +11,11 @@ migration 025 for why it is not the folder tree itself.
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, SQLModel
+import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -19,7 +23,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class Customer(SQLModel, table=True):
+class Customer(ORMModel, kw_only=True, eq=False):
     """A customer, unique by name regardless of case.
 
     Attributes:
@@ -35,10 +39,24 @@ class Customer(SQLModel, table=True):
 
     __tablename__ = "customers"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=255, nullable=False)
-    reference: str = Field(default="", max_length=128, nullable=False)
-    note: str = Field(default="", max_length=1000, nullable=False)
-    is_active: bool = Field(default=True, nullable=False)
-    created_at: datetime = Field(default_factory=_utcnow)
-    updated_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    reference: Mapped[str] = mapped_column(sa.String(128), nullable=False, default="")
+    note: Mapped[str] = mapped_column(sa.String(1000), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(sa.Boolean(), nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
+
+    __table_args__ = (
+        sa.Index("uq_customers_name_lower", sa.func.lower(name), unique=True),
+    )

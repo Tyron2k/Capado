@@ -6,10 +6,12 @@ No parent_id hierarchy — resources are organized exclusively via groups.
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any, cast
 from uuid import UUID
 
+from sqlalchemy import delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import delete, select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.absence import Absence
@@ -71,7 +73,7 @@ async def get_all_personal_resources(
     Returns:
         Tuple of (list of resources, total count).
     """
-    from sqlmodel import func
+    from sqlalchemy import func
 
     base = select(PersonalResource).where(PersonalResource.is_active.is_(True))
     if group_id is not None:
@@ -204,17 +206,23 @@ async def erase_personal_resource(
 
     # Skills and work profiles: keyed directly on the resource.
     report.skills = (
-        await session.execute(
-            delete(PersonalResourceSkill).where(
-                PersonalResourceSkill.resource_id == resource_id
-            )
+        cast(
+            CursorResult[Any],
+            await session.execute(
+                delete(PersonalResourceSkill).where(
+                    PersonalResourceSkill.resource_id == resource_id
+                )
+            ),
         )
     ).rowcount or 0
     report.work_profiles = (
-        await session.execute(
-            delete(ResourceWorkProfile).where(
-                ResourceWorkProfile.resource_id == resource_id
-            )
+        cast(
+            CursorResult[Any],
+            await session.execute(
+                delete(ResourceWorkProfile).where(
+                    ResourceWorkProfile.resource_id == resource_id
+                )
+            ),
         )
     ).rowcount or 0
 
@@ -234,14 +242,22 @@ async def erase_personal_resource(
     )
     if conflict_ids:
         report.conflict_assignments = (
-            await session.execute(
-                delete(ConflictAssignment).where(
-                    ConflictAssignment.conflict_id.in_(conflict_ids)
-                )
+            cast(
+                CursorResult[Any],
+                await session.execute(
+                    delete(ConflictAssignment).where(
+                        ConflictAssignment.conflict_id.in_(conflict_ids)
+                    )
+                ),
             )
         ).rowcount or 0
         report.conflicts = (
-            await session.execute(delete(Conflict).where(Conflict.id.in_(conflict_ids)))
+            cast(
+                CursorResult[Any],
+                await session.execute(
+                    delete(Conflict).where(Conflict.id.in_(conflict_ids))
+                ),
+            )
         ).rowcount or 0
 
     assignment_ids = list(
@@ -271,13 +287,21 @@ async def erase_personal_resource(
 
     if assignment_ids:
         report.assignments = (
-            await session.execute(
-                delete(Assignment).where(Assignment.id.in_(assignment_ids))
+            cast(
+                CursorResult[Any],
+                await session.execute(
+                    delete(Assignment).where(Assignment.id.in_(assignment_ids))
+                ),
             )
         ).rowcount or 0
     if absence_ids:
         report.absences = (
-            await session.execute(delete(Absence).where(Absence.id.in_(absence_ids)))
+            cast(
+                CursorResult[Any],
+                await session.execute(
+                    delete(Absence).where(Absence.id.in_(absence_ids))
+                ),
+            )
         ).rowcount or 0
 
     # The account link is nulled by the foreign key (ON DELETE SET NULL, migration 026). Counted
@@ -301,8 +325,11 @@ async def erase_personal_resource(
 
     touched_ids = [resource_id, *assignment_ids, *absence_ids]
     report.audit_entries = (
-        await session.execute(
-            delete(AuditLog).where(AuditLog.entity_id.in_(touched_ids))
+        cast(
+            CursorResult[Any],
+            await session.execute(
+                delete(AuditLog).where(AuditLog.entity_id.in_(touched_ids))
+            ),
         )
     ).rowcount or 0
 
@@ -382,7 +409,7 @@ async def get_all_infrastructure_resources(
     Returns:
         Tuple of (list of resources, total count).
     """
-    from sqlmodel import func
+    from sqlalchemy import func
 
     base = select(InfrastructureResource).where(
         InfrastructureResource.is_active.is_(True)

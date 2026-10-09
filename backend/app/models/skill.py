@@ -1,4 +1,4 @@
-"""SQLModel models for the unified skill system.
+"""SQLAlchemy models for the unified skill system.
 
 Skills and their attributes are global entities. Assignments link them
 to personal or infrastructure resources via separate join tables.
@@ -7,7 +7,12 @@ to personal or infrastructure resources via separate join tables.
 from datetime import UTC, date, datetime
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, SQLModel, UniqueConstraint
+import sqlalchemy as sa
+from sqlalchemy import UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -15,7 +20,7 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-class Skill(SQLModel, table=True):
+class Skill(ORMModel, kw_only=True, eq=False):
     """A capability or competence (e.g. 'Assembly', 'Crane', 'Painting').
 
     Skills are scoped to a resource type (personal or infrastructure).
@@ -24,13 +29,23 @@ class Skill(SQLModel, table=True):
 
     __tablename__ = "skills"
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    name: str = Field(max_length=100, unique=True)
-    resource_type: str = Field(max_length=20, default="personal")
-    created_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    name: Mapped[str] = mapped_column(sa.String(100), nullable=False, unique=True)
+    resource_type: Mapped[str] = mapped_column(
+        sa.String(20), nullable=False, default="personal"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
 
-class SkillAttribute(SQLModel, table=True):
+class SkillAttribute(ORMModel, kw_only=True, eq=False):
     """A specific attribute/variant of a skill (e.g. 'Series Alpha' for skill 'Assembly').
 
     Each attribute belongs to exactly one skill. A resource is qualified
@@ -42,13 +57,28 @@ class SkillAttribute(SQLModel, table=True):
         UniqueConstraint("skill_id", "name", name="uq_skill_attributes_skill_name"),
     )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    skill_id: UUID = Field(foreign_key="skills.id", index=True)
-    name: str = Field(max_length=100)
-    created_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    skill_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "skills.id", name="fk_skill_attributes_skill_id", ondelete="CASCADE"
+        ),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(sa.String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
 
-class PersonalResourceSkill(SQLModel, table=True):
+class PersonalResourceSkill(ORMModel, kw_only=True, eq=False):
     """Assignment of a skill attribute to a resource.
 
     Attributes:
@@ -71,16 +101,46 @@ class PersonalResourceSkill(SQLModel, table=True):
         ),
     )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    resource_id: UUID = Field(foreign_key="personal_resources.id", index=True)
-    skill_attribute_id: UUID = Field(foreign_key="skill_attributes.id", index=True)
-    valid_from: date | None = Field(default=None)
-    valid_until: date | None = Field(default=None, index=True)
-    level: int | None = Field(default=None, ge=1, le=5)
-    created_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    resource_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "personal_resources.id",
+            name="fk_personal_resource_skills_resource_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+    skill_attribute_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "skill_attributes.id",
+            name="fk_personal_resource_skills_skill_attribute_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+    valid_from: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, default=None
+    )
+    valid_until: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, index=True, default=None
+    )
+    level: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )
 
 
-class InfrastructureResourceSkill(SQLModel, table=True):
+class InfrastructureResourceSkill(ORMModel, kw_only=True, eq=False):
     """Assignment of a skill attribute to a resource.
 
     Attributes:
@@ -103,10 +163,40 @@ class InfrastructureResourceSkill(SQLModel, table=True):
         ),
     )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    resource_id: UUID = Field(foreign_key="infrastructure_resources.id", index=True)
-    skill_attribute_id: UUID = Field(foreign_key="skill_attributes.id", index=True)
-    valid_from: date | None = Field(default=None)
-    valid_until: date | None = Field(default=None, index=True)
-    level: int | None = Field(default=None, ge=1, le=5)
-    created_at: datetime = Field(default_factory=_utcnow)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    resource_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "infrastructure_resources.id",
+            name="fk_infrastructure_resource_skills_resource_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+    skill_attribute_id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        sa.ForeignKey(
+            "skill_attributes.id",
+            name="fk_infrastructure_resource_skills_skill_attribute_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+    valid_from: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, default=None
+    )
+    valid_until: Mapped[date | None] = mapped_column(
+        sa.Date(), nullable=True, index=True, default=None
+    )
+    level: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True, default=None)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), nullable=False, default_factory=_utcnow, insert_default=_utcnow
+    )

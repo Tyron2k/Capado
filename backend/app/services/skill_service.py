@@ -8,9 +8,8 @@ from datetime import date
 from uuid import UUID
 
 from sqlalchemy import delete as sa_delete
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import ConflictError, InputValidationError, NotFoundError
 from app.models.resource import InfrastructureResource, PersonalResource
@@ -23,6 +22,7 @@ from app.models.skill import (
 from app.schemas.skill import (
     ResourceSkillAssignmentResponse,
     ResourceSkillEntry,
+    SkillAttributeResponse,
     SkillWithAttributesResponse,
 )
 
@@ -49,7 +49,7 @@ class SkillService:
             Tuple of (list of skills, total count).
 
         """
-        from sqlmodel import func
+        from sqlalchemy import func
 
         total_result = await self.session.execute(
             select(func.count()).select_from(Skill)
@@ -77,7 +77,7 @@ class SkillService:
             Tuple of (list of skills with attributes, total count).
 
         """
-        from sqlmodel import func
+        from sqlalchemy import func
 
         # Count total matching skills
         count_stmt = select(func.count()).select_from(Skill)
@@ -117,7 +117,10 @@ class SkillService:
                 id=skill.id,
                 name=skill.name,
                 resource_type=skill.resource_type,
-                attributes=attrs_by_skill.get(skill.id, []),
+                attributes=[
+                    SkillAttributeResponse.model_validate(attr)
+                    for attr in attrs_by_skill.get(skill.id, [])
+                ],
             )
             for skill in skills
         ]

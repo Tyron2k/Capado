@@ -9,8 +9,8 @@ Resource skill assignments are scoped:
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.database import get_session
 from app.models.resource import InfrastructureResource, PersonalResource

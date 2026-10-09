@@ -13,12 +13,12 @@ controller to unpivot it by hand is how the numbers get retyped and go wrong.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from uuid import UUID
 
 from openpyxl.styles import PatternFill
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.resource import PersonalResource
 from app.models.resource_group import ResourceGroup
@@ -110,7 +110,10 @@ async def build_utilization_report(
     header_row = row
     row = write_header(wide, wide_columns, row)
     for person, group in people:
-        values: list[object] = [group.name, person.name]
+        values: list[str | int | float | bool | date | datetime | None] = [
+            group.name,
+            person.name,
+        ]
         for week in weeks:
             weekly = per_person[person.id].get(week)
             # None rather than 0 for a week with no data: an empty cell says "not computed",

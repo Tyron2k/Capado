@@ -39,48 +39,27 @@ Fixing it means splitting the table or introducing a proper sum type, which is a
 across every consumer. Not worth it today; worth knowing before adding a third booking
 shape.
 
-## mypy: five error codes disabled
+## Typed persistence and API contracts
 
-`attr-defined`, `arg-type`, `call-overload`, `union-attr` and `operator` are switched off
-in `pyproject.toml`. SQLModel annotates columns as their Python type, so every
-`Column == value` comparison looks like a type error.
+All persistence entities now use native SQLAlchemy `Mapped[...]` columns and one `ORMModel`
+registry/metadata. `MappedAsDataclass` keeps UUIDs and UTC timestamps available before the audit
+listener runs; `eq=False` preserves ORM identity. API and CSV validation use independent Pydantic
+schemas. CSV fields remain explicitly allowlisted by each domain; relationships and credentials
+are never discovered as exportable data. Snapshots read persisted scalar columns only.
 
-Measured rather than assumed: 246 findings become 35 with those five off. Of 131
-`attr-defined`, 124 were SQL-operator noise and **7 were real** — which is why the count
-is recorded here instead of the codes being quietly dropped.
+### Resolved since
 
-Directly typed SQLAlchemy `Mapped[...]` entities are the incremental target, with separate Pydantic
-API schemas and the existing async sessions. `ResourceGroup` is the first pilot; the remaining models
-still use SQLModel. Both mapping styles share `SQLModel.metadata` for Alembic and CSV table discovery.
-The existing `check_attr_defined.py` remains the gate for legacy column-operator noise. The five
-exceptions are re-enabled in the typed pilot modules; no broad new suppression was introduced.
+The five global mypy exceptions and the legacy SQLModel operator filter have been removed, together
+with the SQLModel dependency. Plain mypy checks all application modules in the existing CI job.
+A complete Alembic comparison against migrated PostgreSQL is empty. The mappings also describe
+previously omitted existing indexes, uniqueness and cascade/SET NULL rules; no database migration
+is required. Tests retain authenticated scope checks, connected relationship loading, eager defaults,
+UTC normalization, audit commit/rollback, and complete standalone/ZIP CSV round trips.
 
-### Typed ORM pilot outcome and next steps
-
-Resource groups exercise a self-parent foreign key, enum values, eager UUID/UTC defaults, scopes,
-change tracking and the audit listener without converting a relationship cluster all at once. The
-parent relationship is read-only navigation; mutations keep using `parent_id`. `MappedAsDataclass`
-keeps constructor defaults available before `before_flush`, and `eq=False` retains ORM identity
-semantics. The enum remains VARCHAR(20), not a new PostgreSQL enum/check constraint. The existing
-SQLModel UTC type is reused, preserving UTC normalization on PostgreSQL and SQLite.
-
-CSV validation moved to an explicit `ResourceGroupTransfer` Pydantic schema. Export fields remain
-allowlisted in the domain module; ORM relationships are never discovered as exportable data. API
-schemas remain separate and the generated OpenAPI contract is unchanged by the ORM/router refactor.
-Real migrated PostgreSQL tests cover defaults, eager relationship loading, typed enum reads,
-commit/rollback with the audit actor, and real authenticated editor/viewer scope checks. Alembic
-comparison for this table is empty. The mapping now explicitly matches the existing database's
-named `ON DELETE SET NULL` parent constraint, which the previous model omitted; no migration is needed.
-
-The pilot required a shared mapping base, one mapping conversion, a transfer DTO, a typed route
-boundary and metadata-based export coverage. Better query inference exposed reused result variables
-in the capacity overview and skill-matrix exporter; naming those separately resolved the errors.
-Effort therefore follows consumers, not the number of model files. Next convert personal/infrastructure
-resources together (the same joins), then skill catalogue entities if their queries remain noisy.
-Convert the Project/WorkPackage/Assignment/Conflict relationship cluster as a deliberate later cohort:
-SQLAlchemy string relationships cannot resolve targets in a different mapper registry. Do not mix
-registries within that cluster or convert every model as incidental work. Preserve eager audit IDs,
-UTC types, CSV DTO coverage and actual database constraints on each conversion.
+The generated OpenAPI contract covers every frontend JSON client, including planning overview
+and OIDC status, which previously had no explicit response model. Finite suggestion, digest and
+maintenance values are part of that contract. Input nulls and omitted keys retain their distinct
+meaning. Complete collection clients read all pages before local filtering.
 
 ### Targeted query helper evaluation (#74)
 

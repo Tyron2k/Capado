@@ -4,8 +4,8 @@ from datetime import UTC, date, datetime
 from types import EllipsisType
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.absence import Absence, AbsenceReason, AbsenceStatus
@@ -91,7 +91,7 @@ class AbsenceService:
             Tuple of (list of absences, total count).
 
         """
-        from sqlmodel import func
+        from sqlalchemy import func
 
         count_stmt = (
             select(func.count())

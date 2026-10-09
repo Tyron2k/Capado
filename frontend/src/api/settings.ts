@@ -1,3 +1,7 @@
+import type { ApiBody, ApiResponse } from './contracts'
+
+import type { components } from './generated/schema'
+
 /**
  * API functions for application settings (tenant branding + logo upload/delete).
  */
@@ -8,67 +12,14 @@ import apiClient from './client'
 // Tenant branding settings (DB-persisted, shared across all users)
 // ---------------------------------------------------------------------------
 
-export interface TenantSettings {
-  company_name: string
-  company_subtitle: string
-  logo_url: string
-  primary_color: string
-  /** IANA zone used to display and enter infrastructure booking times. */
-  time_zone: string
-  has_uploaded_logo: boolean
-  /**
-   * Months of audit history to keep. 0 keeps everything.
-   *
-   * Setting this deletes nothing on its own — the backend's prune_audit_log job
-   * applies it. A value here with no scheduled job is a promise, not a mechanism.
-   */
-  audit_retention_months: number
-  /**
-   * Months of plan baselines to keep. 0 keeps everything, and is the default —
-   * deliberately unlike the audit log, because a baseline is a record somebody chose
-   * to create rather than one that accumulated by itself.
-   */
-  baseline_retention_months: number
-  /**
-   * First day that may still be edited, or null for no freeze.
-   *
-   * EXCLUSIVE: the named day is still editable. Sending null LIFTS the freeze, which is why
-   * the update payload has to distinguish "not mentioned" from "explicitly null".
-   */
-  planning_freeze_before: string | null
-  scheduler_enabled: boolean
-  /** Hour after which maintenance runs, in the SERVER's clock — normally UTC. */
-  maintenance_hour: number
-  smtp_enabled: boolean
-  smtp_host: string
-  smtp_port: number
-  smtp_use_tls: boolean
-  smtp_username: string
-  /**
-   * Whether a password is stored — the value itself is never sent.
-   *
-   * Rendering the password into the DOM would leak it to anybody looking over a shoulder, which
-   * is a realistic threat. A boolean lets the operator leave the field blank instead of retyping.
-   */
-  smtp_password_set: boolean
-  smtp_from_address: string
-  digest_recipients: string
-  /**
-   * What is wrong with the mail configuration right now.
-   *
-   * Computed on READ, not only on save: a configuration that was valid when saved can become
-   * incomplete later, and the operator should see that on the page rather than infer it from a
-   * digest that never arrived.
-   */
-  mail_config_errors: string[]
-}
+export type TenantSettings = components['schemas']['OrganizationSettingsResponse']
 
 /**
  * Fetch tenant branding settings from the backend.
  * Available to all authenticated users.
  */
 export async function getTenantSettings(): Promise<TenantSettings> {
-  const { data } = await apiClient.get<TenantSettings>('/api/settings')
+  const { data } = await apiClient.get<ApiResponse<'/api/settings', 'get'>>('/api/settings')
   return data
 }
 
@@ -82,11 +33,15 @@ export async function getTenantSettings(): Promise<TenantSettings> {
  *   client's request interceptor.
  */
 export async function updateTenantSettings(
-  patch: Partial<Omit<TenantSettings, 'has_uploaded_logo'>>,
+  patch: ApiBody<'/api/settings', 'put'>,
   accessToken?: string,
 ): Promise<TenantSettings> {
   const config = accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined
-  const { data } = await apiClient.put<TenantSettings>('/api/settings', patch, config)
+  const { data } = await apiClient.put<ApiResponse<'/api/settings', 'put'>>(
+    '/api/settings',
+    patch,
+    config,
+  )
   return data
 }
 
@@ -103,7 +58,7 @@ export async function uploadLogo(file: File): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
 
-  await apiClient.post('/api/settings/logo', formData, {
+  await apiClient.post<ApiResponse<'/api/settings/logo', 'post'>>('/api/settings/logo', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }

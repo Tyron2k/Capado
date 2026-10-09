@@ -1,37 +1,24 @@
+import { ResourcesTable } from '../ResourcesTable'
 /**
  * Unified resources panel for both personal and infrastructure resources.
- * Displays a FilterBar (search + add) above a grouped DataTable.
+ * Keeps resource forms, permissions, drawers and cache invalidation around the typed table.
  * Group assignment is managed via the edit form only.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  ActionIcon,
-  Badge,
-  Button,
-  Group,
-  Modal,
-  Table,
-  Text,
-  TextInput,
-  Tooltip,
-} from '@mantine/core'
-import { DataTable, FilterBar } from '../../../components/layout'
+import { ActionIcon, Button, Group, Modal, Text, Tooltip } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../../utils/errorHandling'
 import { useNavigate } from 'react-router-dom'
 import { listSites } from '../../../api/calendar'
 import {
-  IconAlertTriangle,
   IconCalendarOff,
   IconCertificate,
   IconClockHour4,
   IconEdit,
-  IconPlus,
-  IconSearch,
   IconTrash,
 } from '@tabler/icons-react'
 import type { Resource, ResourceCreate, ResourceListItem } from '../../../types/resource'
@@ -55,12 +42,7 @@ import { SkillMatrixDrawer } from '../SkillMatrixDrawer'
 import { AbsenceDrawer } from '../AbsenceDrawer'
 import { AvailabilityWindowsDrawer } from '../AvailabilityWindowsDrawer'
 import { WorkProfileDrawer } from '../WorkProfileDrawer'
-import {
-  buildGroupedRows,
-  filterResources,
-  flattenResourceList,
-  type FlatResource,
-} from '../utils/resourceTableUtils'
+import { flattenResourceList, type FlatResource } from '../utils/resourceTableUtils'
 
 interface ResourcesPanelProps {
   /** Determines which API endpoints and groups to use. */
@@ -129,7 +111,6 @@ export function ResourcesPanel({ resourceType }: ResourcesPanelProps) {
     name: string
     group_id: string | null
   } | null>(null)
-  const [search, setSearch] = useState('')
   // Whether the INSTALLATION has sites, not whether the loaded rows use one. Deriving it from the
   // rows would hide the column exactly while an operator is assigning the first ones, which is when
   // they need the feedback. Same rule as the resource form.
@@ -165,9 +146,12 @@ export function ResourcesPanel({ resourceType }: ResourcesPanelProps) {
    */
   const resourcesQuery = useQuery({
     queryKey: queryKeys.resources.list(resourceType, false),
-    queryFn: () => api.getList(),
+    queryFn: ({ signal }) => api.getList(signal),
   })
-  const resources: ResourceListItem[] = resourcesQuery.data ?? []
+  const resources: ResourceListItem[] = useMemo(
+    () => resourcesQuery.data ?? [],
+    [resourcesQuery.data],
+  )
   const loading = resourcesQuery.isPending
 
   useEffect(() => {
@@ -209,11 +193,6 @@ export function ResourcesPanel({ resourceType }: ResourcesPanelProps) {
     ])
 
   const flatResources = useMemo(() => flattenResourceList(resources), [resources])
-  const filteredResources = useMemo(
-    () => filterResources(flatResources, search),
-    [flatResources, search],
-  )
-
   const handleCreate = () => {
     setEditingResource(null)
     openForm()
@@ -300,184 +279,112 @@ export function ResourcesPanel({ resourceType }: ResourcesPanelProps) {
 
   const submitting = saveMutation.isPending || deleteMutation.isPending
 
-  const renderRow = useCallback(
-    (resource: FlatResource) => (
-      <Table.Tr key={resource.id}>
-        <Table.Td>
-          <Text size="sm">{resource.name}</Text>
-        </Table.Td>
-        <Table.Td w={150}>
-          <Text size="xs" c="dimmed">
-            {resource.group_name ?? '—'}
-          </Text>
-        </Table.Td>
-        {hasSites && (
-          <Table.Td w={150}>
-            <Text size="xs" c="dimmed">
-              {resource.site_name || '—'}
-            </Text>
-          </Table.Td>
-        )}
-        <Table.Td w={100}>
-          {resource.conflict_count > 0 && (
-            <Badge
-              color="red"
-              variant="light"
-              size="xs"
-              leftSection={<IconAlertTriangle size={10} />}
-              style={{ cursor: 'pointer' }}
-              onClick={() => navigate(`/planning?resource=${resource.id}`)}
-              role="button"
-              aria-label={`${resource.conflict_count} Conflict${resource.conflict_count === 1 ? '' : 's'} — go to conflict view`}
-            >
-              {resource.conflict_count}
-            </Badge>
-          )}
-        </Table.Td>
-        <Table.Td w={160} ta="right">
-          {/* Every icon carries a Tooltip as well as an aria-label, and the two say different
-              things on purpose: the aria-label names the ROW too ("Kabine 03 Abwesenheiten"),
-              because a screen reader reads the button out of its table context, while the tooltip
-              is read next to the row you are already looking at and only needs the verb. Without
-              the tooltip a sighted user had no way at all to learn what six near-identical icons
-              do — the aria-label is invisible to them. */}
-          <Group gap={4} justify="flex-end">
-            <Tooltip label={t('skills.title')} withArrow>
-              <ActionIcon
-                variant="subtle"
-                color="violet"
-                size="sm"
-                onClick={() => handleSkill(resource)}
-                aria-label={`${resource.name} ${t('skills.title').toLowerCase()}`}
-              >
-                <IconCertificate size={14} />
-              </ActionIcon>
-            </Tooltip>
-            {/* Week profiles are only meaningful for people: a machine's availability
+  const renderActions = (resource: FlatResource) => (
+    <Group gap={4} justify="flex-end">
+      <Tooltip label={t('skills.title')} withArrow>
+        <ActionIcon
+          variant="subtle"
+          color="violet"
+          size="sm"
+          onClick={() => handleSkill(resource)}
+          aria-label={`${resource.name} ${t('skills.title').toLowerCase()}`}
+        >
+          <IconCertificate size={14} />
+        </ActionIcon>
+      </Tooltip>
+      {/* Week profiles are only meaningful for people: a machine's availability
                 is clock windows, not a share of the day. */}
-            {resourceType === 'personal' && (
-              <Tooltip label={t('workProfiles.short')} withArrow>
-                <ActionIcon
-                  variant="subtle"
-                  color="teal"
-                  size="sm"
-                  onClick={() =>
-                    setProfileResource({
-                      id: resource.id,
-                      name: resource.name,
-                      group_id: resource.group_id ?? null,
-                    })
-                  }
-                  aria-label={`${resource.name} ${t('workProfiles.short').toLowerCase()}`}
-                >
-                  <IconClockHour4 size={14} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            {/* Operating hours belong to the resource, not to a global calendar page:
+      {resourceType === 'personal' && (
+        <Tooltip label={t('workProfiles.short')} withArrow>
+          <ActionIcon
+            variant="subtle"
+            color="teal"
+            size="sm"
+            onClick={() =>
+              setProfileResource({
+                id: resource.id,
+                name: resource.name,
+                group_id: resource.group_id ?? null,
+              })
+            }
+            aria-label={`${resource.name} ${t('workProfiles.short').toLowerCase()}`}
+          >
+            <IconClockHour4 size={14} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+      {/* Operating hours belong to the resource, not to a global calendar page:
                 the question "which clock hours does THIS hall run" is only answerable
                 here. Personal resources use week profiles instead. */}
-            {resourceType === 'infrastructure' && (
-              <Tooltip label={t('windows.short')} withArrow>
-                <ActionIcon
-                  variant="subtle"
-                  color="cyan"
-                  size="sm"
-                  onClick={() => setWindowResource(resource)}
-                  aria-label={`${resource.name} ${t('windows.short').toLowerCase()}`}
-                >
-                  <IconClockHour4 size={14} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            <Tooltip label={t('absences.title')} withArrow>
-              <ActionIcon
-                variant="subtle"
-                color="orange"
-                size="sm"
-                onClick={() => handleAbsence(resource)}
-                aria-label={`${resource.name} ${t('absences.title').toLowerCase()}`}
-              >
-                <IconCalendarOff size={14} />
-              </ActionIcon>
-            </Tooltip>
-            {canEditGroup(resource.group_id) && (
-              <Tooltip label={t('common.edit')} withArrow>
-                <ActionIcon
-                  variant="subtle"
-                  color="blue"
-                  size="sm"
-                  onClick={() => handleEdit(resource)}
-                  aria-label={`${resource.name} ${t('common.edit').toLowerCase()}`}
-                >
-                  <IconEdit size={14} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            {canEditGroup(resource.group_id) && (
-              <Tooltip label={t('common.delete')} withArrow>
-                <ActionIcon
-                  variant="subtle"
-                  color="red"
-                  size="sm"
-                  onClick={() => handleDeleteClick(resource)}
-                  aria-label={`${resource.name} ${t('common.delete').toLowerCase()}`}
-                >
-                  <IconTrash size={14} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </Group>
-        </Table.Td>
-      </Table.Tr>
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [navigate, canEditGroup, t, api],
-  )
-
-  const groupedRows = useMemo(
-    () => buildGroupedRows(filteredResources, 4, renderRow),
-    [filteredResources, renderRow],
-  )
-
-  const tableHead = (
-    <Table.Tr>
-      <Table.Th>{t('common.name')}</Table.Th>
-      <Table.Th w={150}>{t('resources.group')}</Table.Th>
-      {hasSites && <Table.Th w={150}>{t('resources.site')}</Table.Th>}
-      <Table.Th w={100}>{t('conflicts.title')}</Table.Th>
-      <Table.Th w={160} ta="right">
-        {t('common.actions')}
-      </Table.Th>
-    </Table.Tr>
+      {resourceType === 'infrastructure' && (
+        <Tooltip label={t('windows.short')} withArrow>
+          <ActionIcon
+            variant="subtle"
+            color="cyan"
+            size="sm"
+            onClick={() => setWindowResource(resource)}
+            aria-label={`${resource.name} ${t('windows.short').toLowerCase()}`}
+          >
+            <IconClockHour4 size={14} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+      <Tooltip label={t('absences.title')} withArrow>
+        <ActionIcon
+          variant="subtle"
+          color="orange"
+          size="sm"
+          onClick={() => handleAbsence(resource)}
+          aria-label={`${resource.name} ${t('absences.title').toLowerCase()}`}
+        >
+          <IconCalendarOff size={14} />
+        </ActionIcon>
+      </Tooltip>
+      {canEditGroup(resource.group_id) && (
+        <Tooltip label={t('common.edit')} withArrow>
+          <ActionIcon
+            variant="subtle"
+            color="blue"
+            size="sm"
+            onClick={() => handleEdit(resource)}
+            aria-label={`${resource.name} ${t('common.edit').toLowerCase()}`}
+          >
+            <IconEdit size={14} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+      {canEditGroup(resource.group_id) && (
+        <Tooltip label={t('common.delete')} withArrow>
+          <ActionIcon
+            variant="subtle"
+            color="red"
+            size="sm"
+            onClick={() => handleDeleteClick(resource)}
+            aria-label={`${resource.name} ${t('common.delete').toLowerCase()}`}
+          >
+            <IconTrash size={14} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+    </Group>
   )
 
   return (
     <>
-      <FilterBar>
-        <TextInput
-          placeholder={t(labels.search)}
-          leftSection={<IconSearch size={14} />}
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-          style={{ minWidth: 260 }}
-        />
-        {canWrite && (
-          <Button leftSection={<IconPlus size={14} />} onClick={handleCreate} size="sm" ml="auto">
-            {t(labels.new)}
-          </Button>
-        )}
-      </FilterBar>
-
-      <DataTable
+      <ResourcesTable
+        key={resourceType}
+        resources={flatResources}
         loading={loading}
-        empty={filteredResources.length === 0}
-        emptyMessage={t(labels.empty)}
-        head={tableHead}
+        hasSites={hasSites}
+        searchLabel={t(labels.search)}
+        emptyLabel={t(labels.empty)}
+        createLabel={t(labels.new)}
+        canWrite={canWrite}
+        onCreate={handleCreate}
+        renderActions={renderActions}
+        onConflicts={(resource) => navigate(`/planning?resource=${resource.id}`)}
         testId={`${resourceType}-resources-table`}
-      >
-        {groupedRows}
-      </DataTable>
+      />
 
       <Modal
         opened={formOpened}

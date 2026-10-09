@@ -1,23 +1,9 @@
+import { masterTableFeatures } from '../../components/table/features'
 /** Project table pilot: stateful table behaviour, with the existing Mantine presentation. */
+import { ColumnPicker, SortHeader } from '../../components/table/controls'
 import { useEffect, useMemo, useState } from 'react'
 import type { RowSelectionState } from '@tanstack/react-table'
-import {
-  columnFilteringFeature,
-  columnVisibilityFeature,
-  createColumnHelper,
-  createFilteredRowModel,
-  createSortedRowModel,
-  filterFn_equalsString,
-  filterFn_includesString,
-  flexRender,
-  globalFilteringFeature,
-  rowSelectionFeature,
-  rowSortingFeature,
-  sortFn_basic,
-  sortFn_text,
-  tableFeatures,
-  useTable,
-} from '@tanstack/react-table'
+import { createColumnHelper, flexRender, useTable } from '@tanstack/react-table'
 import {
   ActionIcon,
   Badge,
@@ -25,39 +11,18 @@ import {
   Button,
   Checkbox,
   Group,
-  Menu,
   Select,
   Table,
   Text,
   TextInput,
-  UnstyledButton,
 } from '@mantine/core'
-import {
-  IconArrowDown,
-  IconArrowUp,
-  IconColumns,
-  IconEdit,
-  IconPackage,
-  IconPlus,
-  IconSearch,
-  IconTrash,
-} from '@tabler/icons-react'
+import { IconEdit, IconPackage, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react'
 import { DataTable, FilterBar } from '../../components/layout'
 import { useTranslation } from '../../i18n'
 import type { Project, ProjectPriority } from '../../types/project'
 import { formatDate } from '../../utils/date'
 
-const features = tableFeatures({
-  columnFilteringFeature,
-  columnVisibilityFeature,
-  globalFilteringFeature,
-  rowSelectionFeature,
-  rowSortingFeature,
-  filteredRowModel: createFilteredRowModel(),
-  sortedRowModel: createSortedRowModel(),
-  filterFns: { equals: filterFn_equalsString, includes: filterFn_includesString },
-  sortFns: { basic: sortFn_basic, text: sortFn_text },
-})
+const features = masterTableFeatures
 const helper = createColumnHelper<typeof features, Project>()
 const priorities: ProjectPriority[] = ['low', 'normal', 'high', 'critical']
 const priorityKeys = {
@@ -288,29 +253,19 @@ export function ProjectsTable({
           w={140}
           disabled={loading}
         />
-        <Menu closeOnItemClick={false}>
-          <Menu.Target>
-            <Button variant="default" leftSection={<IconColumns size={14} />}>
-              {t('projects.columns')}
-            </Button>
-          </Menu.Target>
-          <Menu.Dropdown>
-            {table
-              .getAllLeafColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => (
-                <Menu.CheckboxItem
-                  key={column.id}
-                  checked={column.getIsVisible()}
-                  onChange={(checked) => column.toggleVisibility(checked)}
-                >
-                  {typeof column.columnDef.header === 'string'
-                    ? column.columnDef.header
-                    : column.id}
-                </Menu.CheckboxItem>
-              ))}
-          </Menu.Dropdown>
-        </Menu>
+        <ColumnPicker
+          label={t('projects.columns')}
+          columns={table
+            .getAllLeafColumns()
+            .filter((column) => column.getCanHide())
+            .map((column) => ({
+              id: column.id,
+              label:
+                typeof column.columnDef.header === 'string' ? column.columnDef.header : column.id,
+              visible: column.getIsVisible(),
+              toggle: (visible) => column.toggleVisibility(visible),
+            }))}
+        />
         {canWrite && (
           <Button leftSection={<IconPlus size={14} />} onClick={onCreate} size="sm">
             {t('projects.newProject')}
@@ -378,16 +333,12 @@ export function ProjectsTable({
                         }}
                       />
                     ) : header.column.getCanSort() ? (
-                      <UnstyledButton fw={600} onClick={header.column.getToggleSortingHandler()}>
-                        <Group gap={4} wrap="nowrap">
-                          {flexRender(header.column.columnDef.header, header.getContext())}
-                          {header.column.getIsSorted() === 'asc' ? (
-                            <IconArrowUp size={13} />
-                          ) : header.column.getIsSorted() === 'desc' ? (
-                            <IconArrowDown size={13} />
-                          ) : undefined}
-                        </Group>
-                      </UnstyledButton>
+                      <SortHeader
+                        direction={header.column.getIsSorted()}
+                        onClick={() => header.column.toggleSorting()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      </SortHeader>
                     ) : (
                       flexRender(header.column.columnDef.header, header.getContext())
                     )}

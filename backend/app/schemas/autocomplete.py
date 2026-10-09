@@ -2,10 +2,12 @@
 
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas import ResponseModel
 
 
-class AutocompleteResultResponse(BaseModel):
+class AutocompleteResultResponse(ResponseModel):
     """Response schema for an autocomplete result."""
 
     id: UUID = Field(..., description="Resource ID")

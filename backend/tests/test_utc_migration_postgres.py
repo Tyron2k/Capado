@@ -20,6 +20,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.models.assignment import Assignment
+from app.models.base import column_values
 from app.services.baseline_service import diff_payloads, snapshot_payload
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,7 +60,7 @@ async def test_small_area_import_allows_concurrent_unrelated_history_writes(
         return result
 
     monkeypatch.setattr(skills, "write_import", write_with_unrelated_edit)
-    record = m.Skill(name="Independent import", resource_type="personal").model_dump()
+    record = column_values(m.Skill(name="Independent import", resource_type="personal"))
     content = skills.export_csv({"skills": [record], "skill_attributes": []})
     async with AsyncSession(engine) as session:
         result = await import_area_rows(session, "skills", _read_csv(content))

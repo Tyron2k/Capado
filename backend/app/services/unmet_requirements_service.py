@@ -12,8 +12,8 @@ active resources and their skill assignments.
 from datetime import date
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.assignment import Assignment
 from app.models.project import Project, WorkPackage

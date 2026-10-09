@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas import ResponseModel
+
 
 class RequirementCreate(BaseModel):
     """Request schema for a single skill requirement."""
@@ -14,7 +16,7 @@ class RequirementCreate(BaseModel):
     quantity: int = Field(default=1, ge=1)
 
 
-class RequirementResponse(BaseModel):
+class RequirementResponse(ResponseModel):
     """Response schema for a skill requirement with resolved names."""
 
     id: UUID
@@ -42,7 +44,7 @@ class TemplateUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=1000)
 
 
-class TemplateResponse(BaseModel):
+class TemplateResponse(ResponseModel):
     """Response schema for a template with its requirements."""
 
     id: UUID
@@ -55,7 +57,7 @@ class TemplateResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class TemplateListResponse(BaseModel):
+class TemplateListResponse(ResponseModel):
     """Response schema for template list (without requirements)."""
 
     id: UUID

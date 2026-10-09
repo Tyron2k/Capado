@@ -44,6 +44,7 @@ const mockedUpdateAssignment = vi.mocked(updateAssignment)
 const mockedShow = vi.mocked(notifications.show)
 
 const personalAssignment: ConflictAssignmentInfo = {
+  skill_mismatch: false,
   assignment_id: 'assignment-1',
   work_package_id: 'wp-1',
   work_package_name: 'Work Package One',
@@ -59,6 +60,9 @@ const personalAssignment: ConflictAssignmentInfo = {
 }
 
 const infraAssignment: ConflictAssignmentInfo = {
+  project_id: null,
+  project_name: null,
+  skill_mismatch: false,
   assignment_id: 'assignment-2',
   work_package_id: 'wp-2',
   work_package_name: 'Work Package Two',

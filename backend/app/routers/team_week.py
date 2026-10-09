@@ -13,11 +13,12 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models.user import User
+from app.schemas import ResponseModel
 from app.services.permissions import get_current_user
 from app.services.team_week_service import build_team_week, group_name
 
@@ -25,7 +26,7 @@ from app.services.team_week_service import build_team_week, group_name
 router = APIRouter(prefix="/team-week", tags=["team-week"])
 
 
-class DayEntryResponse(BaseModel):
+class DayEntryResponse(ResponseModel):
     """One thing a person does on one day."""
 
     work_package_name: str
@@ -33,7 +34,7 @@ class DayEntryResponse(BaseModel):
     allocation_percent: float
 
 
-class DayCellResponse(BaseModel):
+class DayCellResponse(ResponseModel):
     """One person on one day."""
 
     day: date
@@ -50,7 +51,7 @@ class DayCellResponse(BaseModel):
     is_overbooked: bool
 
 
-class PersonRowResponse(BaseModel):
+class PersonRowResponse(ResponseModel):
     """One person's week."""
 
     resource_id: UUID
@@ -62,7 +63,7 @@ class PersonRowResponse(BaseModel):
     )
 
 
-class TeamWeekResponse(BaseModel):
+class TeamWeekResponse(ResponseModel):
     """The sheet."""
 
     group_id: UUID

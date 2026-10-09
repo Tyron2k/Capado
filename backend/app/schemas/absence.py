@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.models.absence import AbsenceReason, AbsenceStatus
 from app.models.resource import ResourceType
+from app.schemas import ResponseModel
 
 
 class AbsenceCreate(BaseModel):
@@ -35,7 +36,7 @@ class AbsenceUpdate(BaseModel):
     note: str | None = None
 
 
-class AbsenceResponse(BaseModel):
+class AbsenceResponse(ResponseModel):
     """Response schema for an absence."""
 
     id: UUID

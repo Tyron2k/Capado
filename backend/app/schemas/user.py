@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas import ResponseModel
+
 
 class UserCreateRequest(BaseModel):
     """Request body for POST /api/users (admin creates a new user)."""
@@ -62,7 +64,7 @@ class UserUpdateRequest(BaseModel):
     )
 
 
-class UserResponse(BaseModel):
+class UserResponse(ResponseModel):
     """Response body representing a user."""
 
     id: UUID
@@ -80,7 +82,7 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class UserListResponse(BaseModel):
+class UserListResponse(ResponseModel):
     """Paginated list of users."""
 
     items: list[UserResponse]

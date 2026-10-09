@@ -93,6 +93,29 @@ describe('AuditPage on the query layer', () => {
     vi.mocked(getTenantSettings).mockReset()
     showErrorNotification.mockReset()
     vi.mocked(getTenantSettings).mockResolvedValue({
+      baseline_retention_months: 0,
+      company_name: '',
+      company_subtitle: '',
+      digest_critical_days: 14,
+      digest_horizon_days: 90,
+      digest_max_findings: 100,
+      digest_recipients: '',
+      digest_warning_days: 45,
+      has_uploaded_logo: false,
+      logo_url: '',
+      mail_config_errors: [],
+      maintenance_hour: 0,
+      planning_freeze_before: null,
+      primary_color: '',
+      scheduler_enabled: false,
+      smtp_enabled: false,
+      smtp_from_address: '',
+      smtp_host: '',
+      smtp_password_set: false,
+      smtp_port: 0,
+      smtp_use_tls: false,
+      smtp_username: '',
+      time_zone: '',
       audit_retention_months: 24,
     } as Awaited<ReturnType<typeof getTenantSettings>>)
   })

@@ -2,11 +2,11 @@
 
 from datetime import UTC, date, datetime
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 from sqlalchemy.sql.base import ExecutableOption
-from sqlmodel import select
 
 from app.models.organization_settings import OrganizationSettings
 

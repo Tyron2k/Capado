@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas import ResponseModel
+
 # ---------------------------------------------------------------------------
 # Request schemas
 # ---------------------------------------------------------------------------
@@ -30,14 +32,14 @@ class ChangePasswordRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class UserScopes(BaseModel):
+class UserScopes(ResponseModel):
     """User scope fields included in login response."""
 
     scope_group_ids: list[UUID] | None = None
     scope_project_ids: list[UUID] | None = None
 
 
-class UserInfo(BaseModel):
+class UserInfo(ResponseModel):
     """User profile info returned in login response."""
 
     id: UUID
@@ -48,7 +50,7 @@ class UserInfo(BaseModel):
     scopes: UserScopes
 
 
-class LoginResponse(BaseModel):
+class LoginResponse(ResponseModel):
     """Response body for POST /api/auth/login.
 
     The refresh token is delivered separately as an httpOnly cookie, not in
@@ -59,7 +61,7 @@ class LoginResponse(BaseModel):
     user: UserInfo
 
 
-class RefreshResponse(BaseModel):
+class RefreshResponse(ResponseModel):
     """Response body for POST /api/auth/refresh.
 
     The rotated refresh token is delivered as an httpOnly cookie, not here.
@@ -83,9 +85,15 @@ class SetupRequest(BaseModel):
     password: str = Field(..., min_length=8, description="Admin password (min 8 chars)")
 
 
-class SetupStatusResponse(BaseModel):
+class SetupStatusResponse(ResponseModel):
     """Response body for GET /api/auth/setup-status."""
 
     required: bool = Field(
         ..., description="True if no users exist and setup is needed"
     )
+
+
+class OIDCStatusResponse(ResponseModel):
+    """Whether the configured identity provider is available for login."""
+
+    enabled: bool

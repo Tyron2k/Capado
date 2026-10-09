@@ -16,8 +16,8 @@ you must use the date+hours fields, never ``start_at``/``end_at``.
 from datetime import UTC, date, datetime
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.models.assignment import Assignment
@@ -144,7 +144,9 @@ class AssignmentService:
         self, resource_id: UUID, resource_type: ResourceType
     ) -> None:
         if resource_type == ResourceType.personal:
-            resource = await self.session.get(PersonalResource, resource_id)
+            resource: (
+                PersonalResource | InfrastructureResource | None
+            ) = await self.session.get(PersonalResource, resource_id)
             if resource is None:
                 raise NotFoundError("PersonalResource", resource_id)
         else:

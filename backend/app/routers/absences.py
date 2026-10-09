@@ -9,8 +9,8 @@ DELETE /api/absences/{id}              Delete an absence
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.database import get_session
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType

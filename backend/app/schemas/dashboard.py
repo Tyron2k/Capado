@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.schemas import ResponseModel
+
 # --- Dashboard Schemas ---
 
 
@@ -19,7 +21,7 @@ class WeeklyUtilizationResponse(BaseModel):
     color: str  # "green", "yellow", "red"
 
 
-class ProjectConflictSummary(BaseModel):
+class ProjectConflictSummary(ResponseModel):
     """Project with open conflict count for the dashboard project list."""
 
     id: UUID
@@ -29,7 +31,7 @@ class ProjectConflictSummary(BaseModel):
     conflict_count: int
 
 
-class DashboardResponse(BaseModel):
+class DashboardResponse(ResponseModel):
     """Response schema for GET /api/dashboard."""
 
     personal_utilization: list[WeeklyUtilizationResponse]
@@ -40,7 +42,7 @@ class DashboardResponse(BaseModel):
 # --- Gantt Schemas ---
 
 
-class GanttResourceInfo(BaseModel):
+class GanttResourceInfo(ResponseModel):
     """Resource info for a Gantt bar."""
 
     id: UUID
@@ -48,7 +50,7 @@ class GanttResourceInfo(BaseModel):
     resource_type: str  # "personal" | "infrastructure"
 
 
-class GanttResourceAssignmentSchema(BaseModel):
+class GanttResourceAssignmentSchema(ResponseModel):
     """Ressource mit zugewiesenen Stunden/Tag."""
 
     id: UUID
@@ -57,7 +59,7 @@ class GanttResourceAssignmentSchema(BaseModel):
     allocation_percent: float
 
 
-class GanttWorkPackageBar(BaseModel):
+class GanttWorkPackageBar(ResponseModel):
     """A work package as a Gantt bar with assigned resources and conflict flag."""
 
     id: UUID
@@ -69,7 +71,7 @@ class GanttWorkPackageBar(BaseModel):
     has_conflict: bool
 
 
-class GanttResponse(BaseModel):
+class GanttResponse(ResponseModel):
     """Response-Schema für GET /api/gantt/projects/{projectId}."""
 
     project_id: UUID

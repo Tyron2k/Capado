@@ -11,12 +11,13 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.models.user import User
-from app.services.digest import summarise
+from app.schemas import ResponseModel
+from app.services.digest import FindingKind, Severity, summarise
 from app.services.digest_service import build_digest
 from app.services.permissions import get_current_user
 
@@ -24,7 +25,7 @@ from app.services.permissions import get_current_user
 router = APIRouter(prefix="/digest", tags=["digest"])
 
 
-class FindingResponse(BaseModel):
+class FindingResponse(ResponseModel):
     """One finding as sent to the client.
 
     ``params`` rather than a rendered sentence: ``kind`` says which sentence, the client
@@ -33,8 +34,8 @@ class FindingResponse(BaseModel):
     headings, and could not be fixed on the client at all.
     """
 
-    kind: str
-    severity: str
+    kind: FindingKind
+    severity: Severity
     params: dict[str, str] = Field(
         description="Substitution values for the sentence selected by 'kind'. Dates are "
         "ISO so the client can format them for its own locale."
@@ -45,7 +46,7 @@ class FindingResponse(BaseModel):
     project_id: UUID | None = None
 
 
-class DigestResponse(BaseModel):
+class DigestResponse(ResponseModel):
     """The digest, with the counts a header needs before the detail."""
 
     generated_for: date = Field(
@@ -80,8 +81,8 @@ async def get_digest(
         counts=summarise(findings),
         findings=[
             FindingResponse(
-                kind=f.kind.value,
-                severity=f.severity.value,
+                kind=f.kind,
+                severity=f.severity,
                 params=f.params,
                 due=f.due,
                 resource_id=f.resource_id,

@@ -10,15 +10,15 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, selectinload
-from sqlmodel import SQLModel
 
 from app.database import get_session
 from app.main import app
 from app.models.audit import AuditLog
+from app.models.base import ORMModel
 from app.models.resource import ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.user import User
-from app.schemas.resource import ResourceGroupTransfer
+from app.schemas.transfer.resource import ResourceGroupTransfer
 from app.services.audit import _before_flush, register_audit_listener, set_actor
 from app.services.auth_service import create_access_token
 from tests.test_utc_migration_postgres import legacy_database, migrate
@@ -38,7 +38,7 @@ def test_constructor_defaults_are_eager_and_csv_validation_is_separate():
     assert group != other  # ORM identity, not value equality.
     record = ResourceGroupTransfer.model_validate(group, from_attributes=True)
     assert record.id == group.id and record.resource_type is ResourceType.personal
-    assert ResourceGroup.metadata is SQLModel.metadata
+    assert ResourceGroup.metadata is ORMModel.metadata
 
 
 @pytest_asyncio.fixture
@@ -67,7 +67,7 @@ async def test_postgres_schema_defaults_relationship_tracking_and_rollback(
                 ),
             },
         )
-        return compare_metadata(context, SQLModel.metadata)
+        return compare_metadata(context, ORMModel.metadata)
 
     async with resource_database.connect() as connection:
         assert await connection.run_sync(schema_diff) == []
@@ -106,7 +106,9 @@ async def test_postgres_schema_defaults_relationship_tracking_and_rollback(
         logs = list(
             (
                 await session.scalars(
-                    sa.select(AuditLog).where(AuditLog.entity_id == child_id)
+                    sa.select(AuditLog)
+                    .where(AuditLog.entity_id == child_id)
+                    .order_by(AuditLog.recorded_at)
                 )
             ).all()
         )

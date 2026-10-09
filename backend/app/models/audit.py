@@ -1,4 +1,4 @@
-"""SQLModel entity for the audit trail.
+"""SQLAlchemy entity for the audit trail.
 
 One generic table rather than per-entity history, because the questions asked of
 it cross entities — who changed anything on Friday, what did this user touch (see
@@ -11,7 +11,10 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-from sqlmodel import Column, Field, SQLModel
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 # Entities deliberately NOT audited: they are recomputed rather than edited, so a
 # log of them would describe derivations instead of decisions. `refresh_conflicts`
@@ -45,7 +48,7 @@ class AuditAction(StrEnum):
     deleted = "deleted"
 
 
-class AuditLog(SQLModel, table=True):
+class AuditLog(ORMModel, kw_only=True, eq=False):
     """One recorded change to one entity.
 
     Written by the ``before_flush`` listener in :mod:`app.services.audit`, inside
@@ -70,14 +73,45 @@ class AuditLog(SQLModel, table=True):
     """
 
     __tablename__ = "audit_log"
-
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    entity_type: str = Field(max_length=64, index=True)
-    entity_id: UUID = Field(index=True)
-    action: AuditAction = Field(index=True)
-    actor_id: UUID | None = Field(default=None, foreign_key="users.id", index=True)
-    reason: str | None = Field(default=None, max_length=500)
-    changes: dict[str, Any] = Field(
-        default_factory=dict, sa_column=Column(sa.JSON, nullable=False)
+    __table_args__ = (
+        sa.Index(
+            "ix_audit_log_entity_history", "entity_type", "entity_id", "recorded_at"
+        ),
     )
-    recorded_at: datetime = Field(default_factory=_utcnow, index=True)
+
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    entity_type: Mapped[str] = mapped_column(sa.String(64), nullable=False, index=True)
+    entity_id: Mapped[UUID] = mapped_column(sa.Uuid(), nullable=False, index=True)
+    action: Mapped[AuditAction] = mapped_column(
+        sa.Enum(
+            AuditAction,
+            name="auditaction",
+            native_enum=True,
+            length=7,
+            create_constraint=False,
+        ),
+        nullable=False,
+        index=True,
+    )
+    actor_id: Mapped[UUID | None] = mapped_column(
+        sa.Uuid(), sa.ForeignKey("users.id"), nullable=True, index=True, default=None
+    )
+    reason: Mapped[str | None] = mapped_column(
+        sa.String(500), nullable=True, default=None
+    )
+    changes: Mapped[dict[str, Any]] = mapped_column(
+        sa.JSON, nullable=False, default_factory=dict, insert_default=dict
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        nullable=False,
+        index=True,
+        default_factory=_utcnow,
+        insert_default=_utcnow,
+    )

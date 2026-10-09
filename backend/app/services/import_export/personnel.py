@@ -7,14 +7,19 @@ skill assignments.
 
 import asyncio
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app import models as m
 from app.models.resource import PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.site import Site
 from app.models.skill import PersonalResourceSkill, Skill, SkillAttribute
+from app.schemas.transfer.resource import (
+    InfrastructureResourceTransfer,
+    PersonalResourceTransfer,
+)
+from app.schemas.transfer.skill import PersonalResourceSkillTransfer
 
 from .common import (
     RESOURCE_GROUP_CSV,
@@ -144,11 +149,13 @@ CSV_AREA = CsvArea(
         entity(
             m.PersonalResource,
             "id name group_id site_id is_active created_at updated_at",
+            validation_model=PersonalResourceTransfer,
         ),
         entity(
             m.PersonalResourceSkill,
             "id resource_id skill_attribute_id valid_from valid_until level created_at",
             existing_by_id=True,
+            validation_model=PersonalResourceSkillTransfer,
         ),
         RESOURCE_WORK_PROFILE_CSV,
     ),
@@ -164,6 +171,7 @@ async def load_export(session: AsyncSession) -> dict[str, list[dict]]:
             entity(
                 m.InfrastructureResource,
                 "id name group_id site_id is_active created_at updated_at",
+                validation_model=InfrastructureResourceTransfer,
             ),
         ),
     )

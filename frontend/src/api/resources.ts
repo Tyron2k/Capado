@@ -1,3 +1,6 @@
+import { allPages } from './pagination'
+import type { ApiBody, ApiResponse } from './contracts'
+
 /**
  * API functions for resources (personal & infrastructure).
  */
@@ -5,12 +8,8 @@
 import apiClient from './client'
 import type {
   InfrastructureResource,
-  InfrastructureResourceCreate,
-  InfrastructureResourceUpdate,
   InfrastructureTreeNode,
   PersonalResource,
-  PersonalResourceCreate,
-  PersonalResourceUpdate,
   PersonalTreeNode,
   ResourceGroup,
 } from '../types/resource'
@@ -22,53 +21,61 @@ export async function getGroups(
   resourceType?: 'personal' | 'infrastructure',
   signal?: AbortSignal,
 ): Promise<ResourceGroup[]> {
-  const params = resourceType ? { resource_type: resourceType } : undefined
-  const response = await apiClient.get<{ items: ResourceGroup[]; total: number }>(
-    '/api/resource-groups',
-    { params, signal },
-  )
-  return response.data.items
+  return allPages(async (offset) => {
+    const params = resourceType ? { resource_type: resourceType } : undefined
+    const response = await apiClient.get<ApiResponse<'/api/resource-groups', 'get'>>(
+      '/api/resource-groups',
+      { params: { ...params, limit: 500, offset }, signal },
+    )
+    return response.data
+  })
 }
 
 /** Create a new resource group. */
-export async function createGroup(data: {
-  name: string
-  resource_type: 'personal' | 'infrastructure'
-  parent_id?: string | null
-}): Promise<ResourceGroup> {
-  const response = await apiClient.post<ResourceGroup>('/api/resource-groups', data)
+export async function createGroup(
+  data: ApiBody<'/api/resource-groups', 'post'>,
+): Promise<ResourceGroup> {
+  const response = await apiClient.post<ApiResponse<'/api/resource-groups', 'post'>>(
+    '/api/resource-groups',
+    data,
+  )
   return response.data
 }
 
 /** Update an existing resource group. */
 export async function updateGroup(
   id: string,
-  data: { name?: string; parent_id?: string | null },
+  data: ApiBody<'/api/resource-groups/{group_id}', 'put'>,
 ): Promise<ResourceGroup> {
-  const response = await apiClient.put<ResourceGroup>(`/api/resource-groups/${id}`, data)
+  const response = await apiClient.put<ApiResponse<'/api/resource-groups/{group_id}', 'put'>>(
+    `/api/resource-groups/${id}`,
+    data,
+  )
   return response.data
 }
 
 /** Delete a resource group. */
 export async function deleteGroup(id: string): Promise<void> {
-  await apiClient.delete(`/api/resource-groups/${id}`)
+  await apiClient.delete<ApiResponse<'/api/resource-groups/{group_id}', 'delete'>>(
+    `/api/resource-groups/${id}`,
+  )
 }
 
 // --- Infrastructure Resources ---
 
 /** Fetch a single infrastructure resource by ID. */
 export async function getInfrastructureResource(id: string): Promise<InfrastructureResource> {
-  const response = await apiClient.get<InfrastructureResource>(
-    `/api/resources/infrastructure/${id}`,
-  )
+  const response = await apiClient.get<
+    ApiResponse<'/api/resources/infrastructure/{resource_id}', 'get'>
+  >(`/api/resources/infrastructure/${id}`)
   return response.data
 }
 
 /** Create a new infrastructure resource. */
 export async function createInfrastructureResource(
-  data: InfrastructureResourceCreate,
+  data: ApiBody<'/api/resources/infrastructure', 'post'>,
 ): Promise<InfrastructureResource> {
-  const response = await apiClient.post<InfrastructureResource>(
+  const response = await apiClient.post<ApiResponse<'/api/resources/infrastructure', 'post'>>(
     '/api/resources/infrastructure',
     data,
   )
@@ -78,48 +85,59 @@ export async function createInfrastructureResource(
 /** Update an existing infrastructure resource. */
 export async function updateInfrastructureResource(
   id: string,
-  data: InfrastructureResourceUpdate,
+  data: ApiBody<'/api/resources/infrastructure/{resource_id}', 'put'>,
 ): Promise<InfrastructureResource> {
-  const response = await apiClient.put<InfrastructureResource>(
-    `/api/resources/infrastructure/${id}`,
-    data,
-  )
+  const response = await apiClient.put<
+    ApiResponse<'/api/resources/infrastructure/{resource_id}', 'put'>
+  >(`/api/resources/infrastructure/${id}`, data)
   return response.data
 }
 
 /** Delete an infrastructure resource. */
 export async function deleteInfrastructureResource(id: string): Promise<void> {
-  await apiClient.delete(`/api/resources/infrastructure/${id}`)
+  await apiClient.delete<ApiResponse<'/api/resources/infrastructure/{resource_id}', 'delete'>>(
+    `/api/resources/infrastructure/${id}`,
+  )
 }
 
 // --- Personal Resources ---
 
 /** Fetch a single personal resource by ID. */
 export async function getPersonalResource(id: string): Promise<PersonalResource> {
-  const response = await apiClient.get<PersonalResource>(`/api/resources/personal/${id}`)
+  const response = await apiClient.get<ApiResponse<'/api/resources/personal/{resource_id}', 'get'>>(
+    `/api/resources/personal/${id}`,
+  )
   return response.data
 }
 
 /** Create a new personal resource. */
 export async function createPersonalResource(
-  data: PersonalResourceCreate,
+  data: ApiBody<'/api/resources/personal', 'post'>,
 ): Promise<PersonalResource> {
-  const response = await apiClient.post<PersonalResource>('/api/resources/personal', data)
+  const response = await apiClient.post<ApiResponse<'/api/resources/personal', 'post'>>(
+    '/api/resources/personal',
+    data,
+  )
   return response.data
 }
 
 /** Update an existing personal resource. */
 export async function updatePersonalResource(
   id: string,
-  data: PersonalResourceUpdate,
+  data: ApiBody<'/api/resources/personal/{resource_id}', 'put'>,
 ): Promise<PersonalResource> {
-  const response = await apiClient.put<PersonalResource>(`/api/resources/personal/${id}`, data)
+  const response = await apiClient.put<ApiResponse<'/api/resources/personal/{resource_id}', 'put'>>(
+    `/api/resources/personal/${id}`,
+    data,
+  )
   return response.data
 }
 
 /** Delete a personal resource. */
 export async function deletePersonalResource(id: string): Promise<void> {
-  await apiClient.delete(`/api/resources/personal/${id}`)
+  await apiClient.delete<ApiResponse<'/api/resources/personal/{resource_id}', 'delete'>>(
+    `/api/resources/personal/${id}`,
+  )
 }
 
 // --- Tree Endpoints (Hierarchy) ---
@@ -127,17 +145,23 @@ export async function deletePersonalResource(id: string): Promise<void> {
 /**
  * Loads the complete personal hierarchy as a tree structure.
  */
-export async function getPersonalTree(): Promise<PersonalTreeNode[]> {
-  const response = await apiClient.get<PersonalTreeNode[]>('/api/resources/personal/tree')
+export async function getPersonalTree(signal?: AbortSignal): Promise<PersonalTreeNode[]> {
+  const response = await apiClient.get<ApiResponse<'/api/resources/personal/tree', 'get'>>(
+    '/api/resources/personal/tree',
+    { signal },
+  )
   return response.data
 }
 
 /**
  * Loads the complete infrastructure hierarchy as a tree structure.
  */
-export async function getInfrastructureTree(): Promise<InfrastructureTreeNode[]> {
-  const response = await apiClient.get<InfrastructureTreeNode[]>(
+export async function getInfrastructureTree(
+  signal?: AbortSignal,
+): Promise<InfrastructureTreeNode[]> {
+  const response = await apiClient.get<ApiResponse<'/api/resources/infrastructure/tree', 'get'>>(
     '/api/resources/infrastructure/tree',
+    { signal },
   )
   return response.data
 }

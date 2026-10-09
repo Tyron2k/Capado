@@ -9,12 +9,17 @@ import asyncio
 import io
 
 from openpyxl import Workbook
-from sqlalchemy import func
+from openpyxl.cell.cell import Cell, MergedCell
+from openpyxl.worksheet.worksheet import Worksheet
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app import models as m
 from app.models.skill import Skill, SkillAttribute
+from app.schemas.transfer.work_package_template import (
+    WorkPackageTemplateRequirementTransfer,
+    WorkPackageTemplateTransfer,
+)
 
 from .common import ImportResult, _parse_header
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -72,6 +77,7 @@ def _build_templates_xlsx(rows: list[tuple]) -> bytes:
 
     wb = Workbook()
     ws = wb.active
+    assert isinstance(ws, Worksheet)
     ws.title = "Templates"
 
     headers = ["Template", "Description", "Skill", "Attribute", "Quantity"]
@@ -102,7 +108,7 @@ def _build_templates_xlsx(rows: list[tuple]) -> bytes:
     # --- Header row ---
     ws.row_dimensions[1].height = 22
     for col_idx, header in enumerate(headers, start=1):
-        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell: Cell | MergedCell = ws.cell(row=1, column=col_idx, value=header)
         cell.font = font_header
         cell.fill = fill_header
         cell.alignment = align_center
@@ -292,10 +298,12 @@ CSV_AREA = CsvArea(
         entity(
             m.WorkPackageTemplate,
             "id name description lead_time_working_days created_at updated_at",
+            validation_model=WorkPackageTemplateTransfer,
         ),
         entity(
             m.WorkPackageTemplateRequirement,
             "id template_id skill_id skill_attribute_id quantity requirement_mode min_allocation_percent min_level created_at",
+            validation_model=WorkPackageTemplateRequirementTransfer,
         ),
     ),
 )

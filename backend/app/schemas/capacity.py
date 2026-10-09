@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.models.resource import ResourceType
+from app.schemas import ResponseModel
 
 # --- Capacity Overview (Weekly) ---
 
@@ -22,7 +23,7 @@ class WeeklyUtilizationResponse(BaseModel):
     color: str
 
 
-class ResourceOverviewItem(BaseModel):
+class ResourceOverviewItem(ResponseModel):
     """Capacity overview for a single resource."""
 
     resource_id: UUID
@@ -32,7 +33,7 @@ class ResourceOverviewItem(BaseModel):
     weeks: list[WeeklyUtilizationResponse]
 
 
-class CapacityOverviewResponse(BaseModel):
+class CapacityOverviewResponse(ResponseModel):
     """Full capacity overview (all resources with weekly utilization)."""
 
     resources: list[ResourceOverviewItem]
@@ -43,7 +44,7 @@ class CapacityOverviewResponse(BaseModel):
 # --- Capacity Detail (Daily) ---
 
 
-class DailyUtilizationResponse(BaseModel):
+class DailyUtilizationResponse(ResponseModel):
     """Daily utilization for a single resource."""
 
     date: date
@@ -53,7 +54,7 @@ class DailyUtilizationResponse(BaseModel):
     color: str
 
 
-class ResourceCapacityDetailResponse(BaseModel):
+class ResourceCapacityDetailResponse(ResponseModel):
     """Detailed utilization for a single resource (daily breakdown)."""
 
     resource_id: UUID
@@ -68,7 +69,7 @@ class ResourceCapacityDetailResponse(BaseModel):
 Severity = Literal["low", "medium", "high"]
 
 
-class ConflictAssignmentInfo(BaseModel):
+class ConflictAssignmentInfo(ResponseModel):
     """Information about an assignment involved in a conflict."""
 
     assignment_id: UUID
@@ -86,7 +87,7 @@ class ConflictAssignmentInfo(BaseModel):
     skill_mismatch: bool = False
 
 
-class ConflictResponse(BaseModel):
+class ConflictResponse(ResponseModel):
     """Response schema for a conflict.
 
     Severity is derived from overload_ratio = total_assigned_percent / available_percent:

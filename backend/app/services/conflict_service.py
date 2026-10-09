@@ -31,9 +31,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment, ConflictCause

@@ -15,7 +15,11 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, SQLModel
+import sqlalchemy as sa
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import ORMModel
+from app.utils.utc_datetime import UTCDateTime
 
 
 def _utcnow() -> datetime:
@@ -36,7 +40,7 @@ class JobRunStatus(StrEnum):
     skipped = "skipped"
 
 
-class ScheduledJobRun(SQLModel, table=True):
+class ScheduledJobRun(ORMModel, kw_only=True, eq=False):
     """One attempt at one scheduled job.
 
     Attributes:
@@ -54,11 +58,32 @@ class ScheduledJobRun(SQLModel, table=True):
     """
 
     __tablename__ = "scheduled_job_runs"
+    __table_args__ = (
+        sa.Index("ix_scheduled_job_runs_job_name_started_at", "job_name", "started_at"),
+    )
 
-    id: UUID = Field(default_factory=uuid4, primary_key=True)
-    job_name: str = Field(max_length=100, index=True, nullable=False)
-    started_at: datetime = Field(default_factory=_utcnow, index=True)
-    finished_at: datetime | None = Field(default=None)
-    status: str = Field(default=JobRunStatus.running, max_length=20, nullable=False)
-    items_affected: int | None = Field(default=None)
-    detail: str = Field(default="", max_length=1000, nullable=False)
+    id: Mapped[UUID] = mapped_column(
+        sa.Uuid(),
+        nullable=False,
+        primary_key=True,
+        default_factory=uuid4,
+        insert_default=uuid4,
+    )
+    job_name: Mapped[str] = mapped_column(sa.String(100), nullable=False, index=True)
+    started_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        nullable=False,
+        index=False,
+        default_factory=_utcnow,
+        insert_default=_utcnow,
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        UTCDateTime(), nullable=True, default=None
+    )
+    status: Mapped[str] = mapped_column(
+        sa.String(20), nullable=False, default=JobRunStatus.running
+    )
+    items_affected: Mapped[int | None] = mapped_column(
+        sa.Integer(), nullable=True, default=None
+    )
+    detail: Mapped[str] = mapped_column(sa.String(1000), nullable=False, default="")

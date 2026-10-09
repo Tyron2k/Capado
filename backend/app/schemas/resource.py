@@ -25,7 +25,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.resource import ResourceType
+from app.schemas import ResponseModel
 
 # --- Resource Group Schemas ---
 
@@ -53,7 +53,7 @@ class ResourceGroupUpdate(BaseModel):
     parent_id: UUID | None = Field(None)
 
 
-class ResourceGroupResponse(BaseModel):
+class ResourceGroupResponse(ResponseModel):
     """Response schema for a resource group."""
 
     id: UUID
@@ -64,21 +64,6 @@ class ResourceGroupResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
-
-
-class ResourceGroupTransfer(BaseModel):
-    """Validate full CSV rows without constructing a persistence object.
-
-    Retain the previous SQLModel constraints and nullable-parent semantics.
-    Explicit timestamp offsets remain enforced by the shared CSV parser.
-    """
-
-    id: UUID
-    name: str = Field(max_length=255)
-    resource_type: ResourceType
-    parent_id: UUID | None
-    created_at: datetime
-    updated_at: datetime
 
 
 # --- Resource Schemas (unified for personal and infrastructure) ---
@@ -106,7 +91,7 @@ class ResourceUpdate(BaseModel):
     site_id: UUID | None = Field(None, description="Site the resource is located at")
 
 
-class ResourceResponse(BaseModel):
+class ResourceResponse(ResponseModel):
     """Response schema for a resource (personal or infrastructure)."""
 
     id: UUID
@@ -135,7 +120,7 @@ InfrastructureResourceResponse = ResourceResponse
 # --- Tree/List Representation Schema ---
 
 
-class ResourceListItemResponse(BaseModel):
+class ResourceListItemResponse(ResponseModel):
     """Response schema for a resource in the flat list (with conflict count)."""
 
     id: UUID
@@ -155,7 +140,7 @@ PersonalTreeNodeResponse = ResourceListItemResponse
 InfrastructureTreeNodeResponse = ResourceListItemResponse
 
 
-class ErasureResponse(BaseModel):
+class ErasureResponse(ResponseModel):
     """What an erasure removed, per table.
 
     Counts rather than a bare 204, because the operator answering an Art. 17 request needs something

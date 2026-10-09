@@ -20,13 +20,13 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.database import get_session
 from app.models.audit import AuditAction, AuditLog
 from app.models.user import User
+from app.schemas import ResponseModel
 from app.services.permissions import require_admin
 
 router = APIRouter(tags=["Audit"])
@@ -37,7 +37,7 @@ router = APIRouter(tags=["Audit"])
 MAX_PAGE_SIZE = 200
 
 
-class AuditEntryResponse(BaseModel):
+class AuditEntryResponse(ResponseModel):
     """One recorded change."""
 
     id: UUID

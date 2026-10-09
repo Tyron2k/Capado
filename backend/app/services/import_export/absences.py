@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import models as m
+from app.schemas.transfer.absence import AbsenceTransfer
 
 from .common import ImportResult
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -21,6 +22,7 @@ CSV_AREA = CsvArea(
             "id resource_id resource_type reason start_date end_date allocation_percent status note created_at updated_at",
             reference_tables=("personal_resources", "infrastructure_resources"),
             existing_by_id=True,
+            validation_model=AbsenceTransfer,
         ),
     ),
 )

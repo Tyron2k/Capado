@@ -11,14 +11,15 @@ The totals are carried alongside the lists because both are capped: a caller has
 
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from app.schemas import ResponseModel
 from app.schemas.absence import AbsenceResponse
 from app.schemas.assignment import AssignmentResponse
 from app.schemas.skill import ResourceSkillAssignmentResponse
 
 
-class MyPlanResponse(BaseModel):
+class MyPlanResponse(ResponseModel):
     """Everything the signed-in person may read about their own scheduling."""
 
     resource_id: UUID = Field(

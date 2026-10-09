@@ -1,10 +1,17 @@
-"""Native typed mappings share metadata with the remaining SQLModel entities."""
+"""Shared native SQLAlchemy metadata and eager, identity-based ORM constructors."""
 
+from typing import Any
+
+from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
-from sqlmodel import SQLModel
 
 
 class ORMModel(MappedAsDataclass, DeclarativeBase, kw_only=True, eq=False):
-    """Keep eager constructor defaults and one Alembic schema."""
+    """One mapper registry and metadata for persistence and Alembic."""
 
-    metadata = SQLModel.metadata
+
+def column_values(obj: ORMModel) -> dict[str, Any]:
+    """Read persisted scalar attributes, excluding relationships and ORM state."""
+    return {
+        attr.key: getattr(obj, attr.key) for attr in inspect(type(obj)).column_attrs
+    }

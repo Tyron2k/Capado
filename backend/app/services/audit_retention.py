@@ -25,8 +25,10 @@ import calendar
 import logging
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from typing import Any, cast
 
 import sqlalchemy as sa
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -128,7 +130,7 @@ async def prune_audit_log(
             ),
             {"cutoff": cutoff, "size": DELETE_BATCH_SIZE},
         )
-        batch = result.rowcount or 0
+        batch = cast(CursorResult[Any], result).rowcount or 0
         deleted += batch
         # Commit per batch: an interrupted run should leave the work it already did
         # done, not roll back an hour of deletion.

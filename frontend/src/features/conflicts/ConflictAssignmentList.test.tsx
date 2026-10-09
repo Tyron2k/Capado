@@ -35,6 +35,12 @@ describe('focused conflict assignment', () => {
             <ConflictAssignmentList
               assignments={[
                 {
+                  allocation_percent: null,
+                  end_at: null,
+                  resource_id: null,
+                  resource_name: null,
+                  skill_mismatch: false,
+                  start_at: null,
                   assignment_id: 'a1',
                   project_id: 'p1',
                   project_name: 'Project One',
@@ -44,6 +50,12 @@ describe('focused conflict assignment', () => {
                   end_date: '2026-10-23',
                 },
                 {
+                  allocation_percent: null,
+                  end_at: null,
+                  resource_id: null,
+                  resource_name: null,
+                  skill_mismatch: false,
+                  start_at: null,
                   assignment_id: 'a2',
                   project_id: 'p1',
                   project_name: 'Project One',

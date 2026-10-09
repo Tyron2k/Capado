@@ -7,11 +7,13 @@ project (ADR-008).
 """
 
 from datetime import UTC, datetime
+from typing import Any, cast
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy import select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.project import Project, ProjectFolder
@@ -190,7 +192,9 @@ class ProjectFolderService:
 
         await self.session.delete(folder)
         await self.session.commit()
-        return unfiled.rowcount or 0, moved.rowcount or 0
+        return cast(CursorResult[Any], unfiled).rowcount or 0, cast(
+            CursorResult[Any], moved
+        ).rowcount or 0
 
     async def project_ids_in(
         self, folder_id: UUID, *, include_subfolders: bool = False

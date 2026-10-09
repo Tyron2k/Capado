@@ -1,3 +1,5 @@
+import type { components } from './generated/schema'
+
 /**
  * API client functions for the initial application setup.
  * Used only when no users exist in the database yet.
@@ -14,15 +16,9 @@ const setupClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-interface SetupStatusResponse {
-  required: boolean
-}
+type SetupStatusResponse = components['schemas']['SetupStatusResponse']
 
-interface SetupData {
-  name: string
-  email: string
-  password: string
-}
+type SetupData = components['schemas']['SetupRequest']
 
 /** Check whether initial setup is required (no users exist). */
 export async function getSetupStatus(): Promise<SetupStatusResponse> {

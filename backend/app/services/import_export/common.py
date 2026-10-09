@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from openpyxl import Workbook
-from sqlalchemy import Result, func
+from openpyxl.worksheet.worksheet import Worksheet
+from sqlalchemy import Result, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
 from app.models.calendar import ResourceWorkProfile
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
@@ -29,7 +29,8 @@ from app.models.skill import (
     Skill,
     SkillAttribute,
 )
-from app.schemas.resource import ResourceGroupTransfer
+from app.schemas.transfer.calendar import ResourceWorkProfileTransfer
+from app.schemas.transfer.resource import ResourceGroupTransfer
 from app.services.conflict_refresh import refresh_resources
 
 from .csv_format import entity
@@ -209,6 +210,7 @@ def _build_skill_matrix_xlsx(data: _MatrixData, sheet_title: str) -> bytes:
 
     wb = Workbook()
     ws = wb.active
+    assert isinstance(ws, Worksheet)
     ws.title = sheet_title
 
     num_fixed_cols = 2  # Name, Group
@@ -388,6 +390,7 @@ def _build_flat_resource_xlsx(rows: list[tuple], sheet_title: str) -> bytes:
     """
     wb = Workbook()
     ws = wb.active
+    assert isinstance(ws, Worksheet)
     ws.title = sheet_title
     ws.append(["Name", "Group", "Skill", "Attribute", "Site"])
     for name, group_name, skill_name, attr_name, site_name in rows:
@@ -419,7 +422,7 @@ async def _import_resources(
     Args:
         session: Database session.
         rows: Parsed rows including header.
-        resource_model: SQLModel class (PersonalResource or InfrastructureResource).
+        resource_model: SQLAlchemy class (PersonalResource or InfrastructureResource).
         skill_model: Skill assignment class (PersonalResourceSkill or
             InfrastructureResourceSkill).
         resource_type: ResourceType enum value for new groups/skills.
@@ -656,6 +659,7 @@ RESOURCE_WORK_PROFILE_CSV = entity(
     ResourceWorkProfile,
     "id resource_id group_id profile_id valid_from valid_until created_at updated_at",
     reference_tables=("personal_resources", "infrastructure_resources"),
+    validation_model=ResourceWorkProfileTransfer,
 )
 
 

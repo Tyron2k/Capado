@@ -15,6 +15,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from openpyxl.worksheet._read_only import ReadOnlyWorksheet
+from openpyxl.worksheet.worksheet import Worksheet
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -647,6 +649,8 @@ def _parse_xlsx(content: bytes) -> list[tuple]:
     wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     try:
         ws = wb.active
+        if not isinstance(ws, (Worksheet, ReadOnlyWorksheet)):
+            raise ValueError("An XLSX worksheet is required.")
         return _limited_rows(ws.iter_rows(values_only=True))
     finally:
         wb.close()

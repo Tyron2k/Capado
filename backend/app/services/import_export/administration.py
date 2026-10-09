@@ -6,6 +6,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import models as m
+from app.models.base import column_values
+from app.schemas.transfer.organization_settings import OrganizationSettingsTransfer
+from app.schemas.transfer.user import UserTransfer
 
 from .common import ImportResult
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -24,11 +27,13 @@ CSV_AREA = CsvArea(
             json_columns=("scope_group_ids", "scope_project_ids"),
             defaults={"password_hash": ""},
             reference_tables=("resource_groups", "projects"),
+            validation_model=UserTransfer,
         ),
         entity(
             m.OrganizationSettings,
             "id company_name company_subtitle logo_url primary_color time_zone audit_retention_months baseline_retention_months digest_horizon_days digest_critical_days digest_warning_days digest_max_findings planning_freeze_before scheduler_enabled maintenance_hour smtp_enabled smtp_host smtp_port smtp_use_tls smtp_username smtp_from_address digest_recipients logo_data logo_mime_type singleton_key updated_at",
             binary_columns=("logo_data",),
+            validation_model=OrganizationSettingsTransfer,
         ),
     ),
 )
@@ -153,7 +158,7 @@ def prepare_import(context: ImportContext) -> None:
                 "CSV migration requires an empty destination with only its bootstrap administrator."
             )
         if not context.data["organization_settings"]:
-            settings = m.OrganizationSettings(scheduler_enabled=False).model_dump()
+            settings = column_values(m.OrganizationSettings(scheduler_enabled=False))
             context.data["organization_settings"] = [
                 {key: settings[key] for key in CSV_AREA.entities[1].columns}
             ]

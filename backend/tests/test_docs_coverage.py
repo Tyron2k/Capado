@@ -30,10 +30,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from sqlmodel import SQLModel
-
-import app.models  # noqa: F401  — registers every table on SQLModel.metadata
+import app.models  # noqa: F401  — registers every table on ORMModel.metadata
 from app.main import app
+from app.models.base import ORMModel
 
 DOCS = Path(__file__).parent.parent.parent / "docs" / "reference"
 API_DOC = (DOCS / "api.md").read_text(encoding="utf-8")
@@ -73,7 +72,7 @@ def _paths_named_in_prose() -> set[str]:
 
 def test_every_table_appears_in_the_data_model_reference():
     """A table nobody documented is a table the next person models from scratch."""
-    missing = sorted(t for t in SQLModel.metadata.tables if t not in MODEL_DOC)
+    missing = sorted(t for t in ORMModel.metadata.tables if t not in MODEL_DOC)
     assert not missing, (
         f"{len(missing)} table(s) missing from docs/reference/data-model.md:\n  "
         + "\n  ".join(missing)
@@ -120,7 +119,7 @@ def test_every_column_appears_in_the_data_model_reference():
     because the table was there. Presence of a heading says nothing about the rows underneath it.
     """
     missing: list[str] = []
-    for table_name, table in sorted(SQLModel.metadata.tables.items()):
+    for table_name, table in sorted(ORMModel.metadata.tables.items()):
         section = _table_section(table_name)
         if not section:
             continue  # the table-level test above owns this failure

@@ -1195,5 +1195,20 @@
     "running": "Check in progress",
     "importFailed": "Import saved. The subsequent conflict check failed. The periodic reconciliation will retry if enabled.",
     "importResult": "Conflict check completed: {count} capacity conflicts for the checked resources"
+  },
+  "tables": {
+    "columns": "Columns",
+    "selectRow": "Select {name}",
+    "selectVisible": "Select visible rows",
+    "selectedCount": "{count} selected",
+    "showSelected": "Show selected only",
+    "clearSelection": "Clear selection",
+    "noFilterMatch": "No matching entries",
+    "groupFilter": "Filter by group",
+    "siteFilter": "Filter by site",
+    "noSite": "No site",
+    "missingGroup": "Group no longer present",
+    "conflictsOnly": "With conflicts only",
+    "openConflicts": "Open conflicts for {name}"
   }
 }

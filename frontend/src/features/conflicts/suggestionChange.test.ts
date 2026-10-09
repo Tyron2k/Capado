@@ -4,6 +4,13 @@ import type { ConflictSuggestion } from '../../api/assignments'
 import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
 
 const personal = {
+  created_at: '2026-01-01T00:00:00Z',
+  project_id: null,
+  project_name: null,
+  resource_name: null,
+  skill_mismatch: false,
+  updated_at: '2026-01-01T00:00:00Z',
+  work_package_name: null,
   id: 'a1',
   resource_id: 'r1',
   resource_type: 'personal',
@@ -26,7 +33,18 @@ const infrastructure = {
 } as Assignment
 
 function suggestion(type: ConflictSuggestion['type'], extras: Partial<ConflictSuggestion>) {
-  return { type, assignment_id: 'a1', description: 'test', ...extras }
+  return {
+    type,
+    assignment_id: 'a1',
+    description: 'test',
+    shift_days: null,
+    new_allocation_percent: null,
+    target_resource_id: null,
+    target_resource_name: null,
+    new_start_at: null,
+    new_end_at: null,
+    ...extras,
+  } satisfies ConflictSuggestion
 }
 
 describe('conflict suggestion preview and apply payloads', () => {
