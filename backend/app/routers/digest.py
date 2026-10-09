@@ -7,7 +7,7 @@ exposes that a normal read does not is a person's name next to an expiring quali
 which is already visible on that person's resource page.
 """
 
-from datetime import UTC, date, datetime
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -20,6 +20,7 @@ from app.schemas import ResponseModel
 from app.services.digest import FindingKind, Severity, summarise
 from app.services.digest_service import build_digest
 from app.services.permissions import get_current_user
+from app.services.time_zone import planning_today
 
 # main.py adds the /api prefix; including it here would double it.
 router = APIRouter(prefix="/digest", tags=["digest"])
@@ -73,7 +74,7 @@ async def get_digest(
     plan edit, and a stale digest is worse than a slow one — somebody acting on a finding
     that was already resolved wastes exactly the attention this feature is trying to save.
     """
-    today = datetime.now(UTC).date()
+    today = planning_today()
     builder = await build_digest(session, today)
     findings = builder.result()
     return DigestResponse(

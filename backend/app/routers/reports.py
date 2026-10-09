@@ -9,7 +9,7 @@ can see the utilization chart can export it. Restricting the export while leavin
 would only mean the numbers get retyped by hand, which is worse.
 """
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
@@ -21,6 +21,7 @@ from app.services.permissions import get_current_user
 from app.services.reports.projects import build_project_report
 from app.services.reports.utilization import build_utilization_report
 from app.services.reports.workbook import filename_for
+from app.services.time_zone import planning_today
 
 # main.py adds the /api prefix.
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -57,7 +58,7 @@ async def utilization_report(
     current_user: User = Depends(get_current_user),
 ) -> Response:
     """Weekly utilization, wide for reading and long for pivoting."""
-    today = datetime.now(UTC).date()
+    today = planning_today()
     first = start or today
     # Twelve weeks rather than a year: a default that produces a 50-column sheet trains people to
     # always pass parameters, and the parameters are right there.
@@ -82,4 +83,4 @@ async def project_report(
     filtering it by date would hide exactly the overdue project somebody is looking for.
     """
     content = await build_project_report(session)
-    return _xlsx_response(content, filename_for("projekte", datetime.now(UTC).date()))
+    return _xlsx_response(content, filename_for("projekte", planning_today()))

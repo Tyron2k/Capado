@@ -30,7 +30,12 @@ from app.models.work_package_requirement import (
     WorkPackageRequirement,
 )
 from app.schemas.assignment import ResourceSuggestion, UnmetRequirementResponse
-from app.services.time_zone import local_date, local_day_bounds, planning_zone
+from app.services.time_zone import (
+    local_date,
+    local_day_bounds,
+    planning_today,
+    planning_zone,
+)
 
 
 def assignment_span(assignment: Assignment) -> tuple[date, date] | None:
@@ -134,7 +139,7 @@ async def get_unmet_requirements(
 
     # 2. Load referenced work packages — only those still active (end_date >= today)
     wp_ids = {r.work_package_id for r in requirements}
-    today = date.today()
+    today = planning_today()
     work_packages = list(
         (
             await session.execute(

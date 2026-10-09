@@ -9,7 +9,7 @@ the decision recorded for this project: individual logins were struck deliberate
 for a group is the replacement rather than a stopgap.
 """
 
-from datetime import UTC, date, datetime
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -21,6 +21,7 @@ from app.models.user import User
 from app.schemas import ResponseModel
 from app.services.permissions import get_current_user
 from app.services.team_week_service import build_team_week, group_name
+from app.services.time_zone import planning_today
 
 # main.py adds the /api prefix.
 router = APIRouter(prefix="/team-week", tags=["team-week"])
@@ -89,7 +90,7 @@ async def get_team_week(
     current_user: User = Depends(get_current_user),
 ) -> TeamWeekResponse:
     """Return the grid for one resource group."""
-    anchor = week_of or datetime.now(UTC).date()
+    anchor = week_of or planning_today()
     days, rows = await build_team_week(session, group_id, anchor)
     return TeamWeekResponse(
         group_id=group_id,

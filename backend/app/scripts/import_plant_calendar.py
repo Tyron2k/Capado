@@ -43,6 +43,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session_factory
 from app.models.calendar import Holiday
 from app.models.site import Site
+from app.services.time_zone import planning_today
 
 
 @dataclass(frozen=True)
@@ -209,8 +210,8 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Site name to import into (default: the site flagged is_default)",
     )
-    parser.add_argument("--from-year", type=int, default=date.today().year)
-    parser.add_argument("--to-year", type=int, default=date.today().year + 5)
+    parser.add_argument("--from-year", type=int, default=planning_today().year)
+    parser.add_argument("--to-year", type=int, default=planning_today().year + 5)
     args = parser.parse_args(argv)
 
     if not args.csv_path.is_file():

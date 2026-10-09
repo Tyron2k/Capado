@@ -21,12 +21,14 @@ from __future__ import annotations
 import io
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
+
+from app.services.time_zone import local_time, planning_zone
 
 _HEADER_FILL = PatternFill("solid", fgColor="DDDDDD")
 _HEADER_FONT = Font(bold=True)
@@ -141,7 +143,7 @@ def save(workbook: Workbook) -> bytes:
 
 def generated_subtitle(covers: str, now: datetime | None = None) -> str:
     """The subtitle line: what this covers and when it was made."""
-    moment = now or datetime.now()
+    moment = now if now is not None else local_time(datetime.now(UTC), planning_zone())
     return f"{covers} — erstellt am {moment.strftime('%d.%m.%Y %H:%M')}"
 
 

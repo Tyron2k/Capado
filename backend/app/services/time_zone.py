@@ -23,6 +23,19 @@ def local_date(instant: datetime, zone: ZoneInfo) -> date:
     return local_time(instant, zone).date()
 
 
+def planning_today(
+    *, now: datetime | None = None, zone: ZoneInfo | None = None
+) -> date:
+    """Current calendar day in the planning zone, independent of the host TZ.
+
+    ``now`` accepts an aware instant for reproducible historical calculations.
+    Storage, audit and authentication timestamps continue to use UTC instants.
+    """
+    return local_date(
+        now if now is not None else datetime.now(UTC), zone or planning_zone()
+    )
+
+
 def local_wall_time_to_utc(value: datetime, zone: ZoneInfo) -> datetime:
     """Interpret a wall-clock reading, rejecting DST gaps and repeated times."""
     if value.utcoffset() is not None:

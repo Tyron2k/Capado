@@ -27,6 +27,7 @@ from app.services.critical_path import (
 )
 from app.services.dependencies import check_violation
 from app.services.lead_time import assess_commitment, schedule_warning
+from app.services.time_zone import planning_today
 from app.services.work_package_dependency_service import (
     WorkPackageDependencyService,
 )
@@ -149,7 +150,7 @@ class ProjectOverviewService:
             for wp in extra_result.scalars().all():
                 wp_by_id[wp.id] = wp
 
-        today = today or date.today()
+        today = today or planning_today()
 
         # Compute average resource utilization per project.
         # For each project: find all resource_ids assigned to its WPs, compute
