@@ -117,6 +117,17 @@ The new user must change their password on first login.
    - **Start date** and **End date**
 4. Click "Save"
 
+### Use the project table
+
+Sort projects through the column headings. Search, customer and priority filters combine within the
+selected folder. Use "Columns" to hide or show optional columns. All project pages are loaded;
+search is not limited to the first page.
+
+Checkboxes select visible projects. The selection count appears above the table, and
+"Show selected only" narrows the view. "Clear selection" restores the view. Filtered-out or deleted
+projects lose their selection; changing folders clears it. Opening work packages, editing and deleting
+remain actions on individual projects, according to your permissions.
+
 ### Note for editors
 
 As an editor, you can only create and edit projects that are within your configured project scope.

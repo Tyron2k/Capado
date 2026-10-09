@@ -80,6 +80,8 @@ beforeEach(() => {
       skill_attribute_id: null,
       skill_attribute_name: null,
       quantity: 1,
+      requirement_mode: 'headcount',
+      min_allocation_percent: 100,
     },
   ])
   vi.mocked(getSuggestions).mockResolvedValue([

@@ -76,6 +76,8 @@ repos:
     hooks:
       - id: prettier
         name: prettier (format, frontend)
+        # This file must match the generator byte-for-byte for its drift check.
+        exclude: ^frontend/src/api/generated/schema\.d\.ts$
         language: node # Also lets Renovate identify additional_dependencies as npm packages.
         files: ^frontend/(src|public)/.*\.(ts|tsx|js|jsx|css|scss|json|md|yaml|yml)$
         additional_dependencies:

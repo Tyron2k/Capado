@@ -1,30 +1,16 @@
 /**
  * Self-contained panel component for the Projects tab.
  *
- * Encapsulates all project CRUD state, data fetching, table rendering,
- * modals, and the WorkPackagesSection sub-view. Renders a FilterBar with
- * a search input and "New Project" button as the first content element.
- * Implements client-side search filtering on the projects list (case-insensitive by name).
+ * Encapsulates project CRUD state, data fetching, folder navigation,
+ * modals, and the WorkPackagesSection sub-view. Table state and presentation live in the focused ProjectsTable pilot.
  */
 
 import { useEffect, useMemo, useState } from 'react'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  ActionIcon,
-  Button,
-  Container,
-  Grid,
-  Group,
-  Modal,
-  Paper,
-  Table,
-  Text,
-  TextInput,
-} from '@mantine/core'
+import { Alert, Button, Container, Grid, Group, Modal, Paper, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../utils/errorHandling'
-import { IconEdit, IconTrash, IconPlus, IconPackage, IconSearch } from '@tabler/icons-react'
 import type { Project, ProjectCreate, ProjectFolder } from '../../types/project'
 import {
   createProject,
@@ -42,8 +28,8 @@ import { usePermissions } from '../../hooks/usePermissions'
 import { FolderTree } from './FolderTree'
 import { ProjectForm, type ProjectFormValues } from './ProjectForm'
 import { WorkPackagesSection } from './WorkPackagesSection'
-import { DataTable, FilterBar } from '../../components/layout'
-import { formatDate, toIsoDate } from '../../utils/date'
+import { ProjectsTable } from './ProjectsTable'
+import { toIsoDate } from '../../utils/date'
 
 export function ProjectsPanel() {
   const { t } = useTranslation()
@@ -53,14 +39,13 @@ export function ProjectsPanel() {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
-  const [search, setSearch] = useState('')
   // null = every project regardless of grouping, 'unfiled' = those in no folder, an id
   // = that folder. None of the three is a safe default, so the selection is explicit.
   const [selectedFolder, setSelectedFolder] = useState<string | 'unfiled' | null>(null)
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects.list(),
-    queryFn: () => getProjects(),
+    queryFn: ({ signal }) => getProjects(signal),
   })
   const projects: Project[] = projectsQuery.data ?? []
   const loading = projectsQuery.isPending
@@ -224,20 +209,10 @@ export function ProjectsPanel() {
     } else if (selectedFolder !== null) {
       result = result.filter((p) => p.folder_id === selectedFolder)
     }
-    if (search.trim()) {
-      const term = search.trim().toLowerCase()
-      // Searching the external reference too: the plant identifies a unit by its
-      // external reference far more often than by the name someone typed.
-      result = result.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          (p.external_ref ?? '').toLowerCase().includes(term),
-      )
-    }
     // Ordered the way the backend orders them, so the sequence a planner set is what
     // they see.
     return [...result].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
-  }, [projects, search, selectedFolder])
+  }, [projects, selectedFolder])
 
   const handleCreate = () => {
     setEditingProject(null)
@@ -307,55 +282,6 @@ export function ProjectsPanel() {
     })
   }
 
-  const rows = filteredProjects.map((project) => (
-    <Table.Tr key={project.id}>
-      <Table.Td>{project.name}</Table.Td>
-      <Table.Td>
-        {project.external_ref ?? (
-          <Text size="sm" c="dimmed">
-            —
-          </Text>
-        )}
-      </Table.Td>
-      <Table.Td>{formatDate(project.start_date)}</Table.Td>
-      <Table.Td>{formatDate(project.end_date)}</Table.Td>
-      <Table.Td>
-        <Group gap="xs">
-          <ActionIcon
-            variant="subtle"
-            color="teal"
-            onClick={() => setSelectedProject(project)}
-            aria-label={t('projects.workPackagesAriaLabel')}
-            title={t('projects.workPackagesTitle')}
-          >
-            <IconPackage size={18} />
-          </ActionIcon>
-          {canEditProject(project.id) && (
-            <ActionIcon
-              variant="subtle"
-              color="blue"
-              onClick={() => handleEdit(project)}
-              aria-label={t('projects.editAriaLabel')}
-            >
-              <IconEdit size={18} />
-            </ActionIcon>
-          )}
-          {canEditProject(project.id) && (
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              data-testid={`project-delete-${project.id}`}
-              onClick={() => setDeleteConfirmId(project.id)}
-              aria-label={t('projects.deleteAriaLabel')}
-            >
-              <IconTrash size={18} />
-            </ActionIcon>
-          )}
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ))
-
   if (selectedProject) {
     return (
       <Container size="xl">
@@ -366,21 +292,6 @@ export function ProjectsPanel() {
 
   return (
     <>
-      <FilterBar>
-        <TextInput
-          placeholder={t('projects.searchPlaceholder')}
-          leftSection={<IconSearch size={14} />}
-          value={search}
-          onChange={(e) => setSearch(e.currentTarget.value)}
-          style={{ minWidth: 260 }}
-        />
-        {canWrite && (
-          <Button leftSection={<IconPlus size={14} />} onClick={handleCreate} size="sm" ml="auto">
-            {t('projects.newProject')}
-          </Button>
-        )}
-      </FilterBar>
-
       {/* Folders on the left, the filtered list on the right. The tree stays visible
           even with no folders defined, because that is how a user discovers grouping
           exists at all — a feature reachable only from a menu nobody opens is the same
@@ -401,22 +312,30 @@ export function ProjectsPanel() {
           </Paper>
         </Grid.Col>
         <Grid.Col span={{ base: 12, md: 9 }}>
-          <DataTable
+          {projectsQuery.isError && (
+            <Alert color="red" title={t('common.error')} mb="sm">
+              {t('projects.loadFailed')}
+              <Button
+                variant="subtle"
+                size="compact-sm"
+                ml="sm"
+                onClick={() => projectsQuery.refetch()}
+              >
+                {t('projects.retry')}
+              </Button>
+            </Alert>
+          )}
+          <ProjectsTable
+            projects={filteredProjects}
             loading={loading}
-            empty={filteredProjects.length === 0}
-            emptyMessage={t('projects.noProjects')}
-            head={
-              <Table.Tr>
-                <Table.Th>{t('common.name')}</Table.Th>
-                <Table.Th>{t('projectForm.externalRef')}</Table.Th>
-                <Table.Th>{t('projects.startDate')}</Table.Th>
-                <Table.Th>{t('projects.endDate')}</Table.Th>
-                <Table.Th>{t('common.actions')}</Table.Th>
-              </Table.Tr>
-            }
-          >
-            {rows}
-          </DataTable>
+            scopeKey={selectedFolder}
+            canWrite={canWrite}
+            canEdit={canEditProject}
+            onCreate={handleCreate}
+            onEdit={handleEdit}
+            onDelete={setDeleteConfirmId}
+            onOpen={setSelectedProject}
+          />
         </Grid.Col>
       </Grid>
 

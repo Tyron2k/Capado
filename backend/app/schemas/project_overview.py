@@ -3,10 +3,12 @@
 from datetime import date
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from app.schemas import ResponseModel
 
 
-class LateWorkPackage(BaseModel):
+class LateWorkPackage(ResponseModel):
     """A work package whose working-day lead time overruns its end date."""
 
     work_package_id: UUID
@@ -16,7 +18,7 @@ class LateWorkPackage(BaseModel):
     working_days_short: int
 
 
-class CommitmentBreachResponse(BaseModel):
+class CommitmentBreachResponse(ResponseModel):
     """A committed delivery date the plan does not meet."""
 
     committed: date
@@ -28,7 +30,7 @@ class CommitmentBreachResponse(BaseModel):
     hidden: bool
 
 
-class DependencyViolationResponse(BaseModel):
+class DependencyViolationResponse(ResponseModel):
     """A successor that starts before its predecessor allows.
 
     Carries both names, because a warning naming only one side cannot be acted on: the
@@ -49,7 +51,7 @@ class DependencyViolationResponse(BaseModel):
     working_days_short: int
 
 
-class ScheduleNodeResponse(BaseModel):
+class ScheduleNodeResponse(ResponseModel):
     """Where one work package sits in the schedule."""
 
     work_package_id: UUID
@@ -69,7 +71,7 @@ class ScheduleNodeResponse(BaseModel):
     duration_working_days: int
 
 
-class ProjectScheduleResponse(BaseModel):
+class ProjectScheduleResponse(ResponseModel):
     """Forward and backward pass over one project's work packages."""
 
     project_id: UUID
@@ -81,7 +83,7 @@ class ProjectScheduleResponse(BaseModel):
     nodes: list[ScheduleNodeResponse]
 
 
-class ProjectOverviewItem(BaseModel):
+class ProjectOverviewItem(ResponseModel):
     """Aggregated KPIs for a single project."""
 
     project_id: UUID
@@ -119,7 +121,7 @@ class ProjectOverviewItem(BaseModel):
         return bool(self.late_work_packages)
 
 
-class ProjectOverviewResponse(BaseModel):
+class ProjectOverviewResponse(ResponseModel):
     """Response containing aggregated project overview items."""
 
     projects: list[ProjectOverviewItem]

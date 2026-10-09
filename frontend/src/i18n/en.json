@@ -252,7 +252,18 @@
     "workPackagesTitle": "Work Packages",
     "editAriaLabel": "Edit project",
     "deleteAriaLabel": "Delete project",
-    "searchPlaceholder": "Search projects…"
+    "searchPlaceholder": "Search projects…",
+    "selectProject": "Select {name}",
+    "selectVisible": "Select visible projects",
+    "selectedCount": "{count} selected",
+    "clearSelection": "Clear selection",
+    "showSelected": "Show selected only",
+    "columns": "Columns",
+    "customerFilter": "Customer",
+    "priorityFilter": "Priority",
+    "internalCustomer": "Internal work",
+    "noFilterMatch": "No projects match the filters.",
+    "retry": "Retry"
   },
   "projectOverview": {
     "title": "Project Overview",

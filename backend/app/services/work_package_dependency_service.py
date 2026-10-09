@@ -188,3 +188,32 @@ class WorkPackageDependencyService:
             )
             for row in result.all()
         ]
+
+    async def edges_for_projects(
+        self, project_ids: set[UUID]
+    ) -> dict[UUID, list[DependencyEdge]]:
+        """Read successor-scoped dependencies for an overview in one query.
+
+        Cross-project predecessors stay attached to the successor's project.
+        Reuse the caller's transaction; this is a targeted query, not a second
+        persistence abstraction or a loop of per-project requests.
+        """
+        if not project_ids:
+            return {}
+        successor = sa.orm.aliased(WorkPackage)
+        result = await self.session.execute(
+            select(
+                successor.project_id,
+                WorkPackageDependency.predecessor_id,
+                WorkPackageDependency.successor_id,
+                WorkPackageDependency.lag_working_days,
+            )
+            .join(successor, successor.id == WorkPackageDependency.successor_id)
+            .where(successor.project_id.in_(project_ids))
+        )
+        grouped: dict[UUID, list[DependencyEdge]] = {}
+        for project_id, predecessor_id, successor_id, lag in result.all():
+            grouped.setdefault(project_id, []).append(
+                DependencyEdge(predecessor_id, successor_id, lag)
+            )
+        return grouped

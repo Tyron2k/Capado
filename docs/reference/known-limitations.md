@@ -49,27 +49,56 @@ Measured rather than assumed: 246 findings become 35 with those five off. Of 131
 `attr-defined`, 124 were SQL-operator noise and **7 were real** — which is why the count
 is recorded here instead of the codes being quietly dropped.
 
-**The way out is not what this document used to claim.** It named "migrating to SQLAlchemy 2.0
-`Mapped[]` annotations" as the path. That is wrong: this project uses **SQLModel**, which does not
-use `Mapped[]` at all — it derives columns from plain Python annotations. Getting `Mapped[]` would
-mean replacing SQLModel with bare SQLAlchemy across 17 model files, 237 field definitions and every
-query in the codebase. A rearchitecture with no functional benefit, sold by this document as a
-mechanical upgrade.
+Directly typed SQLAlchemy `Mapped[...]` entities are the incremental target, with separate Pydantic
+API schemas and the existing async sessions. `ResourceGroup` is the first pilot; the remaining models
+still use SQLModel. Both mapping styles share `SQLModel.metadata` for Alembic and CSV table discovery.
+The existing `check_attr_defined.py` remains the gate for legacy column-operator noise. The five
+exceptions are re-enabled in the typed pilot modules; no broad new suppression was introduced.
 
-What was done instead, at a fraction of the cost: **`backend/scripts/check_attr_defined.py`**. The
-noise turned out to be a closed set of 24 SQLAlchemy column operators (`in_`, `label`, `asc`, `is_`,
-`desc`, …) — 150 of 163 findings. The script runs mypy with `attr-defined` enabled, filters exactly
-those names, and fails on anything else. It replaces the plain `mypy` call in CI rather than running
-beside it, so it costs no extra minutes.
+### Typed ORM pilot outcome and next steps
 
-Measured when it was introduced: after fixing 13 loosely-typed spots (a bare `type`, the `SQLModel`
-base used where a concrete model was meant, and one `object` in freshly written code), the filtered
-report is empty. Verified against a real regression by reintroducing one of the three bugs above —
-the script catches it and exits 1.
+Resource groups exercise a self-parent foreign key, enum values, eager UUID/UTC defaults, scopes,
+change tracking and the audit listener without converting a relationship cluster all at once. The
+parent relationship is read-only navigation; mutations keep using `parent_id`. `MappedAsDataclass`
+keeps constructor defaults available before `before_flush`, and `eq=False` retains ORM identity
+semantics. The enum remains VARCHAR(20), not a new PostgreSQL enum/check constraint. The existing
+SQLModel UTC type is reused, preserving UTC normalization on PostgreSQL and SQLite.
 
-The residual gap: a name that is BOTH a genuine mistake and one of the 24 operator names would still
-slip through. Nothing in this codebase defines an attribute called `in_` or `asc`, and adding one to
-the operator set is the one thing the script's own docstring forbids.
+CSV validation moved to an explicit `ResourceGroupTransfer` Pydantic schema. Export fields remain
+allowlisted in the domain module; ORM relationships are never discovered as exportable data. API
+schemas remain separate and the generated OpenAPI contract is unchanged by the ORM/router refactor.
+Real migrated PostgreSQL tests cover defaults, eager relationship loading, typed enum reads,
+commit/rollback with the audit actor, and real authenticated editor/viewer scope checks. Alembic
+comparison for this table is empty. The mapping now explicitly matches the existing database's
+named `ON DELETE SET NULL` parent constraint, which the previous model omitted; no migration is needed.
+
+The pilot required a shared mapping base, one mapping conversion, a transfer DTO, a typed route
+boundary and metadata-based export coverage. Better query inference exposed reused result variables
+in the capacity overview and skill-matrix exporter; naming those separately resolved the errors.
+Effort therefore follows consumers, not the number of model files. Next convert personal/infrastructure
+resources together (the same joins), then skill catalogue entities if their queries remain noisy.
+Convert the Project/WorkPackage/Assignment/Conflict relationship cluster as a deliberate later cohort:
+SQLAlchemy string relationships cannot resolve targets in a different mapper registry. Do not mix
+registries within that cluster or convert every model as incidental work. Preserve eager audit IDs,
+UTC types, CSV DTO coverage and actual database constraints on each conversion.
+
+### Targeted query helper evaluation (#74)
+
+The overview claimed to load dependencies in one pass but called `edges_for_project` in a loop.
+The concrete correction is `WorkPackageDependencyService.edges_for_projects`: one scoped query,
+grouped by successor project, retaining cross-project predecessors.
+
+| Option | Maintenance and tests | Cost and transaction ownership |
+|---|---|---|
+| Focused service using `AsyncSession` | Keeps analysis boundaries and ORM tracking; test domain edges directly. | Reuses the caller's session; no new commits or per-project queries. |
+| Targeted batch query helper | Removes the demonstrated query loop; assert scope and one roundtrip. | One method in the existing dependency service; no new abstraction file. |
+| General repository boundary | Adds interfaces and translations without an interchangeable persistence need. | Still needs SQLAlchemy session/audit ownership; extra implementation and test contracts. |
+
+Decision: retain request-scoped `AsyncSession` and focused services, using the targeted batch helper.
+HTTP authentication/scopes stay in routers/dependencies, read analysis does not commit, write services
+retain existing transaction ownership, and the session listener records writes in the same transaction.
+Existing exceptions and HTTP handling are retained. There is no independent persistence provider to
+replace and no repeated complex query requiring a repository today; re-evaluate when either appears.
 
 ### What this actually costs, measured on one feature
 

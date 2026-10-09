@@ -124,6 +124,18 @@ Der neue Benutzer muss beim ersten Login sein Passwort ändern.
    - **Startdatum** und **Enddatum**
 4. Klicken Sie auf "Speichern"
 
+### Projekttabelle nutzen
+
+Mit den Spaltenüberschriften sortieren Sie Projekte. Suche, Kunde und Priorität filtern gemeinsam
+innerhalb des gewählten Ordners. Über "Spalten" blenden Sie optionale Spalten ein oder aus.
+Alle Projekte werden geladen; die Suche ist nicht auf die erste Seite beschränkt.
+
+Checkboxen wählen sichtbare Projekte aus. Die Anzahl erscheint über der Tabelle, und
+"Nur ausgewählte anzeigen" grenzt die Ansicht ein. "Auswahl aufheben" stellt die Ansicht zurück.
+Herausgefilterte oder gelöschte Projekte verlieren ihre Auswahl; beim Ordnerwechsel wird sie geleert.
+Arbeitspakete öffnen, Bearbeiten und Löschen bleiben Aktionen des jeweiligen Projekts und richten
+sich nach Ihren Berechtigungen.
+
 ### Hinweis für Editoren
 
 Als Editor können Sie nur Projekte erstellen und bearbeiten, die in Ihrem konfigurierten Projektbereich liegen.

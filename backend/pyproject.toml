@@ -159,3 +159,8 @@ dev = [
     "mypy==2.4.0",  # Type check — runs as its own CI job, see .github/workflows/ci.yml
     "types-openpyxl>=3.1.5",  # Stubs for the import/export workbook writers
 ]
+
+# Typed ORM pilot: legacy SQLModel operator exceptions do not apply here.
+[[tool.mypy.overrides]]
+module = ["app.models.base", "app.models.resource_group"]
+enable_error_code = ["attr-defined", "arg-type", "call-overload", "union-attr", "operator"]

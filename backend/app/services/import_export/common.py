@@ -29,6 +29,7 @@ from app.models.skill import (
     Skill,
     SkillAttribute,
 )
+from app.schemas.resource import ResourceGroupTransfer
 from app.services.conflict_refresh import refresh_resources
 
 from .csv_format import entity
@@ -167,8 +168,8 @@ async def _load_matrix_data(
             ).where(InfrastructureResourceSkill.resource_id.in_(resource_ids))
 
         skill_result = await session.execute(skill_stmt)
-        for row in skill_result.all():
-            resource_attrs[row.resource_id].add(row.skill_attribute_id)
+        for skill_row in skill_result.all():
+            resource_attrs[skill_row.resource_id].add(skill_row.skill_attribute_id)
 
     # 5. Build resource list with their attribute sets
     resources: list[tuple[str, str, set[UUID]]] = []
@@ -649,6 +650,7 @@ RESOURCE_GROUP_CSV = entity(
     ResourceGroup,
     "id name resource_type parent_id created_at updated_at",
     validation_dependents=("personal_resources", "infrastructure_resources"),
+    validation_model=ResourceGroupTransfer,
 )
 RESOURCE_WORK_PROFILE_CSV = entity(
     ResourceWorkProfile,

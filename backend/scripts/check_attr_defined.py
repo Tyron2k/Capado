@@ -25,13 +25,13 @@ The noise is a CLOSED SET of attribute names — the column operators below. Eve
 loosely (``object``, ``type``, the ``SQLModel`` base) that the checker has nothing to check. Both
 are worth fixing, so filtering by name turns an unreadable report into a gate.
 
-WHY NOT MIGRATE TO SQLALCHEMY 2.0 ``Mapped[]``
+INCREMENTAL TYPED ORM
 
-``docs/reference/known-limitations.md`` used to name that as the way out. It is wrong, and the doc
-is corrected: this project uses SQLModel, which does not use ``Mapped[]`` annotations at all.
-Getting them would mean replacing SQLModel with plain SQLAlchemy across 17 model files, 237 field
-definitions and every query — a rearchitecture with no functional benefit. This script costs
-nothing by comparison and closes the same gap.
+ResourceGroup now uses SQLAlchemy Mapped[] with the legacy error codes re-enabled
+in its model modules. Other SQLModel entities still need this closed operator
+filter. Keep one mypy invocation during the incremental conversion; remove each
+exception only when its model/query cohort is typed. See the ORM pilot outcome in
+docs/reference/known-limitations.md.
 
 USAGE
 

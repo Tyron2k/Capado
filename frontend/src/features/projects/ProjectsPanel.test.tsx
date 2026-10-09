@@ -114,6 +114,15 @@ const mockedGetProjects = vi.mocked(getProjects)
 const mockedUsePermissions = vi.mocked(usePermissions)
 
 beforeAll(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  )
+
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({

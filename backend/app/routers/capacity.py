@@ -192,18 +192,21 @@ async def get_capacity_overview(
             infra_stmt = infra_stmt.where(ResourceGroup.name == department)
         infra_rows = (await session.execute(infra_stmt)).all()
 
-        for row in infra_rows:
-            res = row[0]
-            group_name = row[1] or ""
-            if project_resource_ids is not None and res.id not in project_resource_ids:
+        for infra_row in infra_rows:
+            infra_resource = infra_row[0]
+            group_name = infra_row[1] or ""
+            if (
+                project_resource_ids is not None
+                and infra_resource.id not in project_resource_ids
+            ):
                 continue
             weeks = await capacity_service.get_weekly_utilization(
-                res.id, start_date, end_date
+                infra_resource.id, start_date, end_date
             )
             resources.append(
                 ResourceOverviewItem(
-                    resource_id=res.id,
-                    resource_name=res.name,
+                    resource_id=infra_resource.id,
+                    resource_name=infra_resource.name,
                     resource_type=ResourceType.infrastructure,
                     department_or_location=group_name,
                     weeks=[

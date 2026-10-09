@@ -13,9 +13,11 @@ from itertools import islice
 from typing import Any
 from uuid import UUID
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import Table
 from sqlmodel import SQLModel
+
+from app.models.base import ORMModel
 
 MAX_EXPANDED_BYTES = 100 * 1024 * 1024
 MAX_ROWS = 200_000
@@ -29,7 +31,7 @@ _CSV_VERSION = "2"
 class CsvEntity:
     """Approved fields and their wire encodings, owned by a domain module."""
 
-    model: type[SQLModel]
+    model: type[SQLModel] | type[ORMModel]
     columns: tuple[str, ...]
     json_columns: tuple[str, ...] = ()
     binary_columns: tuple[str, ...] = ()
@@ -37,6 +39,7 @@ class CsvEntity:
     reference_tables: tuple[str, ...] = ()
     validation_dependents: tuple[str, ...] = ()
     existing_by_id: bool = False
+    validation_model: type[BaseModel] | None = None
 
     @property
     def name(self) -> str:
@@ -49,7 +52,9 @@ class CsvEntity:
         return SQLModel.metadata.tables[self.name]
 
 
-def entity(model: type[SQLModel], columns: str, **kwargs: Any) -> CsvEntity:
+def entity(
+    model: type[SQLModel] | type[ORMModel], columns: str, **kwargs: Any
+) -> CsvEntity:
     """Declare a field allowlist; never discover exportable fields automatically."""
     return CsvEntity(model, tuple(columns.split()), **kwargs)
 
@@ -241,7 +246,14 @@ def _decode(entity: CsvEntity, row: list[str]) -> dict:
             raise _FieldError(column, f"invalid {kind} field value.") from exc
     raw.update(entity.defaults)
     try:
-        obj = entity.model.model_validate(raw)
+        validation_model = entity.validation_model
+        if validation_model is None:
+            if not issubclass(entity.model, BaseModel):
+                raise TypeError(
+                    f"{entity.name} requires an explicit CSV validation schema"
+                )
+            validation_model = entity.model
+        obj = validation_model.model_validate(raw)
     except ValidationError as exc:
         error = exc.errors(include_input=False, include_url=False)[0]
         column = ".".join(str(part) for part in error["loc"])
