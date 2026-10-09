@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.project import WorkPackage, WorkPackageDependency
 from app.services.dependencies import DependencyEdge, would_create_cycle
+from app.services.graph_locks import lock_graph
 from app.services.work_package_service import WorkPackageService
 
 
@@ -119,6 +120,30 @@ class WorkPackageDependencyService:
                 "The lag must not be negative.", field="lag_working_days"
             )
 
+        await lock_graph(self.session, "dependencies")
+        if (
+            isinstance(self.session, AsyncSession)
+            and self.session.get_bind().dialect.name == "postgresql"
+        ):
+            # Keep endpoints present until the validated edge has committed. A delete
+            # waits for key-share locks; acquire before audit FK writes and in ID order.
+            endpoints = list(
+                (
+                    await self.session.execute(
+                        select(WorkPackage)
+                        .where(WorkPackage.id.in_({predecessor_id, successor_id}))
+                        .order_by(WorkPackage.id)
+                        .with_for_update(read=True, key_share=True)
+                        .execution_options(populate_existing=True)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            present = {wp.id for wp in endpoints}
+            for wp_id in (predecessor_id, successor_id):
+                if wp_id not in present:
+                    raise NotFoundError("WorkPackage", wp_id)
         await self._require_work_package(predecessor_id)
         await self._require_work_package(successor_id, project_id)
 
@@ -188,6 +213,7 @@ class WorkPackageDependencyService:
         project_id: UUID | None = None,
     ) -> None:
         """Remove a link. Neither work package is touched."""
+        await lock_graph(self.session, "dependencies")
         dependency = await self._require_dependency(
             dependency_id, successor_id, project_id
         )

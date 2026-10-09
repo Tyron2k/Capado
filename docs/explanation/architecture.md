@@ -54,6 +54,13 @@ HTTP Request
 **Schemas** (`app/schemas/`) define Pydantic request/response shapes separately
 from models. This decouples the API contract from the database schema.
 
+Dependency graph mutations and folder hierarchy mutations have separate transaction-level
+PostgreSQL advisory locks. Each structural check and write observes the preceding committed
+change; opposing requests therefore cannot both validate against an empty/old graph. Folder
+metadata edits and unrelated planning writes remain independent. CSV imports acquire these
+same graph locks before destination table locks and validation. Locks release on commit,
+rollback or connection closure; existing cycle errors remain ordinary business-rule responses.
+
 ## Domain Model
 
 ```

@@ -163,6 +163,14 @@ async def _lock_destination(
             if entities is not None
             else set(ORMModel.metadata.tables)
         )
+        # Import validation must share graph serialization with ordinary HTTP writes.
+        # Acquire graph locks before table locks, preserving one lock order.
+        from app.services.graph_locks import lock_graph
+
+        if "work_package_dependencies" in tables:
+            await lock_graph(session, "dependencies")
+        if "project_folders" in tables:
+            await lock_graph(session, "folders")
         if entities is None or tables & {
             "audit_log",
             "baselines",
