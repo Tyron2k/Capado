@@ -260,10 +260,16 @@ async def update_personal_resource(
     current_user: User = Depends(get_current_user),
 ):
     """Persist changed data."""
-    existing = await resource_service.get_personal_resource_by_id(session, resource_id)
+    existing = await resource_service.get_personal_resource_by_id(
+        session, resource_id, for_update=True
+    )
     check_write_permission(
         current_user, EntityType.resource, group_id=existing.group_id
     )
+    if data.group_id is not None:
+        check_write_permission(
+            current_user, EntityType.resource, group_id=data.group_id
+        )
     sent = data.model_dump(exclude_unset=True)
     resource = await resource_service.update_personal_resource(
         session=session,
@@ -409,11 +415,15 @@ async def update_infrastructure_resource(
 ):
     """Persist changed data."""
     existing = await resource_service.get_infrastructure_resource_by_id(
-        session, resource_id
+        session, resource_id, for_update=True
     )
     check_write_permission(
         current_user, EntityType.resource, group_id=existing.group_id
     )
+    if data.group_id is not None:
+        check_write_permission(
+            current_user, EntityType.resource, group_id=data.group_id
+        )
     sent = data.model_dump(exclude_unset=True)
     resource = await resource_service.update_infrastructure_resource(
         session=session,
