@@ -130,3 +130,11 @@ of them no longer hold, so a reader does not act on a resolved concern.
 
   One caveat that belongs with it: without the maintenance job running, **nothing is deleted**
   whatever the setting says. The maintenance run log is the evidence that the period is applied.
+
+- **"Bulk imports therefore produce bulk audit rows."** Versioned CSV transfers
+  now use Core statements and record one attributable operation marker inside
+  the import transaction. This includes default-calendar swaps; a rollback also
+  removes the marker. HTTP individual writes retain field-level ORM history.
+  CSV markers deliberately contain no invented per-row before/after changes;
+  imported historic audit records are preserved. See the
+  [CSV audit semantics](../reference/import-export.md#complete-migration-to-an-empty-installation).

@@ -17,11 +17,12 @@ hold no matter who writes:
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy.engine import CursorResult
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import BusinessRuleError, NotFoundError
@@ -39,6 +40,20 @@ from app.services.conflict_refresh import refresh_resources
 def _utcnow() -> datetime:
     """Current timezone-aware UTC timestamp."""
     return datetime.now(UTC)
+
+
+async def lock_calendar_default(
+    session: AsyncSession, table: Literal["sites", "work_week_profiles"]
+) -> None:
+    """Serialize each default's read/change/commit, including CSV imports."""
+    if (
+        isinstance(session, AsyncSession)
+        and session.get_bind().dialect.name == "postgresql"
+    ):
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(:namespace, :key)"),
+            {"namespace": 0x43_41_50_43, "key": 1 if table == "sites" else 2},
+        )
 
 
 def weekly_minutes(profile: WorkWeekProfile) -> int:
@@ -63,9 +78,11 @@ class CalendarService:
         result = await self.session.execute(statement.order_by(Site.name))
         return list(result.scalars().all())
 
-    async def get_site(self, site_id: UUID) -> Site:
+    async def get_site(self, site_id: UUID, *, for_update: bool = False) -> Site:
         """One site, or 404."""
-        site = await self.session.get(Site, site_id)
+        site = await self.session.get(
+            Site, site_id, with_for_update=for_update, populate_existing=for_update
+        )
         if site is None:
             raise NotFoundError("Site", site_id)
         return site
@@ -75,6 +92,7 @@ class CalendarService:
     ) -> Site:
         """Create a site, clearing any previous default when this one claims it."""
         if is_default:
+            await lock_calendar_default(self.session, "sites")
             await self._clear_default_site()
         site = Site(name=name, region_code=region_code, is_default=is_default)
         self.session.add(site)
@@ -85,7 +103,27 @@ class CalendarService:
 
     async def update_site(self, site_id: UUID, **changes: object) -> Site:
         """Apply partial changes to a site."""
-        site = await self.get_site(site_id)
+        if "is_default" in changes or "is_active" in changes:
+            await lock_calendar_default(self.session, "sites")
+        site = await self.get_site(site_id, for_update=True)
+        if site.is_default and changes.get("is_default") is False:
+            raise BusinessRuleError(
+                "Replace the default site by making another site the default first."
+            )
+        default = (
+            changes.get("is_default")
+            if changes.get("is_default") is not None
+            else site.is_default
+        )
+        active = (
+            changes.get("is_active")
+            if changes.get("is_active") is not None
+            else site.is_active
+        )
+        if default and not active:
+            raise BusinessRuleError(
+                "The default site must remain active; select another default first."
+            )
         if changes.get("is_default") is True and not site.is_default:
             await self._clear_default_site()
         for field, value in changes.items():
@@ -100,7 +138,8 @@ class CalendarService:
 
     async def deactivate_site(self, site_id: UUID) -> None:
         """Soft-delete a site, consistent with resources and users."""
-        site = await self.get_site(site_id)
+        await lock_calendar_default(self.session, "sites")
+        site = await self.get_site(site_id, for_update=True)
         if site.is_default:
             raise BusinessRuleError(
                 "the default site cannot be deactivated; make another site "
@@ -125,7 +164,9 @@ class CalendarService:
         )
         for site in result.scalars().all():
             site.is_default = False
+            site.updated_at = _utcnow()
             self.session.add(site)
+        await self.session.flush()
 
     # ------------------------------------------------------------- holidays
 
@@ -203,9 +244,18 @@ class CalendarService:
         )
         return list(result.scalars().all())
 
-    async def get_profile(self, profile_id: UUID) -> WorkWeekProfile:
+    async def get_profile(
+        self, profile_id: UUID, *, for_update: bool = False, key_share: bool = False
+    ) -> WorkWeekProfile:
         """One week profile, or 404."""
-        profile = await self.session.get(WorkWeekProfile, profile_id)
+        profile = await self.session.get(
+            WorkWeekProfile,
+            profile_id,
+            with_for_update={"read": True, "key_share": True}
+            if key_share
+            else for_update,
+            populate_existing=for_update or key_share,
+        )
         if profile is None:
             raise NotFoundError("WorkWeekProfile", profile_id)
         return profile
@@ -225,6 +275,7 @@ class CalendarService:
     ) -> WorkWeekProfile:
         """Create a week profile, clearing any previous default when claimed."""
         if is_default:
+            await lock_calendar_default(self.session, "work_week_profiles")
             await self._clear_default_profile()
         profile = WorkWeekProfile(
             name=name,
@@ -248,7 +299,13 @@ class CalendarService:
         self, profile_id: UUID, **changes: object
     ) -> WorkWeekProfile:
         """Apply partial changes to a week profile."""
-        profile = await self.get_profile(profile_id)
+        if "is_default" in changes:
+            await lock_calendar_default(self.session, "work_week_profiles")
+        profile = await self.get_profile(profile_id, for_update=True)
+        if profile.is_default and changes.get("is_default") is False:
+            raise BusinessRuleError(
+                "Replace the default profile by making another profile the default first."
+            )
         if changes.get("is_default") is True and not profile.is_default:
             await self._clear_default_profile()
         for field, value in changes.items():
@@ -263,7 +320,8 @@ class CalendarService:
 
     async def delete_profile(self, profile_id: UUID) -> None:
         """Delete a week profile that nothing depends on."""
-        profile = await self.get_profile(profile_id)
+        await lock_calendar_default(self.session, "work_week_profiles")
+        profile = await self.get_profile(profile_id, for_update=True)
         if profile.is_default:
             raise BusinessRuleError(
                 "the default profile cannot be deleted; resources without a "
@@ -294,7 +352,9 @@ class CalendarService:
         )
         for profile in result.scalars().all():
             profile.is_default = False
+            profile.updated_at = _utcnow()
             self.session.add(profile)
+        await self.session.flush()
 
     # ------------------------------------------------------------- bindings
 
@@ -328,7 +388,11 @@ class CalendarService:
         """
         if (resource_id is None) == (group_id is None):
             raise BusinessRuleError("give exactly one of resource_id or group_id")
-        await self.get_profile(profile_id)
+        if valid_until is not None and valid_until < valid_from:
+            raise BusinessRuleError("The binding end must not precede its start.")
+        # Keep the referenced profile alive through the binding's commit, without
+        # serializing independent bindings that merely share a profile.
+        await self.get_profile(profile_id, key_share=True)
         if group_id is not None:
             group = await self.session.scalar(
                 select(ResourceGroup)
@@ -353,7 +417,21 @@ class CalendarService:
             valid_until=valid_until,
         )
         self.session.add(binding)
-        await self.session.commit()
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            name = getattr(
+                getattr(exc.orig, "__cause__", None), "constraint_name", None
+            )
+            if name in {
+                "ex_work_profiles_resource_period",
+                "ex_work_profiles_group_period",
+            }:
+                raise BusinessRuleError(
+                    "This target already has a profile for part of that period; end the existing binding first."
+                ) from exc
+            raise
         await refresh_resources(
             self.session, [resource_id] if resource_id is not None else None
         )

@@ -322,6 +322,15 @@ exclusion decision. Original IDs and timestamps are retained. The source-admin-t
 the one ID exception. Each successful standalone import adds an audit event; a full ZIP restore adds
 one event for the transaction. Standalone downloads are verified byte-for-byte against ZIP members.
 
+CSV imports use Core writes and deliberately record an **operation-level** audit
+marker (`csv_import` or `csv_migration`, actor and timestamp), including calendar
+default swaps. HTTP individual edits instead record per-entity before/after
+changes. A CSV marker does not reconstruct individual field changes: retain the
+input CSV and a prior backup when that detail is required. The marker and all
+imported changes share one transaction; a failed import leaves neither data
+changes nor a success marker. Imported historical audit records remain unchanged
+apart from the documented account mapping and credential redaction.
+
 ### Format and exclusions
 
 The version-2 manifest records the format, version, filename, row count and SHA-256 for each CSV.
