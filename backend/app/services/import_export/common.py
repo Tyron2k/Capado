@@ -718,10 +718,7 @@ def validate_resource_csv(context: "ImportContext", kind: str) -> None:
             )
         if row["parent_id"] is not None:
             parent = by_id["resource_groups"][row["parent_id"]]
-            if (
-                parent["parent_id"] is not None
-                or parent["resource_type"] != row["resource_type"]
-            ):
+            if parent["resource_type"] != row["resource_type"]:
                 context.fail(
                     "resource_groups",
                     row,
