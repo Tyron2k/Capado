@@ -1,6 +1,6 @@
 """Complete CSV export and import of working-time data."""
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import models as m
@@ -58,9 +58,24 @@ def parse_csv(rows: list[tuple] | list[list[str]]) -> CsvBatch:
 def validate_import(context: ImportContext) -> None:
     """Check default calendars and holiday values in the planned state."""
     for table in ("sites", "work_week_profiles"):
-        validate_single_flag(
-            list(context.merged[table].values()), "is_default", table, context=context
-        )
+        planned = list(context.merged[table].values())
+        validate_single_flag(planned, "is_default", table, context=context)
+        if any(row["is_default"] for row in context.existing[table]) and not any(
+            row["is_default"] for row in planned
+        ):
+            old = next(row for row in context.existing[table] if row["is_default"])
+            context.fail(
+                table,
+                context.merged[table][old["id"]],
+                "is_default",
+                "Replace the configured default with another default.",
+            )
+        if table == "sites":
+            for row in planned:
+                if row["is_default"] and not row["is_active"]:
+                    context.fail(
+                        table, row, "is_active", "The default site must remain active."
+                    )
 
 
 async def write_import(
@@ -68,6 +83,23 @@ async def write_import(
 ) -> ImportResult:
     """Write this area's prepared records inside the caller's transaction."""
     await _track_calendar_resources(session, context)
+    # Clear relinquished flags before selecting their replacements. CSV row order
+    # must not cause an intermediate unique-index failure in a valid atomic swap.
+    for model in (m.Site, m.WorkWeekProfile):
+        old_defaults = {
+            row["id"]
+            for row in context.existing[model.__tablename__]
+            if row["is_default"]
+        }
+        relinquished = [
+            row["id"]
+            for row in batch.data[model.__tablename__]
+            if row["id"] in old_defaults and not row["is_default"]
+        ]
+        for chunk in id_batches(set(relinquished)):
+            await session.execute(
+                update(model).where(model.id.in_(chunk)).values(is_default=False)
+            )
     return await write_area(session, CSV_AREA.entities, batch.data, context)
 
 

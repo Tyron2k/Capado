@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 from sqlalchemy import UniqueConstraint
+from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import ORMModel
@@ -83,7 +84,16 @@ class WorkWeekProfile(ORMModel, kw_only=True, eq=False):
     """
 
     __tablename__ = "work_week_profiles"
-    __table_args__ = (UniqueConstraint("name", name="uq_work_week_profiles_name"),)
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_work_week_profiles_name"),
+        sa.Index(
+            "uq_work_week_profiles_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+            sqlite_where=sa.text("is_default"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(
         sa.Uuid(),
@@ -156,6 +166,28 @@ class ResourceWorkProfile(ORMModel, kw_only=True, eq=False):
     """
 
     __tablename__ = "resource_work_profiles"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "(resource_id IS NULL) <> (group_id IS NULL)",
+            name="ck_resource_work_profiles_one_target",
+        ),
+        sa.CheckConstraint(
+            "valid_until IS NULL OR valid_until >= valid_from",
+            name="ck_resource_work_profiles_validity_order",
+        ),
+        ExcludeConstraint(
+            ("resource_id", "="),
+            (sa.text("daterange(valid_from, valid_until, '[]')"), "&&"),
+            where=sa.text("resource_id IS NOT NULL"),
+            name="ex_work_profiles_resource_period",
+        ).ddl_if(dialect="postgresql"),
+        ExcludeConstraint(
+            ("group_id", "="),
+            (sa.text("daterange(valid_from, valid_until, '[]')"), "&&"),
+            where=sa.text("group_id IS NOT NULL"),
+            name="ex_work_profiles_group_period",
+        ).ddl_if(dialect="postgresql"),
+    )
 
     id: Mapped[UUID] = mapped_column(
         sa.Uuid(),
