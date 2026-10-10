@@ -171,6 +171,14 @@ async def _lock_destination(
             await lock_graph(session, "dependencies")
         if "project_folders" in tables:
             await lock_graph(session, "folders")
+        if "resource_groups" in tables:
+            await lock_graph(session, "resource_groups")
+        from app.services.calendar_service import lock_calendar_default
+
+        if "sites" in tables:
+            await lock_calendar_default(session, "sites")
+        if "work_week_profiles" in tables:
+            await lock_calendar_default(session, "work_week_profiles")
         if entities is None or tables & {
             "audit_log",
             "baselines",

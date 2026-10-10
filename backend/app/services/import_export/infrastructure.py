@@ -195,7 +195,6 @@ def parse_csv(rows: list[tuple] | list[list[str]]) -> CsvBatch:
 
 def validate_import(context: ImportContext) -> None:
     """Check this domain's rules against the complete planned destination."""
-    validate_resource_csv(context, "infrastructure")
     batch = context.batches.get(CSV_AREA.name)
     if batch:
         for row in batch.data["resource_work_profiles"]:
@@ -214,6 +213,7 @@ def validate_import(context: ImportContext) -> None:
                 "end_time",
                 "Availability window start/end must differ.",
             )
+    validate_resource_csv(context, "infrastructure")
 
 
 async def write_import(

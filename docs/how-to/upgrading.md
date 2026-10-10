@@ -95,6 +95,36 @@ docker exec -i <db-container> pg_restore -l < capado-<stamp>.dump | grep -c "TAB
 
 A count of zero means you have a schema-only dump and no backup.
 
+This verifies readability and data sections. To verify recovery, restore the dump
+into a **new database on an isolated test PostgreSQL instance**, upgrade that
+database, start a test backend against it and check authentication, planning and
+historical data. Keep mail and scheduled maintenance disabled on a restored copy.
+Only proceed with the installation upgrade after the restore check succeeds.
+
+The repository's automated recovery test uses synthetic records and the actual
+`pg_dump`/`pg_restore` clients. It restores both revision `002` backups and backups
+created at the current migration head (`004`) into separate databases, compares
+every application table/column, upgrades to the current migration head,
+starts the real FastAPI lifecycle and verifies authenticated API reads. Projects,
+work packages, both resource types, bookings, calendars, permissions, audit,
+baselines, dependencies, conflicts, logos and token records must survive unchanged.
+It also verifies that restoring and starting the copy leaves the source untouched.
+
+Locally, run it against a disposable test server with CREATE DATABASE permission:
+
+```bash
+cd backend
+TEST_POSTGRES_URL=postgresql+asyncpg://postgres:test-only@127.0.0.1:5432/postgres \
+TEST_POSTGRES_CONTAINER=capado-test-db \
+ENVIRONMENT=test uv run pytest tests/test_postgres_backup_restore.py
+```
+
+`TEST_POSTGRES_CONTAINER` identifies the test server's container and uses its
+matching PostgreSQL clients. Without it, matching `pg_dump` and `pg_restore` must
+be installed on PATH. CI reuses its existing PostgreSQL service. Each run creates
+and removes uniquely named source/restore databases; it never migrates the supplied
+server database. Dumps and startup logs contain synthetic test values only.
+
 ## 2. Check where you are starting from
 
 ```sql
@@ -130,6 +160,72 @@ zone, baseline comparisons, audit history, and rollback cases. Locally, set
 `TEST_POSTGRES_URL` to a **test server** with CREATE DATABASE permission and run
 `uv run pytest tests/test_utc_migration_postgres.py`. Each test creates and drops
 its own disposable database; the supplied database is not migrated.
+
+### Booking uniqueness
+
+Revision `003` adds uniqueness guards for **identical bookings**, including
+resource type, resource, work package, complete period and personal allocation.
+Different bookings of the same resource/work package remain allowed. The migration
+stops and lists the assignment IDs if it finds identical legacy rows. It does not
+delete bookings, conflict links, audit history or baseline entries. Review those
+rows on a restored backup, correct the intended bookings explicitly, then retry.
+
+Read-only checks before upgrading:
+
+```sql
+SELECT resource_id, work_package_id, start_date, end_date, allocation_percent,
+       array_agg(id ORDER BY id) AS assignment_ids
+FROM assignments WHERE resource_type = 'personal'
+GROUP BY resource_id, work_package_id, start_date, end_date, allocation_percent
+HAVING count(*) > 1;
+
+SELECT resource_id, work_package_id, start_at, end_at,
+       array_agg(id ORDER BY id) AS assignment_ids
+FROM assignments WHERE resource_type = 'infrastructure'
+GROUP BY resource_id, work_package_id, start_at, end_at
+HAVING count(*) > 1;
+```
+
+### Calendar integrity
+
+Revision `004` ensures at most one default site and work-week profile, an active
+default site, and non-overlapping bindings for each resource or group. Date ranges
+are inclusive; an omitted end remains open. A resource binding may coexist with
+its group's binding because individual overrides retain priority.
+
+The migration stops with row IDs on multiple defaults, inactive default sites,
+invalid binding targets/periods or overlapping bindings. No row is selected or
+deleted automatically. Check and resolve these on a restored backup before retrying:
+
+```sql
+SELECT id, name FROM sites WHERE is_default;
+SELECT id, name FROM work_week_profiles WHERE is_default;
+SELECT id FROM sites WHERE is_default AND NOT is_active;
+SELECT id FROM resource_work_profiles
+WHERE (resource_id IS NULL) = (group_id IS NULL) OR valid_until < valid_from;
+SELECT a.id, b.id FROM resource_work_profiles a
+JOIN resource_work_profiles b ON a.id < b.id
+  AND (a.resource_id = b.resource_id OR a.group_id = b.group_id)
+  AND daterange(a.valid_from, a.valid_until, '[]') &&
+      daterange(b.valid_from, b.valid_until, '[]');
+```
+
+The binding guards use PostgreSQL's [range exclusion constraints](https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-CONSTRAINT)
+with [btree_gist](https://www.postgresql.org/docs/current/btree-gist.html). The migration
+installs that trusted extension if necessary; the migration account needs CREATE
+on this database, or an operator must install it beforehand. It does not need
+superuser privileges for this trusted extension. The standard Compose deployment
+runs migrations as the PostgreSQL bootstrap/database owner. For a restricted
+external migration role, grant database CREATE during the upgrade or have the
+operator preinstall `btree_gist`; table ownership alone is insufficient. A denied
+extension installation rolls back revision 004, leaving revision 003 and all
+existing data intact. Downgrading leaves
+the extension installed because other applications may also use it.
+
+A fresh installation may initially lack a default. Once selected, supported HTTP
+and CSV writes require replacing it with another default instead of clearing it.
+Default swaps are atomic and HTTP changes are audited; CSV row order does not
+matter. PostgreSQL guards also protect imports and concurrent writes.
 
 ## 3. Get the new images
 

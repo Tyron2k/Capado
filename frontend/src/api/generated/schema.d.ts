@@ -2369,7 +2369,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a resource group
-         * @description Delete a resource group (only if no resources reference it).
+         * @description Delete an unused leaf without changing inherited calendars.
          */
         delete: operations["delete_group_api_resource_groups__group_id__delete"];
         options?: never;
@@ -2881,7 +2881,7 @@ export interface paths {
          *         start_date: Start date of the time range.
          *         end_date: End date of the time range.
          *         allocation_percent: Required allocation percentage.
-         *         work_package_id: Optional work package whose assigned resources are excluded.
+         *         work_package_id: Optional work package whose identical bookings are excluded.
          *         session: Database session.
          *
          *     Returns:
@@ -11290,7 +11290,7 @@ export interface operations {
                 end_date: string;
                 /** @description Required allocation percent (required) */
                 allocation_percent: number;
-                /** @description Exclude resources already assigned to this work package */
+                /** @description Exclude identical bookings for this work package and requested dates/allocation */
                 work_package_id?: string | null;
             };
             header?: never;

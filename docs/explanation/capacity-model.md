@@ -127,3 +127,24 @@ The dashboard shows weekly utilization as stacked bar charts:
 Both are derived from minutes and expressed as percentages of the available
 time, so a peak week reads the same whether it is staffed by full-time or
 part-time people.
+
+## Distinct bookings for one work package
+
+The confirmed product rule permits multiple bookings of one resource to one work
+package. Only a fully identical booking is rejected: resource type, resource ID,
+work-package ID and complete period, plus allocation for personal resources.
+API, preview, CSV and database guards share that rule. Each booking retains its
+own ID for display, editing, deletion and baseline comparison.
+
+For example, 50% and 70% for the same person, package and days are two valid
+bookings. Demand adds to 120%; the preview and saved conflicts expose the
+overbooking. Infrastructure remains exclusive: distinct overlapping timestamp
+bookings are accepted with an overlap conflict. A separate period can be added
+without replacing earlier work. Suggestions exclude exact duplicates and still
+count existing demand when ranking distinct candidates.
+
+Reverting to one booking per resource/package would prevent accidental repeated
+planning, but would also remove phased bookings and conflict with existing CSV
+semantics. Keeping distinct bookings is recommended and was explicitly selected
+by the project owner. Migration 003 reports existing exact duplicates by ID and
+stops atomically; it never merges or deletes existing records.

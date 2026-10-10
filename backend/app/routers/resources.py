@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.models.resource import ResourceType
 from app.models.resource_group import ResourceGroup
 from app.models.user import User
 from app.schemas.pagination import PaginatedResponse
@@ -40,6 +40,7 @@ from app.services.permissions import (
     get_current_user,
     require_admin,
 )
+from app.services.resource_group_service import ResourceGroupService
 
 router = APIRouter()
 
@@ -92,14 +93,9 @@ async def create_group(
 ):
     """Create a new resource group scoped to a resource type."""
     check_write_permission(current_user, EntityType.resource, group_id=None)
-    group = ResourceGroup(
-        name=data.name.strip(),
-        resource_type=ResourceType(data.resource_type),
-        parent_id=data.parent_id,
+    return await ResourceGroupService(session).create(
+        data.name, ResourceType(data.resource_type), data.parent_id
     )
-    session.add(group)
-    await session.commit()
-    return group
 
 
 @router.put(
@@ -118,18 +114,15 @@ async def update_group(
     The parent is not cosmetic: a work-profile binding on the parent group is inherited by this one.
     """
     check_write_permission(current_user, EntityType.resource, group_id=group_id)
-    group = await session.get(ResourceGroup, group_id)
-    if group is None:
-        from app.exceptions import NotFoundError
-
-        raise NotFoundError("ResourceGroup", group_id)
-    if data.name is not None:
-        group.name = data.name.strip()
-    if data.parent_id is not None:
-        group.parent_id = data.parent_id
-    session.add(group)
-    await session.commit()
-    return group
+    if "parent_id" in data.model_fields_set:
+        # Hierarchy writes change inherited calendars, including descendants
+        # outside an editor's exact group scopes. Match calendar's admin rule.
+        await require_admin(current_user)
+    return await ResourceGroupService(session).update(
+        group_id,
+        data.name,
+        data.parent_id if "parent_id" in data.model_fields_set else UNSET,
+    )
 
 
 @router.delete(
@@ -140,38 +133,10 @@ async def update_group(
 async def delete_group(
     group_id: UUID,
     session: AsyncSession = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ):
-    """Delete a resource group (only if no resources reference it)."""
-    check_write_permission(current_user, EntityType.resource, group_id=group_id)
-    group = await session.get(ResourceGroup, group_id)
-    if group is None:
-        from app.exceptions import NotFoundError
-
-        raise NotFoundError("ResourceGroup", group_id)
-
-    # Check if any resources still reference this group
-    from sqlalchemy import func as sa_func
-
-    personal_count = (
-        await session.execute(
-            select(sa_func.count()).where(PersonalResource.group_id == group_id)
-        )
-    ).scalar_one()
-    infra_count = (
-        await session.execute(
-            select(sa_func.count()).where(InfrastructureResource.group_id == group_id)
-        )
-    ).scalar_one()
-    if personal_count + infra_count > 0:
-        from app.exceptions import ConflictError
-
-        raise ConflictError(
-            f"Cannot delete: {personal_count + infra_count} resources still belong to this group."
-        )
-
-    await session.delete(group)
-    await session.commit()
+    """Delete an unused leaf without changing inherited calendars."""
+    await ResourceGroupService(session).delete(group_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -260,10 +225,16 @@ async def update_personal_resource(
     current_user: User = Depends(get_current_user),
 ):
     """Persist changed data."""
-    existing = await resource_service.get_personal_resource_by_id(session, resource_id)
+    existing = await resource_service.get_personal_resource_by_id(
+        session, resource_id, for_update=True
+    )
     check_write_permission(
         current_user, EntityType.resource, group_id=existing.group_id
     )
+    if data.group_id is not None:
+        check_write_permission(
+            current_user, EntityType.resource, group_id=data.group_id
+        )
     sent = data.model_dump(exclude_unset=True)
     resource = await resource_service.update_personal_resource(
         session=session,
@@ -409,11 +380,15 @@ async def update_infrastructure_resource(
 ):
     """Persist changed data."""
     existing = await resource_service.get_infrastructure_resource_by_id(
-        session, resource_id
+        session, resource_id, for_update=True
     )
     check_write_permission(
         current_user, EntityType.resource, group_id=existing.group_id
     )
+    if data.group_id is not None:
+        check_write_permission(
+            current_user, EntityType.resource, group_id=data.group_id
+        )
     sent = data.model_dump(exclude_unset=True)
     resource = await resource_service.update_infrastructure_resource(
         session=session,

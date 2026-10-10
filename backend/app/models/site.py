@@ -36,6 +36,18 @@ class Site(ORMModel, kw_only=True, eq=False):
     """
 
     __tablename__ = "sites"
+    __table_args__ = (
+        sa.Index(
+            "uq_sites_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+            sqlite_where=sa.text("is_default"),
+        ),
+        sa.CheckConstraint(
+            "NOT is_default OR is_active", name="ck_sites_default_active"
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(
         sa.Uuid(),

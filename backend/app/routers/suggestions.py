@@ -38,7 +38,7 @@ async def get_suggestions(
     ),
     work_package_id: UUID | None = Query(
         default=None,
-        description="Exclude resources already assigned to this work package",
+        description="Exclude identical bookings for this work package and requested dates/allocation",
     ),
     session: AsyncSession = Depends(get_session),
     _current_user: User = Depends(get_current_user),
@@ -52,7 +52,7 @@ async def get_suggestions(
         start_date: Start date of the time range.
         end_date: End date of the time range.
         allocation_percent: Required allocation percentage.
-        work_package_id: Optional work package whose assigned resources are excluded.
+        work_package_id: Optional work package whose identical bookings are excluded.
         session: Database session.
 
     Returns:

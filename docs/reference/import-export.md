@@ -67,7 +67,7 @@ duplicate display names are safe. The columns/schema are shared by standalone do
 
 Individual imports validate **the whole file** before committing. They insert new IDs and update
 existing IDs; records omitted from the file remain unchanged. Editing an assignment with the same ID
-updates that booking; distinct IDs remain separate even if all values are identical. External references
+updates that booking; distinct IDs remain separate only when their complete booking identities differ. External references
 must exist in the destination. A missing dependency, invalid field/reference/graph or a constraint
 failure rejects the entire area with zero rows written. Public user fields can be updated without
 replacing existing credentials. Imported organization settings disable email and maintenance.
@@ -242,6 +242,12 @@ import file that names it.** This is why renaming a skill is restricted to admin
 
 A duplicate assignment — **same resource type, resource, work package, full interval and
 allocation** — is skipped. Separate bookings of the same resource/work package are retained.
+
+The API and preview use this same full booking identity. PostgreSQL unique indexes
+also reject identical bookings from concurrent requests; different periods or
+allocations remain independent bookings. In versioned CSVs, IDs identify updates:
+two different IDs cannot represent an identical booking, and the import rolls
+back with a row error if the planned result contains one.
 Equivalent UTC instants with different offsets count as the same interval. Re-importing an unchanged
 file creates no additional assignments; editing an interval or allocation creates a separate booking,
 it does not replace the previous one. Exactly identical rows are collapsed, including within a file.
@@ -315,6 +321,15 @@ explicit allowlists; a coverage test requires every new model field/table to rec
 exclusion decision. Original IDs and timestamps are retained. The source-admin-to-bootstrap mapping is
 the one ID exception. Each successful standalone import adds an audit event; a full ZIP restore adds
 one event for the transaction. Standalone downloads are verified byte-for-byte against ZIP members.
+
+CSV imports use Core writes and deliberately record an **operation-level** audit
+marker (`csv_import` or `csv_migration`, actor and timestamp), including calendar
+default swaps. HTTP individual edits instead record per-entity before/after
+changes. A CSV marker does not reconstruct individual field changes: retain the
+input CSV and a prior backup when that detail is required. The marker and all
+imported changes share one transaction; a failed import leaves neither data
+changes nor a success marker. Imported historical audit records remain unchanged
+apart from the documented account mapping and credential redaction.
 
 ### Format and exclusions
 

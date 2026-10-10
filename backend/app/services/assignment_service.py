@@ -17,6 +17,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import BusinessRuleError, ConflictError, NotFoundError
@@ -30,6 +31,38 @@ from app.services.time_zone import local_day_bounds, planning_zone
 def _utcnow() -> datetime:
     """Return current timezone-aware UTC time."""
     return datetime.now(UTC)
+
+
+def duplicate_booking_query(booking: Assignment, exclude_id: UUID | None = None):
+    """Match the complete booking identity, shared by persistence and preview."""
+    statement = select(Assignment).where(
+        Assignment.resource_type == booking.resource_type,
+        Assignment.resource_id == booking.resource_id,
+        Assignment.work_package_id == booking.work_package_id,
+    )
+    fields = (
+        ("start_date", "end_date", "allocation_percent")
+        if booking.resource_type == ResourceType.personal
+        else ("start_at", "end_at")
+    )
+    for field in fields:
+        statement = statement.where(
+            getattr(Assignment, field) == getattr(booking, field)
+        )
+    if exclude_id is not None:
+        statement = statement.where(Assignment.id != exclude_id)
+    return statement
+
+
+def is_identical_booking_violation(error: IntegrityError) -> bool:
+    """Recognize only the booking guards, not unrelated integrity failures."""
+    name = getattr(getattr(error.orig, "__cause__", None), "constraint_name", None)
+    return name in {
+        "uq_assignments_personal_booking",
+        "uq_assignments_infrastructure_booking",
+    } or str(error.orig).startswith(
+        "UNIQUE constraint failed: assignments.resource_type, assignments.resource_id, assignments.work_package_id,"
+    )
 
 
 def _validate_personal_fields(
@@ -191,9 +224,9 @@ class AssignmentService:
     async def _trigger_conflict_detection(self, resource_id: UUID) -> None:
         """Trigger conflict detection refresh for a resource."""
         # Local import to avoid circular dependency.
-        from app.services.conflict_refresh import refresh_resources
+        from app.services.conflict_refresh import refresh_after_commit
 
-        await refresh_resources(self.session, [resource_id])
+        await refresh_after_commit(self.session, [resource_id])
 
     async def create(
         self,
@@ -221,17 +254,6 @@ class AssignmentService:
         await self._check_resource_exists(resource_id, resource_type)
         await self._check_work_package_exists(work_package_id)
 
-        # Prevent duplicate: same resource + same work package
-        existing_stmt = select(Assignment).where(
-            Assignment.resource_id == resource_id,
-            Assignment.work_package_id == work_package_id,
-        )
-        existing_result = await self.session.execute(existing_stmt)
-        if existing_result.scalars().first() is not None:
-            raise ConflictError(
-                "This resource is already assigned to this work package."
-            )
-
         assignment = Assignment(
             resource_id=resource_id,
             resource_type=resource_type,
@@ -242,8 +264,14 @@ class AssignmentService:
             start_at=start_at,
             end_at=end_at,
         )
+        existing = await self.session.execute(duplicate_booking_query(assignment))
+        if existing.scalars().first() is not None:
+            raise ConflictError(
+                "An identical booking already exists for this resource and work package."
+            )
+
         self.session.add(assignment)
-        await self.session.commit()
+        await self._commit_booking()
 
         warnings: list[str] = []
         if resource_type == ResourceType.personal and start_date and end_date:
@@ -253,6 +281,18 @@ class AssignmentService:
 
         await self._trigger_conflict_detection(resource_id)
         return assignment, warnings
+
+    async def _commit_booking(self) -> None:
+        """Translate a concurrent identical insert/update, preserving other DB failures."""
+        try:
+            await self.session.commit()
+        except IntegrityError as exc:
+            await self.session.rollback()
+            if is_identical_booking_violation(exc):
+                raise ConflictError(
+                    "An identical booking already exists for this resource and work package."
+                ) from exc
+            raise
 
     async def get_all(
         self,
@@ -407,21 +447,23 @@ class AssignmentService:
         if work_package_id is not None:
             await self._check_work_package_exists(effective_work_package_id)
 
-        if (
-            effective_resource_id != assignment.resource_id
-            or effective_work_package_id != assignment.work_package_id
-        ):
-            duplicate_result = await self.session.execute(
-                select(Assignment).where(
-                    Assignment.resource_id == effective_resource_id,
-                    Assignment.work_package_id == effective_work_package_id,
-                    Assignment.id != assignment_id,
-                )
+        proposed = Assignment(
+            resource_id=effective_resource_id,
+            resource_type=effective_resource_type,
+            work_package_id=effective_work_package_id,
+            start_date=effective_start_date,
+            end_date=effective_end_date,
+            allocation_percent=effective_allocation_percent,
+            start_at=effective_start_at,
+            end_at=effective_end_at,
+        )
+        duplicate_result = await self.session.execute(
+            duplicate_booking_query(proposed, assignment_id)
+        )
+        if duplicate_result.scalars().first() is not None:
+            raise ConflictError(
+                "An identical booking already exists for this resource and work package."
             )
-            if duplicate_result.scalars().first() is not None:
-                raise ConflictError(
-                    "This resource is already assigned to this work package."
-                )
 
         previous_resource_id = assignment.resource_id
 
@@ -436,7 +478,7 @@ class AssignmentService:
         assignment.updated_at = _utcnow()
 
         self.session.add(assignment)
-        await self.session.commit()
+        await self._commit_booking()
 
         warnings: list[str] = []
         if (

@@ -1,5 +1,6 @@
 """Shared conflict reconciliation for edits, imports and scheduled checks."""
 
+import logging
 from collections.abc import Iterable
 from uuid import UUID
 
@@ -12,6 +13,7 @@ from app.services.conflict_service import ConflictService
 
 CONFLICT_CHECK_JOB = "refresh-conflicts"
 CONFLICT_CHECK_INTERVAL_MINUTES = 15
+logger = logging.getLogger(__name__)
 
 
 async def refresh_resources(
@@ -40,3 +42,28 @@ async def refresh_resources(
     for rid in sorted(set(resource_ids)):
         count += len(await service.refresh_conflicts(rid))
     return count
+
+
+async def refresh_after_commit(
+    session: AsyncSession, resource_ids: Iterable[UUID] | None = None
+) -> None:
+    """Reconcile a committed write without reporting that saved input as failed.
+
+    An independent session keeps rollback of derived data from expiring the saved
+    ORM objects used in the API response. Scheduler/import entry points retain
+    strict refresh_resources and their existing failure reporting/retry behavior.
+    """
+    try:
+        if isinstance(session, AsyncSession):
+            async with AsyncSession(
+                bind=session.bind, expire_on_commit=False, info=session.info.copy()
+            ) as derived:
+                await refresh_resources(derived, resource_ids)
+        else:
+            # Existing DB-free service tests use session doubles. They cannot
+            # establish transaction isolation, which the PostgreSQL tests cover.
+            await refresh_resources(session, resource_ids)
+    except Exception:
+        logger.exception(
+            "Conflict refresh failed after committed write; scheduler will retry."
+        )

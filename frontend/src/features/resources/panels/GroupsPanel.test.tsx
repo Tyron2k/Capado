@@ -24,6 +24,9 @@ vi.mock('../../../api/resources', () => ({
   deleteGroup: vi.fn(),
 }))
 
+const permissions = vi.hoisted(() => ({ isAdmin: true, canEditGroup: vi.fn(() => true) }))
+vi.mock('../../../hooks/usePermissions', () => ({ usePermissions: () => permissions }))
+
 const showErrorNotification = vi.fn()
 vi.mock('../../../utils/errorHandling', () => ({
   showErrorNotification: (...args: unknown[]) => showErrorNotification(...args),
@@ -89,6 +92,8 @@ function renderPanel() {
 
 describe('GroupsPanel on the query layer', () => {
   beforeEach(() => {
+    permissions.isAdmin = true
+    permissions.canEditGroup.mockReset().mockReturnValue(true)
     vi.mocked(getGroups).mockReset()
     vi.mocked(createGroup).mockReset()
     vi.mocked(updateGroup).mockReset()
@@ -167,5 +172,24 @@ describe('GroupsPanel on the query layer', () => {
 
     await waitFor(() => expect(screen.getByText(/nicht geladen|fehlgeschlagen/i)).toBeTruthy())
     expect(showErrorNotification).not.toHaveBeenCalled()
+  })
+})
+
+describe('GroupsPanel permissions', () => {
+  it('lets an editor rename only scoped groups and hides structural actions', async () => {
+    permissions.isAdmin = false
+    permissions.canEditGroup.mockImplementation((id?: string) => id === 'own')
+    vi.mocked(getGroups).mockResolvedValue([group('own', 'Eigene'), group('foreign', 'Fremde')])
+    renderPanel()
+    await screen.findByText('Eigene')
+    expect(screen.getByLabelText('Eigene bearbeiten')).toBeTruthy()
+    expect(screen.queryByLabelText('Fremde bearbeiten')).toBeNull()
+    expect(screen.queryByTestId('group-delete-own')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Gruppe hinzufügen/i })).toBeNull()
+    fireEvent.click(screen.getByLabelText('Eigene bearbeiten'))
+    fireEvent.change(screen.getByDisplayValue('Eigene'), { target: { value: 'Umbenannt' } })
+    vi.mocked(updateGroup).mockResolvedValue(group('own', 'Umbenannt'))
+    fireEvent.click(screen.getByLabelText('Speichern'))
+    await waitFor(() => expect(updateGroup).toHaveBeenCalledWith('own', { name: 'Umbenannt' }))
   })
 })

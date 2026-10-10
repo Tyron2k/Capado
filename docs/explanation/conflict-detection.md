@@ -148,6 +148,16 @@ finishes before stored results are replaced, and replacement commits atomically.
 replacement rolls back and retains previous results. Unchanged conflicts retain their IDs.
 The scheduler's separate job lock stays on one physical database connection across commits.
 
+For HTTP edits, the input commit remains separate from derived conflict reconciliation.
+A failed follow-up check is logged and retried by the enabled scheduler; the API still
+returns the successful result of the saved edit. Reconciliation uses an independent
+session with the same audit actor, so its rollback cannot expire the saved objects
+used in the response. Until a successful check, conflict views may show older results.
+Assignment deletion clears conflicts linked to the removed booking in the input
+transaction. Imports retain their explicit `conflict_check_failed` reporting, and
+scheduled failures remain visible in the run log. With the scheduler disabled, a
+later edit/import or a manually triggered reconciliation is required to retry.
+
 Planning and Gantt show the last successful **full** check, failure/overdue status and whether
 periodic checks are disabled. Visible views refresh every minute. The status endpoint is
 available to signed-in users without exposing the administrative job log.
