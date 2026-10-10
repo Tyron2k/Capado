@@ -14,7 +14,7 @@
 
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
 import { QueryClientProvider } from '@tanstack/react-query'
 
@@ -22,7 +22,7 @@ import { createTestQueryClient } from '../../testUtils/queryClient'
 import { I18nProvider } from '../../i18n'
 import { AssignmentsPanel } from './AssignmentsPanel'
 import type { Assignment, AssignmentWithWarnings } from '../../types/assignment'
-import { getAssignments, createAssignment } from '../../api/assignments'
+import { getAssignments, createAssignment, updateAssignment } from '../../api/assignments'
 
 // --- Mocks ---
 
@@ -206,6 +206,28 @@ describe('AssignmentsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockedGetAssignments.mockResolvedValue(fakeAssignments)
+  })
+
+  it('keeps distinct bookings for the same resource and package independently editable', async () => {
+    const first = fakeAssignments[0]
+    const second = { ...first, id: 'second-booking', allocation_percent: 70 }
+    mockedGetAssignments.mockResolvedValue([first, second])
+    vi.mocked(updateAssignment).mockResolvedValue({ assignment: second, warnings: [] })
+    renderPanel()
+    await waitFor(() => expect(screen.getAllByText(first.resource_name!)).toHaveLength(2))
+    const firstRow = screen.getByTestId(`assignment-delete-${first.id}`).closest('tr')!
+    const secondRow = screen.getByTestId('assignment-delete-second-booking').closest('tr')!
+    expect(within(firstRow).getByText('50%')).toBeInTheDocument()
+    expect(within(secondRow).getByText('70%')).toBeInTheDocument()
+    fireEvent.click(within(secondRow).getByRole('button', { name: /edit/i }))
+    fireEvent.click(await screen.findByTestId('form-submit'))
+    await waitFor(() =>
+      expect(updateAssignment).toHaveBeenCalledWith(
+        'second-booking',
+        expect.objectContaining({ allocation_percent: 80 }),
+      ),
+    )
+    expect(createAssignment).not.toHaveBeenCalled()
   })
 
   describe('FilterBar rendering (Requirement 1.5)', () => {

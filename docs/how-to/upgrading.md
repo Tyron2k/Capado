@@ -133,6 +133,29 @@ its own disposable database; the supplied database is not migrated.
 
 ## 3. Get the new images
 
+Revision `003` adds uniqueness guards for **identical bookings**, including
+resource type, resource, work package, complete period and personal allocation.
+Different bookings of the same resource/work package remain allowed. The migration
+stops and lists the assignment IDs if it finds identical legacy rows. It does not
+delete bookings, conflict links, audit history or baseline entries. Review those
+rows on a restored backup, correct the intended bookings explicitly, then retry.
+
+Read-only checks before upgrading:
+
+```sql
+SELECT resource_id, work_package_id, start_date, end_date, allocation_percent,
+       array_agg(id ORDER BY id) AS assignment_ids
+FROM assignments WHERE resource_type = 'personal'
+GROUP BY resource_id, work_package_id, start_date, end_date, allocation_percent
+HAVING count(*) > 1;
+
+SELECT resource_id, work_package_id, start_at, end_at,
+       array_agg(id ORDER BY id) AS assignment_ids
+FROM assignments WHERE resource_type = 'infrastructure'
+GROUP BY resource_id, work_package_id, start_at, end_at
+HAVING count(*) > 1;
+```
+
 A published release builds and pushes both images automatically, tagged with the full version plus the
 shortened forms and `latest`. Pull the version you mean to run rather than `latest`:
 
