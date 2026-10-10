@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import BusinessRuleError, NotFoundError
 from app.models.project import Project, ProjectFolder
 from app.services.folder_tree import FolderNode, descendants, would_create_cycle
+from app.services.graph_locks import lock_graph
 from app.services.partial_update import UNSET, UnsetType
 from app.services.project_service import _clean_ref
 
@@ -112,6 +113,8 @@ class ProjectFolderService:
     ) -> ProjectFolder:
         """Create a folder, optionally inside another."""
         clean_name = _validate_name(name)
+        if parent_id is not None:
+            await lock_graph(self.session, "folders")
         await self._validate_parent(None, parent_id)
 
         folder = ProjectFolder(
@@ -140,6 +143,8 @@ class ProjectFolderService:
         null has to mean "move to the top level", which None-means-unchanged cannot
         express.
         """
+        if not isinstance(parent_id, UnsetType):
+            await lock_graph(self.session, "folders")
         folder = await self.get_by_id(folder_id)
 
         if name is not None:
@@ -173,6 +178,7 @@ class ProjectFolderService:
         Returns:
             (projects unfiled, sub-folders re-parented).
         """
+        await lock_graph(self.session, "folders")
         folder = await self.get_by_id(folder_id)
         parent_id = folder.parent_id
 
