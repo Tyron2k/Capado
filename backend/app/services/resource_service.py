@@ -171,9 +171,9 @@ async def update_personal_resource(
     resource.updated_at = _utcnow()
     session.add(resource)
     await session.commit()
-    from app.services.conflict_refresh import refresh_resources
+    from app.services.conflict_refresh import refresh_after_commit
 
-    await refresh_resources(session, [resource_id])
+    await refresh_after_commit(session, [resource_id])
     return resource
 
 
@@ -516,9 +516,9 @@ async def update_infrastructure_resource(
     resource.updated_at = _utcnow()
     session.add(resource)
     await session.commit()
-    from app.services.conflict_refresh import refresh_resources
+    from app.services.conflict_refresh import refresh_after_commit
 
-    await refresh_resources(session, [resource_id])
+    await refresh_after_commit(session, [resource_id])
     return resource
 
 
