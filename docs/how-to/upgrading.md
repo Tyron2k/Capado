@@ -95,6 +95,36 @@ docker exec -i <db-container> pg_restore -l < capado-<stamp>.dump | grep -c "TAB
 
 A count of zero means you have a schema-only dump and no backup.
 
+This verifies readability and data sections. To verify recovery, restore the dump
+into a **new database on an isolated test PostgreSQL instance**, upgrade that
+database, start a test backend against it and check authentication, planning and
+historical data. Keep mail and scheduled maintenance disabled on a restored copy.
+Only proceed with the installation upgrade after the restore check succeeds.
+
+The repository's automated recovery test uses synthetic records and the actual
+`pg_dump`/`pg_restore` clients. It restores both revision `002` backups and backups
+created at the current migration head (`004`) into separate databases, compares
+every application table/column, upgrades to the current migration head,
+starts the real FastAPI lifecycle and verifies authenticated API reads. Projects,
+work packages, both resource types, bookings, calendars, permissions, audit,
+baselines, dependencies, conflicts, logos and token records must survive unchanged.
+It also verifies that restoring and starting the copy leaves the source untouched.
+
+Locally, run it against a disposable test server with CREATE DATABASE permission:
+
+```bash
+cd backend
+TEST_POSTGRES_URL=postgresql+asyncpg://postgres:test-only@127.0.0.1:5432/postgres \
+TEST_POSTGRES_CONTAINER=capado-test-db \
+ENVIRONMENT=test uv run pytest tests/test_postgres_backup_restore.py
+```
+
+`TEST_POSTGRES_CONTAINER` identifies the test server's container and uses its
+matching PostgreSQL clients. Without it, matching `pg_dump` and `pg_restore` must
+be installed on PATH. CI reuses its existing PostgreSQL service. Each run creates
+and removes uniquely named source/restore databases; it never migrates the supplied
+server database. Dumps and startup logs contain synthetic test values only.
+
 ## 2. Check where you are starting from
 
 ```sql

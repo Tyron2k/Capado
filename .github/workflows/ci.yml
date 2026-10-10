@@ -215,6 +215,8 @@ jobs:
       # while CI ran plain pytest, so nothing produced a number and nothing noticed that
       # import_export/projects.py sits at 8% and skill_service.py at 12%.
       - name: Run tests
+        env:
+          TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
         run: >
           uv run pytest --tb=short -q
           --cov=app --cov-report=term-missing:skip-covered --cov-fail-under=57
