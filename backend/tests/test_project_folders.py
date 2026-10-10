@@ -185,7 +185,17 @@ class _FakeSession:
         columns = list(statement.selected_columns)
 
         class _Result:
-            def all(self) -> list[tuple[Any, ...]]:
+            def all(self) -> list[Any]:
+                target = _FakeSession._bound_uuid(statement)
+                expression = statement.column_descriptions[0]["expr"]
+                if expression is Project:
+                    return [
+                        p for p in session.projects.values() if p.folder_id == target
+                    ]
+                if expression is ProjectFolder:
+                    return [
+                        f for f in session.folders.values() if f.parent_id == target
+                    ]
                 if len(columns) == 1:
                     target = _FakeSession._bound_uuid(statement)
                     return [

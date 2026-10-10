@@ -78,6 +78,12 @@ from models. This decouples the API contract from the database schema.
                                     └───────────────────────┘    └─────────────────────────────┘
 ```
 
+Deleting a project folder keeps its projects and child folders. Direct projects become
+unfiled; direct child folders move to the deleted folder's parent. Their stored foreign-key
+changes are individual ORM audit events in the deletion transaction, including the folder's
+own deletion. Changed customer inheritance follows from these recorded moves rather than
+inventing persisted customer changes. A failed deletion rolls back data and all audit events.
+
 ### Key Relationships
 
 - **Project → WorkPackage** (1:N): A project contains multiple work packages.
