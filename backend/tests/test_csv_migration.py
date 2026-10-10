@@ -184,8 +184,8 @@ async def source(db_session):
             work_package_id=wp.id,
             start_date=DAY,
             end_date=DAY,
-            allocation_percent=33.5,
-        ),  # identical values, distinct IDs
+            allocation_percent=34.5,
+        ),  # same period, distinct allocation and IDs; both must survive transfer
         m.Assignment(
             resource_type="personal",
             resource_id=person.id,

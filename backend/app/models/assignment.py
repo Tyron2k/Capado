@@ -40,6 +40,31 @@ class Assignment(ORMModel, kw_only=True, eq=False):
     """
 
     __tablename__ = "assignments"
+    __table_args__ = (
+        sa.Index(
+            "uq_assignments_personal_booking",
+            "resource_type",
+            "resource_id",
+            "work_package_id",
+            "start_date",
+            "end_date",
+            "allocation_percent",
+            unique=True,
+            postgresql_where=sa.text("resource_type = 'personal'"),
+            sqlite_where=sa.text("resource_type = 'personal'"),
+        ),
+        sa.Index(
+            "uq_assignments_infrastructure_booking",
+            "resource_type",
+            "resource_id",
+            "work_package_id",
+            "start_at",
+            "end_at",
+            unique=True,
+            postgresql_where=sa.text("resource_type = 'infrastructure'"),
+            sqlite_where=sa.text("resource_type = 'infrastructure'"),
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(
         sa.Uuid(),
