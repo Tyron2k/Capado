@@ -63,6 +63,10 @@ const mockWorkPackage: WorkPackage = {
 
 // --- Mocks ---
 
+vi.mock('../../hooks/usePermissions', () => ({
+  usePermissions: () => ({ canEditProject: () => true }),
+}))
+
 vi.mock('../../api/workPackages', () => ({
   getWorkPackages: vi.fn(),
   createWorkPackage: vi.fn(),

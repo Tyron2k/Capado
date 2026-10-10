@@ -161,19 +161,10 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
         end_at: assignment.end_at ?? null,
       })
       setResourceType(assignment.resource_type)
+      setSelectedProjectId(assignment.project_id ?? null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignment])
-
-  useEffect(() => {
-    if (assignment && projects.length > 0 && !selectedProjectId) {
-      // Use project_id directly from the assignment instead of scanning all projects
-      if (assignment.project_id) {
-        setSelectedProjectId(assignment.project_id)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assignment, projects])
 
   const handleResourceAutocompleteChange = (id: string | null, _name: string) => {
     form.setFieldValue('resource_id', id || '')
@@ -257,6 +248,8 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
         )}
 
         <AutocompleteField
+          key={assignment?.id ?? 'new'}
+          initialLabel={assignment?.resource_name ?? undefined}
           type={resourceType}
           label={t('assignmentForm.resource')}
           placeholder={

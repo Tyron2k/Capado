@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,12 +60,13 @@ def run_migrations() -> None:
 
     logger.info("Running database migrations...")
     env = os.environ.copy()
-    env["PYTHONPATH"] = "/app"
+    backend_root = str(Path(__file__).resolve().parents[1])
+    env["PYTHONPATH"] = backend_root
     result = subprocess.run(
         ["alembic", "upgrade", "head"],
         capture_output=True,
         text=True,
-        cwd="/app",
+        cwd=backend_root,
         env=env,
     )
     if result.returncode != 0:

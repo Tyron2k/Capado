@@ -115,3 +115,32 @@ prek run -a    # runs all linters/formatters
 
 Equivalent to `pre-commit run --all-files` but faster. Must pass before
 every commit.
+
+## Real browser workflows
+
+With Docker, Node.js and uv installed, run from `frontend`:
+
+```bash
+npm ci
+npx playwright install chromium
+npm run e2e:check
+npm run test:e2e
+```
+
+Playwright starts PostgreSQL 18 in a disposable container, the real FastAPI
+backend (including migrations and maintenance), and Vite on loopback ports
+38601/38600. These ports must be free. Each workflow resets only this owned test
+database and uses fictional users and planning records; no running Capado
+installation or developer `.env` is used. The runner removes its container and
+state file after success, failure or normal interruption. After a forced process
+kill, find orphaned test containers with `docker ps -a --filter label=capado.e2e=true`
+and remove the listed test container by name.
+
+The three Chromium workflows cover project/package creation and views,
+overbooking and correction, and editor scope denial in both UI and API. They run
+in the existing frontend CI job. Failures retain screenshots and Playwright
+traces under `test-results`; open a trace with
+`npx playwright show-trace test-results/<failed-test>/trace.zip`.
+No API requests are mocked. See the
+[Playwright web server documentation](https://playwright.dev/docs/test-webserver)
+for lifecycle configuration.

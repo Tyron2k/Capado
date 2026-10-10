@@ -56,7 +56,8 @@ interface WorkPackagesSectionProps {
 
 export function WorkPackagesSection({ project, onBack }: WorkPackagesSectionProps) {
   const { t } = useTranslation()
-  const { canWrite } = usePermissions()
+  const { canEditProject } = usePermissions()
+  const canWrite = canEditProject(project.id)
   const queryClient = useQueryClient()
   const [dependencyWP, setDependencyWP] = useState<WorkPackage | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -332,23 +333,27 @@ export function WorkPackagesSection({ project, onBack }: WorkPackagesSectionProp
           >
             <IconArrowsSplit2 size={18} />
           </ActionIcon>
-          <ActionIcon
-            variant="subtle"
-            color="blue"
-            onClick={() => handleEdit(wp)}
-            aria-label={t('workPackages.editAriaLabel')}
-          >
-            <IconEdit size={18} />
-          </ActionIcon>
-          <ActionIcon
-            variant="subtle"
-            color="red"
-            data-testid={`wp-delete-${wp.id}`}
-            onClick={() => setDeleteConfirmId(wp.id)}
-            aria-label={t('workPackages.deleteAriaLabel')}
-          >
-            <IconTrash size={18} />
-          </ActionIcon>
+          {canWrite && (
+            <>
+              <ActionIcon
+                variant="subtle"
+                color="blue"
+                onClick={() => handleEdit(wp)}
+                aria-label={t('workPackages.editAriaLabel')}
+              >
+                <IconEdit size={18} />
+              </ActionIcon>
+              <ActionIcon
+                variant="subtle"
+                color="red"
+                data-testid={`wp-delete-${wp.id}`}
+                onClick={() => setDeleteConfirmId(wp.id)}
+                aria-label={t('workPackages.deleteAriaLabel')}
+              >
+                <IconTrash size={18} />
+              </ActionIcon>
+            </>
+          )}
         </Group>
       </Table.Td>
     </Table.Tr>
@@ -363,9 +368,11 @@ export function WorkPackagesSection({ project, onBack }: WorkPackagesSectionProp
           </Button>
           <Title order={3}>{t('workPackages.title', { name: project.name })}</Title>
         </Group>
-        <Button leftSection={<IconPlus size={18} />} onClick={handleCreate}>
-          {t('workPackages.newWorkPackage')}
-        </Button>
+        {canWrite && (
+          <Button leftSection={<IconPlus size={18} />} onClick={handleCreate}>
+            {t('workPackages.newWorkPackage')}
+          </Button>
+        )}
       </Group>
 
       <Text size="sm" c="dimmed">

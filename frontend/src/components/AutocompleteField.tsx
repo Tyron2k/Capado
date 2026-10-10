@@ -9,6 +9,8 @@ import { searchAutocomplete } from '../api/autocomplete'
 import type { AutocompleteResult } from '../types/resource'
 
 interface AutocompleteFieldProps {
+  /** Display an existing selection when an edit form opens. */
+  initialLabel?: string
   type: 'personal' | 'infrastructure'
   label: string
   placeholder?: string
@@ -29,6 +31,7 @@ const TIMEOUT_MS = 5000
  */
 export function AutocompleteField({
   type,
+  initialLabel,
   label,
   placeholder,
   value,
@@ -37,9 +40,9 @@ export function AutocompleteField({
   error,
   noResultsMessage,
 }: AutocompleteFieldProps) {
-  const [inputValue, setInputValue] = useState('')
+  const [inputValue, setInputValue] = useState(initialLabel ?? '')
   const [focusedIndex, setFocusedIndex] = useState(-1)
-  const [hasSelected, setHasSelected] = useState(false)
+  const [hasSelected, setHasSelected] = useState(Boolean(initialLabel))
 
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -129,7 +132,7 @@ export function AutocompleteField({
   const handleBlur = () => {
     // Delay to allow click on dropdown items
     setTimeout(() => {
-      if (!containerRef.current?.contains(document.activeElement)) {
+      if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
         setDismissed(true)
         setFocusedIndex(-1)
         if (!hasSelected) {

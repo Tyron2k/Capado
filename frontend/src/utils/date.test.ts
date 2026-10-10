@@ -483,10 +483,11 @@ describe('differenceInDays', () => {
   it('Property: is antisymmetric and zero for identical days', () => {
     fc.assert(
       fc.property(isoDateArb, isoDateArb, (a, b) => {
-        expect(differenceInDays(a, b)).toBe(-differenceInDays(b, a))
+        // Calendar-day antisymmetry treats positive and negative zero equally.
+        expect(differenceInDays(a, b) + differenceInDays(b, a)).toBe(0)
         expect(differenceInDays(a, a)).toBe(0)
       }),
-      { numRuns: 100 },
+      { numRuns: 100, examples: [['2003-10-26', '2003-10-26']] },
     )
   })
 

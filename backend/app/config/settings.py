@@ -10,6 +10,7 @@ sets :attr:`Settings.jwt_secret_key`).
 """
 
 import logging
+import os
 import secrets
 from functools import cached_property
 from typing import Annotated, Literal
@@ -69,7 +70,8 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Browser/test processes get explicit settings, never a developer's .env.
+        env_file=None if os.environ.get("ENVIRONMENT") == "test" else ".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
