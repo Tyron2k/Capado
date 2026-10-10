@@ -143,7 +143,7 @@ async def serve():
                 f"POSTGRES_DB={database}",
                 "-p",
                 "127.0.0.1::5432",
-                "postgres:18",
+                "public.ecr.aws/docker/library/postgres:18",
             ],
             check=True,
             stdout=subprocess.DEVNULL,
