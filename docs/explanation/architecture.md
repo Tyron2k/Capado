@@ -197,6 +197,13 @@ Project creation, the editor's new scope and audit records are committed once by
 A row lock protects the scope append against concurrent creates. Failure rolls back all three;
 the frontend refreshes editor permission scopes after successful creation.
 
+Project deletion removes its live work packages, bookings, requirements and dependencies
+at either end. Each explicit business deletion is audited; affected resource conflicts are
+reconciled in the same transaction, and deleted project IDs are removed from editor scopes.
+Work-package deletion uses the same cleanup. Frozen baselines, baseline entries and existing
+audit history remain unchanged. Any failure rolls back the plan, scopes, conflicts and audit.
+No database cascade or schema change is required for this service-owned deletion boundary.
+
 ### Roles and Responsibility
 
 - **Admin**: Full access to everything.
