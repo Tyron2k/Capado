@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -43,6 +43,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # is unknown so login timing does not reveal whether an account exists
 # (mitigates user enumeration via response-time side channel).
 _DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
+
+# CAPA: a dedicated namespace, separate from graph, scheduler and resource locks.
+_SETUP_LOCK_NAMESPACE = 0x43_41_50_41
 
 
 async def _revoke_all_user_tokens(session: AsyncSession, user_id: UUID) -> None:
@@ -467,7 +470,13 @@ async def setup(
         HTTPException: 403 if users already exist (setup already completed).
 
     """
-    # Verify no users exist
+    # Serialize the empty-table claim through user/token commit, even for different emails.
+    if session.get_bind().dialect.name == "postgresql":
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(:namespace, :key)"),
+            {"namespace": _SETUP_LOCK_NAMESPACE, "key": 1},
+        )
+    # Verify no users exist after acquiring the transaction-level claim lock.
     count_statement = select(func.count()).select_from(User)
     result = await session.execute(count_statement)
     user_count = result.scalar_one()

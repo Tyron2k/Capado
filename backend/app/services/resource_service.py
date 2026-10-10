@@ -24,6 +24,8 @@ from app.models.resource import (
     PersonalResource,
     ResourceType,
 )
+from app.models.resource_group import ResourceGroup
+from app.models.site import Site
 from app.models.skill import PersonalResourceSkill
 from app.models.user import User
 from app.services.partial_update import UNSET, UnsetType
@@ -31,6 +33,31 @@ from app.services.partial_update import UNSET, UnsetType
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+async def _validate_placement(
+    session: AsyncSession,
+    resource_type: ResourceType,
+    group_id: UUID | None,
+    site_id: UUID | None | UnsetType,
+) -> None:
+    """Validate references before mutation; keep their keys valid through commit."""
+    lock = {"read": True, "key_share": True}
+    if group_id is not None:
+        group = await session.get(ResourceGroup, group_id, with_for_update=lock)
+        if group is None:
+            raise NotFoundError("ResourceGroup", group_id)
+        if group.resource_type != resource_type:
+            raise BusinessRuleError(
+                "Resource and target group must have the same resource type.",
+                field="group_id",
+            )
+    if (
+        not isinstance(site_id, UnsetType)
+        and site_id is not None
+        and await session.get(Site, site_id, with_for_update=lock) is None
+    ):
+        raise NotFoundError("Site", site_id)
 
 
 # --- PersonalResource CRUD ---
@@ -46,6 +73,7 @@ async def create_personal_resource(
     if not name or not name.strip():
         raise BusinessRuleError("Name is required.", field="name")
 
+    await _validate_placement(session, ResourceType.personal, group_id, site_id)
     resource = PersonalResource(
         name=name.strip(),
         group_id=group_id,
@@ -98,9 +126,17 @@ async def get_all_personal_resources(
 async def get_personal_resource_by_id(
     session: AsyncSession,
     resource_id: UUID,
+    *,
+    for_update: bool = False,
 ) -> PersonalResource:
     """Load a personal resource by ID or raise NotFoundError."""
-    resource = await session.get(PersonalResource, resource_id)
+    resource = (
+        await session.get(
+            PersonalResource, resource_id, with_for_update=True, populate_existing=True
+        )
+        if for_update
+        else await session.get(PersonalResource, resource_id)
+    )
     if resource is None:
         raise NotFoundError("PersonalResource", resource_id)
     return resource
@@ -121,6 +157,7 @@ async def update_personal_resource(
     matters less for them because a resource always has a group and a name.
     """
     resource = await get_personal_resource_by_id(session, resource_id)
+    await _validate_placement(session, ResourceType.personal, group_id, site_id)
 
     if name is not None:
         if not name.strip():
@@ -382,6 +419,7 @@ async def create_infrastructure_resource(
     if not name or not name.strip():
         raise BusinessRuleError("Name is required.", field="name")
 
+    await _validate_placement(session, ResourceType.infrastructure, group_id, site_id)
     resource = InfrastructureResource(
         name=name.strip(),
         group_id=group_id,
@@ -436,9 +474,20 @@ async def get_all_infrastructure_resources(
 async def get_infrastructure_resource_by_id(
     session: AsyncSession,
     resource_id: UUID,
+    *,
+    for_update: bool = False,
 ) -> InfrastructureResource:
     """Load an infrastructure resource by ID or raise NotFoundError."""
-    resource = await session.get(InfrastructureResource, resource_id)
+    resource = (
+        await session.get(
+            InfrastructureResource,
+            resource_id,
+            with_for_update=True,
+            populate_existing=True,
+        )
+        if for_update
+        else await session.get(InfrastructureResource, resource_id)
+    )
     if resource is None:
         raise NotFoundError("InfrastructureResource", resource_id)
     return resource
@@ -453,6 +502,7 @@ async def update_infrastructure_resource(
 ) -> InfrastructureResource:
     """Update an infrastructure resource. See ``update_personal_resource`` on ``site_id``/UNSET."""
     resource = await get_infrastructure_resource_by_id(session, resource_id)
+    await _validate_placement(session, ResourceType.infrastructure, group_id, site_id)
 
     if name is not None:
         if not name.strip():

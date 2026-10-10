@@ -22,7 +22,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.models.resource import InfrastructureResource, PersonalResource
+from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.models.resource_group import ResourceGroup
+from app.models.site import Site
 from app.schemas.resource import ResourceCreate, ResourceUpdate
 from app.services import resource_service
 from app.services.partial_update import UNSET
@@ -35,11 +37,17 @@ SITE_B = UUID("33333333-0000-0000-0000-00000000000b")
 class _FakeSession:
     """Enough AsyncSession to run the resource service: get, add, commit."""
 
-    def __init__(self, rows: list[Any]) -> None:
+    def __init__(self, rows: list[Any], group_type=ResourceType.personal) -> None:
         self._rows = {(type(r), r.id): r for r in rows}
+        references = [
+            ResourceGroup(id=GROUP, name="Valid group", resource_type=group_type),
+            Site(id=SITE_A, name="Site A"),
+            Site(id=SITE_B, name="Site B"),
+        ]
+        self._rows.update({(type(row), row.id): row for row in references})
         self.committed = 0
 
-    async def get(self, model: type, pk: UUID) -> Any:
+    async def get(self, model: type, pk: UUID, **kwargs) -> Any:
         return self._rows.get((model, pk))
 
     def add(self, obj: Any) -> None:  # pragma: no cover — nothing to assert
@@ -125,7 +133,7 @@ class TestTheUpdateSentinel:
     async def test_infrastructure_behaves_identically(self):
         """Both resource types share one code path; a divergence here would be silent."""
         resource = _infrastructure(SITE_A)
-        session = _FakeSession([resource])
+        session = _FakeSession([resource], group_type=ResourceType.infrastructure)
         cleared = await resource_service.update_infrastructure_resource(
             session,  # type: ignore[arg-type]
             resource.id,
@@ -149,7 +157,7 @@ class TestCreateTakesASite:
 
     @pytest.mark.asyncio
     async def test_a_resource_can_be_created_at_a_site(self):
-        session = _FakeSession([])
+        session = _FakeSession([], group_type=ResourceType.infrastructure)
         result = await resource_service.create_infrastructure_resource(
             session,  # type: ignore[arg-type]
             name="Gleis 31",
