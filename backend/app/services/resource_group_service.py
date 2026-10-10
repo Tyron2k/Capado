@@ -10,7 +10,7 @@ from app.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.models.calendar import ResourceWorkProfile
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
-from app.services.conflict_refresh import refresh_resources
+from app.services.conflict_refresh import refresh_after_commit
 from app.services.graph_locks import lock_graph
 from app.services.partial_update import UNSET, UnsetType
 
@@ -129,7 +129,7 @@ class ResourceGroupService:
         group.updated_at = datetime.now(UTC)
         await self.session.commit()
         if affected:
-            await refresh_resources(self.session, affected)
+            await refresh_after_commit(self.session, affected)
         return group
 
     async def _descendant_resources(self, group_id: UUID) -> list[UUID]:
