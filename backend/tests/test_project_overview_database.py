@@ -175,7 +175,7 @@ async def _bounded_query_overview(db_session, project_count):
     db_session.add_all(packages)
     await db_session.flush()
     for i, package in enumerate(packages):
-        for person in (people[0], people[i]):
+        for booking_index, person in enumerate((people[0], people[i])):
             db_session.add(
                 Assignment(
                     resource_id=person.id,
@@ -183,7 +183,7 @@ async def _bounded_query_overview(db_session, project_count):
                     work_package_id=package.id,
                     start_date=start,
                     end_date=end,
-                    allocation_percent=25,
+                    allocation_percent=25 + booking_index,
                 )
             )
     await db_session.commit()

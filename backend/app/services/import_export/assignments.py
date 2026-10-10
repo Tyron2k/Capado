@@ -6,6 +6,7 @@ from typing import NotRequired, TypedDict
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import models as m
@@ -14,6 +15,7 @@ from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
 from app.schemas.transfer.assignment import AssignmentTransfer
+from app.services.assignment_service import is_identical_booking_violation
 from app.services.time_zone import local_date, local_wall_time_to_utc, planning_zone
 
 from .common import ImportResult, _parse_header, check_import_conflicts
@@ -313,7 +315,17 @@ async def import_assignments(session: AsyncSession, rows: list[tuple]) -> Import
         existing_keys.add(key)
         result.created += 1
 
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        if not is_identical_booking_violation(exc):
+            raise
+        result.created = 0
+        result.errors.append(
+            "An identical booking was saved concurrently. No new rows were imported; retry the import."
+        )
+        return result
     await check_import_conflicts(session, result, affected)
     return result
 
@@ -353,7 +365,29 @@ def validate_import(context: ImportContext) -> None:
     validate_ranges(
         list(by_id["assignments"].values()), context=context, table="assignments"
     )
+    identities: set[tuple] = set()
     for row in by_id["assignments"].values():
+        identity = tuple(
+            row[field]
+            for field in (
+                "resource_type",
+                "resource_id",
+                "work_package_id",
+                "start_date",
+                "end_date",
+                "allocation_percent",
+                "start_at",
+                "end_at",
+            )
+        )
+        if identity in identities:
+            context.fail(
+                "assignments",
+                row,
+                "resource_id/work_package_id/start_date/start_at",
+                "An identical booking already exists.",
+            )
+        identities.add(identity)
         personal = row["resource_type"] == "personal"
         table = "personal_resources" if personal else "infrastructure_resources"
         if row["resource_id"] not in by_id[table]:
