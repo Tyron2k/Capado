@@ -20,7 +20,7 @@ Phase 1 (work calendars), because a calendar has to hang off *something*:
 - `docs/reference/glossary.md` defines **Site / Betriebsstätte** as the
   "top-level organizational/physical location", but no such entity exists in
   the data model. Multi-plant operators currently have only `ResourceGroup`
-  with a maximum depth of 2.
+  for logical resource pools rather than physical locations.
 
 These are different needs that are easily conflated: serving several
 *unrelated companies* from one instance (tenancy) versus one company running
@@ -47,6 +47,20 @@ mechanism. **See [Resolved since](#resolved-since) for what of this landed and w
 
 **Rename `tenant_settings` to `organization_settings`** so the schema stops
 implying a tenancy model the project has rejected.
+
+**Resource groups may nest to any depth**, separately for personal and
+infrastructure resources. HTTP writes and CSV imports reject mixed types and
+cycles. This replaces the original two-level assumption: profile resolution
+already follows all ancestors, using the nearest group binding unless the
+resource has its own binding. Sites remain a separate location axis.
+
+Group creation, deletion and parent changes require an administrator, matching
+the existing calendar configuration permissions. Editor scopes are exact group
+IDs, not inherited subtree rights: editors may rename their own groups, but
+cannot change a hierarchy and thereby alter calendars of foreign descendants.
+Supplying `parent_id`, including `null`, is an administrator operation.
+Deletion only accepts an unused leaf: subgroups, resources or profile bindings
+produce HTTP 409. The API does not automatically detach or reparent children.
 
 ## Consequences
 

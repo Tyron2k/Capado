@@ -5,7 +5,7 @@ name: CI
 # Edge images are handled by the conditional nightly build in build-images.yml.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, "codex/**"] # Also validate the stacked stabilization PRs.
   push:
     branches: [main]
     paths:

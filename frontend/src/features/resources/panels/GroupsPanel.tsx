@@ -19,6 +19,7 @@ import {
   IconX,
 } from '@tabler/icons-react'
 import { useTranslation } from '../../../i18n'
+import { usePermissions } from '../../../hooks/usePermissions'
 import { queryKeys } from '../../../api/queryClient'
 import type { ResourceGroup } from '../../../types/resource'
 import { createGroup, deleteGroup, getGroups, updateGroup } from '../../../api/resources'
@@ -31,6 +32,7 @@ interface GroupsPanelProps {
 export function GroupsPanel({ resourceType }: GroupsPanelProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { isAdmin, canEditGroup } = usePermissions()
 
   const [addMode, setAddMode] = useState(false)
   const [addValue, setAddValue] = useState('')
@@ -137,7 +139,7 @@ export function GroupsPanel({ resourceType }: GroupsPanelProps) {
       <SectionHeader
         title={t('groups.title')}
         actions={
-          !addMode ? (
+          isAdmin && !addMode ? (
             <Button size="xs" leftSection={<IconPlus size={14} />} onClick={() => setAddMode(true)}>
               {t('groups.add')}
             </Button>
@@ -145,7 +147,7 @@ export function GroupsPanel({ resourceType }: GroupsPanelProps) {
         }
       />
 
-      {addMode && (
+      {isAdmin && addMode && (
         <Group gap="xs">
           <TextInput
             placeholder={t('groups.placeholder')}
@@ -236,7 +238,7 @@ export function GroupsPanel({ resourceType }: GroupsPanelProps) {
               )}
             </Table.Td>
             <Table.Td>
-              {editId !== group.id && (
+              {editId !== group.id && canEditGroup(group.id) && (
                 <Group gap="xs">
                   <ActionIcon
                     variant="subtle"
@@ -250,16 +252,18 @@ export function GroupsPanel({ resourceType }: GroupsPanelProps) {
                   >
                     <IconEdit size={14} />
                   </ActionIcon>
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    size="sm"
-                    data-testid={`group-delete-${group.id}`}
-                    onClick={() => handleDelete(group.id, group.name)}
-                    aria-label={`${group.name} ${t('common.delete').toLowerCase()}`}
-                  >
-                    <IconTrash size={14} />
-                  </ActionIcon>
+                  {isAdmin && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size="sm"
+                      data-testid={`group-delete-${group.id}`}
+                      onClick={() => handleDelete(group.id, group.name)}
+                      aria-label={`${group.name} ${t('common.delete').toLowerCase()}`}
+                    >
+                      <IconTrash size={14} />
+                    </ActionIcon>
+                  )}
                 </Group>
               )}
             </Table.Td>
