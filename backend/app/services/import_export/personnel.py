@@ -196,7 +196,6 @@ def parse_csv(rows: list[tuple] | list[list[str]]) -> CsvBatch:
 
 def validate_import(context: ImportContext) -> None:
     """Check this domain's rules against the complete planned destination."""
-    validate_resource_csv(context, "personal")
     batch = context.batches.get(CSV_AREA.name)
     if batch:
         for row in batch.data["resource_work_profiles"]:
@@ -207,6 +206,7 @@ def validate_import(context: ImportContext) -> None:
                     "resource_id/group_id",
                     "Work-profile binding belongs to another CSV area.",
                 )
+    validate_resource_csv(context, "personal")
 
 
 async def write_import(

@@ -131,7 +131,7 @@ zone, baseline comparisons, audit history, and rollback cases. Locally, set
 `uv run pytest tests/test_utc_migration_postgres.py`. Each test creates and drops
 its own disposable database; the supplied database is not migrated.
 
-## 3. Get the new images
+### Booking uniqueness
 
 Revision `003` adds uniqueness guards for **identical bookings**, including
 resource type, resource, work package, complete period and personal allocation.
@@ -155,6 +155,49 @@ FROM assignments WHERE resource_type = 'infrastructure'
 GROUP BY resource_id, work_package_id, start_at, end_at
 HAVING count(*) > 1;
 ```
+
+### Calendar integrity
+
+Revision `004` ensures at most one default site and work-week profile, an active
+default site, and non-overlapping bindings for each resource or group. Date ranges
+are inclusive; an omitted end remains open. A resource binding may coexist with
+its group's binding because individual overrides retain priority.
+
+The migration stops with row IDs on multiple defaults, inactive default sites,
+invalid binding targets/periods or overlapping bindings. No row is selected or
+deleted automatically. Check and resolve these on a restored backup before retrying:
+
+```sql
+SELECT id, name FROM sites WHERE is_default;
+SELECT id, name FROM work_week_profiles WHERE is_default;
+SELECT id FROM sites WHERE is_default AND NOT is_active;
+SELECT id FROM resource_work_profiles
+WHERE (resource_id IS NULL) = (group_id IS NULL) OR valid_until < valid_from;
+SELECT a.id, b.id FROM resource_work_profiles a
+JOIN resource_work_profiles b ON a.id < b.id
+  AND (a.resource_id = b.resource_id OR a.group_id = b.group_id)
+  AND daterange(a.valid_from, a.valid_until, '[]') &&
+      daterange(b.valid_from, b.valid_until, '[]');
+```
+
+The binding guards use PostgreSQL's [range exclusion constraints](https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-CONSTRAINT)
+with [btree_gist](https://www.postgresql.org/docs/current/btree-gist.html). The migration
+installs that trusted extension if necessary; the migration account needs CREATE
+on this database, or an operator must install it beforehand. It does not need
+superuser privileges for this trusted extension. The standard Compose deployment
+runs migrations as the PostgreSQL bootstrap/database owner. For a restricted
+external migration role, grant database CREATE during the upgrade or have the
+operator preinstall `btree_gist`; table ownership alone is insufficient. A denied
+extension installation rolls back revision 004, leaving revision 003 and all
+existing data intact. Downgrading leaves
+the extension installed because other applications may also use it.
+
+A fresh installation may initially lack a default. Once selected, supported HTTP
+and CSV writes require replacing it with another default instead of clearing it.
+Default swaps are atomic and HTTP changes are audited; CSV row order does not
+matter. PostgreSQL guards also protect imports and concurrent writes.
+
+## 3. Get the new images
 
 A published release builds and pushes both images automatically, tagged with the full version plus the
 shortened forms and `latest`. Pull the version you mean to run rather than `latest`:
