@@ -160,7 +160,8 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:18
+        # Docker's official mirror avoids shared-runner Docker Hub pull limits.
+        image: public.ecr.aws/docker/library/postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: test-only
@@ -390,7 +391,7 @@ jobs:
         working-directory: backend
     services:
       postgres:
-        image: postgres:18-alpine
+        image: public.ecr.aws/docker/library/postgres:18-alpine
         env:
           POSTGRES_USER: capado
           POSTGRES_PASSWORD: capado
