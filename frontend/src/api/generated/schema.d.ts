@@ -2369,7 +2369,7 @@ export interface paths {
         post?: never;
         /**
          * Delete a resource group
-         * @description Delete a resource group (only if no resources reference it).
+         * @description Delete an unused leaf without changing inherited calendars.
          */
         delete: operations["delete_group_api_resource_groups__group_id__delete"];
         options?: never;

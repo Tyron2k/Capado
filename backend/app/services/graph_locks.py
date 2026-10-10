@@ -8,17 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 _GRAPH_NAMESPACE = (
     0x43_41_50_47  # CAPG; distinct from scheduler CAPO and resource keys.
 )
-_GRAPH_KEYS = {"dependencies": 1, "folders": 2}
+_GRAPH_KEYS = {"dependencies": 1, "folders": 2, "resource_groups": 3}
 
 
 async def lock_graph(
-    session: AsyncSession, graph: Literal["dependencies", "folders"]
+    session: AsyncSession, graph: Literal["dependencies", "folders", "resource_groups"]
 ) -> None:
     """Hold one graph's lock through validation/write and release on transaction end.
 
     Cross-project dependencies can connect arbitrary components. Serializing that
-    graph's structural writes protects the full cycle check; folder hierarchy writes
-    use another key. Metadata edits, reads and resource planning do not acquire it.
+    graph's structural writes protects the full cycle check; folder and resource-group
+    hierarchies use separate keys. Metadata edits and reads do not acquire them.
     SQLite/session doubles are not evidence of PostgreSQL concurrency behavior.
     """
     if (

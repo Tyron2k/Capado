@@ -171,6 +171,8 @@ async def _lock_destination(
             await lock_graph(session, "dependencies")
         if "project_folders" in tables:
             await lock_graph(session, "folders")
+        if "resource_groups" in tables:
+            await lock_graph(session, "resource_groups")
         if entities is None or tables & {
             "audit_log",
             "baselines",
