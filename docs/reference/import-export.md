@@ -67,7 +67,7 @@ duplicate display names are safe. The columns/schema are shared by standalone do
 
 Individual imports validate **the whole file** before committing. They insert new IDs and update
 existing IDs; records omitted from the file remain unchanged. Editing an assignment with the same ID
-updates that booking; distinct IDs remain separate even if all values are identical. External references
+updates that booking; distinct IDs remain separate only when their complete booking identities differ. External references
 must exist in the destination. A missing dependency, invalid field/reference/graph or a constraint
 failure rejects the entire area with zero rows written. Public user fields can be updated without
 replacing existing credentials. Imported organization settings disable email and maintenance.
@@ -242,6 +242,12 @@ import file that names it.** This is why renaming a skill is restricted to admin
 
 A duplicate assignment — **same resource type, resource, work package, full interval and
 allocation** — is skipped. Separate bookings of the same resource/work package are retained.
+
+The API and preview use this same full booking identity. PostgreSQL unique indexes
+also reject identical bookings from concurrent requests; different periods or
+allocations remain independent bookings. In versioned CSVs, IDs identify updates:
+two different IDs cannot represent an identical booking, and the import rolls
+back with a row error if the planned result contains one.
 Equivalent UTC instants with different offsets count as the same interval. Re-importing an unchanged
 file creates no additional assignments; editing an interval or allocation creates a separate booking,
 it does not replace the previous one. Exactly identical rows are collapsed, including within a file.

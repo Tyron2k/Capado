@@ -72,7 +72,7 @@ class SuggestionService:
             start_date: Start of the planning window.
             end_date: End of the planning window.
             allocation_percent: Required daily allocation percentage.
-            work_package_id: Exclude resources already assigned to this work package.
+            work_package_id: Exclude only identical bookings for this work package.
 
         Returns:
             Sorted list of available/partially-available resources.
@@ -85,7 +85,11 @@ class SuggestionService:
 
         if work_package_id is not None:
             assigned_stmt = select(Assignment.resource_id).where(
-                Assignment.work_package_id == work_package_id
+                Assignment.work_package_id == work_package_id,
+                Assignment.resource_type == ResourceType.personal,
+                Assignment.start_date == start_date,
+                Assignment.end_date == end_date,
+                Assignment.allocation_percent == allocation_percent,
             )
             assigned_result = await self.session.execute(assigned_stmt)
             assigned_ids = set(assigned_result.scalars().all())

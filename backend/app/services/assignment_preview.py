@@ -19,6 +19,7 @@ from app.schemas.assignment import (
 from app.services.assignment_service import (
     AssignmentService,
     _validate_assignment_fields,
+    duplicate_booking_query,
 )
 from app.services.capacity_service import CapacityService
 from app.services.conflict_service import ConflictPeriod, ConflictService
@@ -98,16 +99,11 @@ class AssignmentPreviewService:
 
         # Preview must fail on a duplicate just as creation does.
         duplicate_result = await self.session.execute(
-            select(Assignment).where(
-                Assignment.resource_id == data.resource_id,
-                Assignment.work_package_id == data.work_package_id,
-            )
+            duplicate_booking_query(proposed, data.assignment_id)
         )
-        if any(
-            row.id != data.assignment_id for row in duplicate_result.scalars().all()
-        ):
+        if duplicate_result.scalars().first() is not None:
             raise ConflictError(
-                "This resource is already assigned to this work package."
+                "An identical booking already exists for this resource and work package."
             )
 
         windows_by_resource: dict[UUID, list[Span]] = {
