@@ -731,6 +731,7 @@ def validate_resource_csv(context: "ImportContext", kind: str) -> None:
             context.fail(table, row, "group_id", "Resource group/type mismatch.")
     bindings = list(by_id["resource_work_profiles"].values())
     validate_ranges(bindings, context=context, table="resource_work_profiles")
+    intervals: dict[tuple[str, UUID], list[dict]] = {}
     for row in bindings:
         if (row["resource_id"] is None) == (row["group_id"] is None):
             context.fail(
@@ -751,6 +752,26 @@ def validate_resource_csv(context: "ImportContext", kind: str) -> None:
                 "Unknown resource work-profile reference.",
             )
         binding_resource_type(row, by_id)
+        target = (
+            ("resource", row["resource_id"])
+            if row["resource_id"] is not None
+            else ("group", row["group_id"])
+        )
+        intervals.setdefault(target, []).append(row)
+    for rows in intervals.values():
+        previous = None
+        for row in sorted(rows, key=lambda item: (item["valid_from"], item["id"])):
+            if previous is not None and (
+                previous["valid_until"] is None
+                or row["valid_from"] <= previous["valid_until"]
+            ):
+                context.fail(
+                    "resource_work_profiles",
+                    row,
+                    "valid_from/valid_until",
+                    "Work-profile periods overlap for the same target.",
+                )
+            previous = row
     skill_table = (
         "personal_resource_skills"
         if kind == "personal"
