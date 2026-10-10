@@ -33,6 +33,7 @@ from app.schemas.capacity import (
 )
 from app.services.capacity_service import CapacityService
 from app.services.permissions import get_current_user
+from app.services.time_zone import planning_today
 
 router = APIRouter(tags=["Capacity"])
 
@@ -120,7 +121,7 @@ async def get_capacity_overview(
         parsed_project_ids = _parse_project_ids(project_ids)
 
     if start_date is None:
-        today = date.today()
+        today = planning_today()
         start_date = today - timedelta(days=today.weekday())
     if end_date is None:
         end_date = start_date + timedelta(weeks=4)
@@ -264,7 +265,7 @@ async def get_resource_capacity_detail(
 
     """
     if start_date is None:
-        today = date.today()
+        today = planning_today()
         start_date = today - timedelta(days=today.weekday())
     if end_date is None:
         end_date = start_date + timedelta(weeks=2)

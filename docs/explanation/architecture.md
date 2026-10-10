@@ -379,6 +379,17 @@ it finished, is in [known limitations](../reference/known-limitations.md).
 - Response interceptor: on 401, attempts token refresh and retries the
   original request. Queues concurrent requests during refresh.
 
+## Planning calendar days
+
+Daily planning defaults use `planning_today()` in the existing
+`Europe/Berlin` planning zone, derived from an aware UTC clock. Dashboard and
+capacity windows, overview progress/active work, unmet requirements, digest,
+team week and report dates agree even when the server runs in another timezone.
+Explicit historical dates keep their meaning. Report display timestamps use the
+same local clock. Tenant booking input/display timezone settings retain their
+existing purpose; this change does not alter stored booking instants.
+Audit, authentication, maintenance and other stored timestamps remain UTC.
+
 ## Database Migrations
 
 Alembic runs automatically on backend startup (`alembic upgrade head`).

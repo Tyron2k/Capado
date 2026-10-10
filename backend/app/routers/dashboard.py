@@ -15,6 +15,7 @@ from app.schemas.dashboard import (
 )
 from app.services.dashboard_service import DashboardService
 from app.services.permissions import get_current_user
+from app.services.time_zone import planning_today
 
 router = APIRouter(tags=["Dashboard"])
 
@@ -88,7 +89,7 @@ async def get_dashboard(
 
     # Default time range: current Monday + 12 weeks
     if start_date is None:
-        today = date.today()
+        today = planning_today()
         start_date = today - timedelta(days=today.weekday())  # Monday
     if end_date is None:
         end_date = start_date + timedelta(weeks=12)
