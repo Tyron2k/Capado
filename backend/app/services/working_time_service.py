@@ -128,8 +128,8 @@ class WorkingTimeService:
     async def _load_group_hierarchy(self) -> None:
         """Parent links for resource groups, so a binding can be inherited.
 
-        Loaded wholesale: the hierarchy is small (documented maximum depth 2) and
-        walking it per resource would otherwise cost a query per level.
+        Load the group map once: same-type, cycle-free hierarchies have no depth
+        limit, and walking them per resource would cost a query per level.
         """
         result = await self.session.execute(
             select(ResourceGroup.id, ResourceGroup.parent_id)

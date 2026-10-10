@@ -224,7 +224,7 @@
 | `id` | UUID | PK | Primary key |
 | `name` | VARCHAR(255) | NOT NULL | Group name |
 | `resource_type` | VARCHAR(20) | NOT NULL, INDEX | `personal` or `infrastructure` |
-| `parent_id` | UUID | FK → `resource_groups.id`, INDEX, NULLABLE | Parent group. Read by `WorkingTimeService` to inherit a work-profile binding: the parent's binding applies unless this group carries its own. No depth limit is enforced in code; cycles are guarded where the chain is walked |
+| `parent_id` | UUID | FK → `resource_groups.id`, INDEX, NULLABLE | Same-type parent group, with no depth limit (ADR-003). HTTP and CSV writes reject cycles. `WorkingTimeService` inherits the nearest ancestor binding unless this group or the resource carries its own |
 | `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 | `updated_at` | TIMESTAMPTZ | NOT NULL | Last update timestamp |
 
@@ -758,7 +758,7 @@ identifier resolves to nothing, which is what makes the deletion complete rather
 
 ## Key Constraints
 
-- `ResourceGroup.parent_id` → self-referencing FK. **No depth limit is enforced** — earlier text here claimed a maximum of 2 levels, and nothing in the code checks it. The traversal that reads it guards against cycles rather than depth
+- `ResourceGroup.parent_id` → self-referencing FK. Same-type, acyclic hierarchies may have any depth (ADR-003). Structural HTTP writes and CSV imports share a PostgreSQL graph lock; explicit `parent_id: null` detaches a group. Reads retain a cycle guard for legacy data
 - `SkillAttribute` has a composite unique on `(skill_id, name)`
 - `PersonalResourceSkill` has a composite unique on `(resource_id, skill_attribute_id)`
 - `InfrastructureResourceSkill` has a composite unique on `(resource_id, skill_attribute_id)`

@@ -31,6 +31,7 @@ from app.models.calendar import (
     ResourceWorkProfile,
     WorkWeekProfile,
 )
+from app.models.resource_group import ResourceGroup
 from app.models.site import Site
 from app.services.conflict_refresh import refresh_resources
 
@@ -328,6 +329,14 @@ class CalendarService:
         if (resource_id is None) == (group_id is None):
             raise BusinessRuleError("give exactly one of resource_id or group_id")
         await self.get_profile(profile_id)
+        if group_id is not None:
+            group = await self.session.scalar(
+                select(ResourceGroup)
+                .where(ResourceGroup.id == group_id)
+                .with_for_update(read=True, key_share=True)
+            )
+            if group is None:
+                raise NotFoundError("ResourceGroup", group_id)
         for existing in await self.list_bindings(resource_id, group_id):
             existing_end = existing.valid_until or date.max
             new_end = valid_until or date.max
