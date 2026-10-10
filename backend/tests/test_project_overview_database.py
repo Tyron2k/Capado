@@ -288,3 +288,147 @@ async def test_query_count_is_bounded_when_projects_and_resources_grow(
 async def test_bounded_overview_queries_against_migrated_postgres(resource_database):
     async with AsyncSession(resource_database, expire_on_commit=False) as session:
         await _bounded_query_overview(session, 15)
+
+
+@pytest.mark.parametrize("weekday", range(7))
+async def test_default_calendar_weekdays_include_weekends(db_session, weekday):
+    """Plant lead times follow the actual default week, including working weekends."""
+    fields = dict.fromkeys(
+        (
+            "monday_minutes",
+            "tuesday_minutes",
+            "wednesday_minutes",
+            "thursday_minutes",
+            "friday_minutes",
+            "saturday_minutes",
+            "sunday_minutes",
+        ),
+        0,
+    )
+    fields[list(fields)[weekday]] = 480
+    profile = WorkWeekProfile(name="One working day", is_default=True, **fields)
+    start = date(2026, 1, 5)
+    project = Project(
+        name="Calendar", start_date=start, end_date=start + timedelta(days=6)
+    )
+    db_session.add_all([profile, project])
+    await db_session.flush()
+    db_session.add(
+        WorkPackage(
+            name="Two working days",
+            project_id=project.id,
+            start_date=start,
+            end_date=project.end_date,
+            lead_time_working_days=2,
+        )
+    )
+    await db_session.commit()
+    item = (
+        await ProjectOverviewService(db_session).get_overview(today=start)
+    ).projects[0]
+    assert len(item.late_work_packages) == 1
+    assert item.late_work_packages[0].derived_end == start + timedelta(days=7 + weekday)
+    assert item.late_work_packages[0].working_days_short == 1
+
+
+@pytest.mark.parametrize("default_exists", [False, True])
+async def test_unusable_default_calendar_keeps_dates_without_derived_schedule(
+    db_session, default_exists
+):
+    """No working day means no invented end/float, even with dependency edges."""
+    if default_exists:
+        db_session.add(
+            WorkWeekProfile(
+                name="Closed",
+                is_default=True,
+                monday_minutes=0,
+                tuesday_minutes=0,
+                wednesday_minutes=0,
+                thursday_minutes=0,
+                friday_minutes=0,
+                saturday_minutes=0,
+                sunday_minutes=0,
+            )
+        )
+    start = date(2026, 1, 5)
+    project = Project(
+        name="Closed calendar", start_date=start, end_date=start + timedelta(days=4)
+    )
+    db_session.add(project)
+    await db_session.flush()
+    first = WorkPackage(
+        name="First",
+        project_id=project.id,
+        start_date=start,
+        end_date=project.end_date,
+        lead_time_working_days=3,
+    )
+    second = WorkPackage(
+        name="Second",
+        project_id=project.id,
+        start_date=start,
+        end_date=project.end_date,
+        lead_time_working_days=3,
+    )
+    db_session.add_all([first, second])
+    await db_session.flush()
+    db_session.add(
+        WorkPackageDependency(predecessor_id=first.id, successor_id=second.id)
+    )
+    await db_session.commit()
+    item = (
+        await ProjectOverviewService(db_session).get_overview(today=start)
+    ).projects[0]
+    assert item.start_date == project.start_date
+    assert item.end_date == project.end_date
+    assert item.active_work_package_count == 2
+    assert item.late_work_packages == []
+    assert item.dependency_violations == []
+    assert item.min_float_working_days is None
+    assert item.critical_work_package_count == 0
+
+
+async def test_legacy_zero_resource_keeps_dated_profile_resolution(db_session):
+    """Imported UUID zero must not turn a dated binding into a static plant week."""
+    from uuid import UUID
+
+    start = date(2026, 1, 5)
+    group = ResourceGroup(name="Imported group")
+    profile = WorkWeekProfile(name="Dated", is_default=False)
+    project = Project(
+        name="Imported IDs", start_date=start, end_date=start + timedelta(days=1)
+    )
+    db_session.add_all([group, profile, project])
+    await db_session.flush()
+    person = PersonalResource(id=UUID(int=0), name="Imported person", group_id=group.id)
+    package = WorkPackage(
+        name="Dated package",
+        project_id=project.id,
+        start_date=start,
+        end_date=project.end_date,
+        lead_time_working_days=3,
+    )
+    db_session.add_all([person, package])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            ResourceWorkProfile(
+                resource_id=person.id,
+                profile_id=profile.id,
+                valid_from=start + timedelta(days=1),
+            ),
+            Assignment(
+                resource_id=person.id,
+                resource_type="personal",
+                work_package_id=package.id,
+                start_date=start,
+                end_date=project.end_date,
+                allocation_percent=25,
+            ),
+        ]
+    )
+    await db_session.commit()
+    item = (
+        await ProjectOverviewService(db_session).get_overview(today=start)
+    ).projects[0]
+    assert item.late_work_packages[0].derived_end == start + timedelta(days=3)

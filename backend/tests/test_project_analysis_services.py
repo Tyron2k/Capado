@@ -27,6 +27,7 @@ async def test_overview_handles_a_project_without_work_packages_at_a_fixed_date(
     session.execute.side_effect = [result([project]), result([])]
     with patch("app.services.capacity_service.WorkingTimeService") as working:
         working.return_value.prepare = AsyncMock()
+        working.return_value.profile_for.return_value = None
         response = await ProjectOverviewService(session).get_overview(
             today=date(2026, 1, 6)
         )
