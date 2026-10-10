@@ -224,9 +224,9 @@ class AssignmentService:
     async def _trigger_conflict_detection(self, resource_id: UUID) -> None:
         """Trigger conflict detection refresh for a resource."""
         # Local import to avoid circular dependency.
-        from app.services.conflict_refresh import refresh_resources
+        from app.services.conflict_refresh import refresh_after_commit
 
-        await refresh_resources(self.session, [resource_id])
+        await refresh_after_commit(self.session, [resource_id])
 
     async def create(
         self,
