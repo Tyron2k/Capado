@@ -20,6 +20,7 @@ from app.schemas.transfer.work_package_template import (
     WorkPackageTemplateRequirementTransfer,
     WorkPackageTemplateTransfer,
 )
+from app.utils.xlsx import write_cell
 
 from .common import ImportResult, _parse_header
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -108,7 +109,7 @@ def _build_templates_xlsx(rows: list[tuple]) -> bytes:
     # --- Header row ---
     ws.row_dimensions[1].height = 22
     for col_idx, header in enumerate(headers, start=1):
-        cell: Cell | MergedCell = ws.cell(row=1, column=col_idx, value=header)
+        cell: Cell | MergedCell = write_cell(ws, row=1, column=col_idx, value=header)
         cell.font = font_header
         cell.fill = fill_header
         cell.alignment = align_center
@@ -125,8 +126,8 @@ def _build_templates_xlsx(rows: list[tuple]) -> bytes:
             current_template = tpl_name
             row_in_tpl = 0
             ws.row_dimensions[current_row].height = 20
-            ws.cell(row=current_row, column=1, value=tpl_name)
-            ws.cell(row=current_row, column=2, value=description or "")
+            write_cell(ws, row=current_row, column=1, value=tpl_name)
+            write_cell(ws, row=current_row, column=2, value=description or "")
             for col in range(1, total_cols + 1):
                 cell = ws.cell(row=current_row, column=col)
                 cell.fill = fill_template
@@ -138,9 +139,11 @@ def _build_templates_xlsx(rows: list[tuple]) -> bytes:
         # Requirement data row (only if there's a skill)
         if skill_name:
             is_stripe = row_in_tpl % 2 == 1
-            ws.cell(row=current_row, column=3, value=skill_name or "")
-            ws.cell(row=current_row, column=4, value=attr_name or "")
-            ws.cell(row=current_row, column=5, value=quantity if quantity else "")
+            write_cell(ws, row=current_row, column=3, value=skill_name or "")
+            write_cell(ws, row=current_row, column=4, value=attr_name or "")
+            write_cell(
+                ws, row=current_row, column=5, value=quantity if quantity else ""
+            )
             for col in range(1, total_cols + 1):
                 cell = ws.cell(row=current_row, column=col)
                 cell.font = font_data

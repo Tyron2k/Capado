@@ -26,6 +26,7 @@ from app.schemas.transfer.project import (
     WorkPackageTransfer,
 )
 from app.schemas.transfer.work_package_requirement import WorkPackageRequirementTransfer
+from app.utils.xlsx import write_cell
 
 from .common import ImportResult, _parse_header
 from .csv_format import CsvArea, CsvBatch, dump_area, entity, parse_area_rows
@@ -136,7 +137,7 @@ def _build_projects_xlsx(rows: list[tuple]) -> bytes:
     # --- Header row ---
     ws.row_dimensions[1].height = 22
     for col_idx, header in enumerate(headers, start=1):
-        cell: Cell | MergedCell = ws.cell(row=1, column=col_idx, value=header)
+        cell: Cell | MergedCell = write_cell(ws, row=1, column=col_idx, value=header)
         cell.font = font_header
         cell.fill = fill_header
         cell.alignment = align_center
@@ -164,13 +165,15 @@ def _build_projects_xlsx(rows: list[tuple]) -> bytes:
             current_project = project_name
             current_wp = None
             ws.row_dimensions[current_row].height = 20
-            ws.cell(row=current_row, column=1, value=project_name)
-            ws.cell(
+            write_cell(ws, row=current_row, column=1, value=project_name)
+            write_cell(
+                ws,
                 row=current_row,
                 column=2,
                 value=p_start.isoformat() if p_start else "",
             )
-            ws.cell(
+            write_cell(
+                ws,
                 row=current_row,
                 column=3,
                 value=p_end.isoformat() if p_end else "",
@@ -187,13 +190,15 @@ def _build_projects_xlsx(rows: list[tuple]) -> bytes:
         if wp_name and wp_name != current_wp:
             current_wp = wp_name
             row_in_wp = 0
-            ws.cell(row=current_row, column=4, value=wp_name)
-            ws.cell(
+            write_cell(ws, row=current_row, column=4, value=wp_name)
+            write_cell(
+                ws,
                 row=current_row,
                 column=5,
                 value=wp_start.isoformat() if wp_start else "",
             )
-            ws.cell(
+            write_cell(
+                ws,
                 row=current_row,
                 column=6,
                 value=wp_end.isoformat() if wp_end else "",
@@ -209,9 +214,11 @@ def _build_projects_xlsx(rows: list[tuple]) -> bytes:
         # Requirement data row (only if there's a skill)
         if skill_name:
             is_stripe = row_in_wp % 2 == 1
-            ws.cell(row=current_row, column=7, value=skill_name or "")
-            ws.cell(row=current_row, column=8, value=attr_name or "")
-            ws.cell(row=current_row, column=9, value=quantity if quantity else "")
+            write_cell(ws, row=current_row, column=7, value=skill_name or "")
+            write_cell(ws, row=current_row, column=8, value=attr_name or "")
+            write_cell(
+                ws, row=current_row, column=9, value=quantity if quantity else ""
+            )
             for col in range(1, total_cols + 1):
                 cell = ws.cell(row=current_row, column=col)
                 cell.font = font_data
