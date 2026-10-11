@@ -166,7 +166,7 @@ export function GanttSection() {
   const isEmpty = perspective !== 'project' && resourceGantt && resourceGantt.projects.length === 0
 
   return (
-    <Stack gap="md">
+    <Stack gap="md" className="capado-gantt">
       <ConflictCheckStatus />
       <SegmentedControl
         value={perspective}
@@ -193,7 +193,7 @@ export function GanttSection() {
           searchable
           clearable
           disabled={isOptionsEmpty}
-          style={{ minWidth: 300 }}
+          style={{ width: '100%', maxWidth: 420 }}
         />
       )}
 

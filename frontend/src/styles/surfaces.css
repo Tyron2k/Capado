@@ -107,3 +107,13 @@
     margin-bottom: 20px;
   }
 }
+
+.mantine-Tooltip-tooltip {
+  background: var(--capado-raised);
+  color: var(--capado-text);
+  border: 1px solid var(--capado-border);
+  box-shadow: var(--capado-shadow);
+  max-width: min(360px, calc(100vw - 24px));
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

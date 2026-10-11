@@ -1,20 +1,6 @@
-/**
- * Deriving shades from a brand colour, and the two shades the app shell depends on.
- *
- * The interesting assertions here are not the arithmetic — they are the two CONTRAST properties the
- * shell relies on and would otherwise only discover by eye:
- *
- *   The navigation shade must clear WCAG AA for SMALL text (4.5:1) against white. It exists because the
- *   untouched brand colour does not: the product's own default, #0d9488, gives white 3.74:1. That is
- *   not enough for the small labels the navigation carries.
- *
- *   The header shade must be DARKER than the navigation one, because the whole composition is "header
- *   deeper than nav". Getting that backwards would not throw; it would just look wrong, and only on
- *   screens nobody happened to open.
- */
 import { describe, expect, it } from 'vitest'
 
-import { BRAND_SHADE_FACTORS, brandShade, HEADER_SHADE, NAVBAR_SHADE } from '../brand'
+import { BRAND_SHADE_FACTORS, brandShade } from '../brand'
 import { readableTextForeground } from '../contrast'
 
 /** Relative luminance, per WCAG — duplicated here so the test does not lean on the code it checks. */
@@ -61,31 +47,28 @@ describe('brandShade', () => {
   })
 })
 
-describe('the shades the app shell paints with', () => {
-  it('gives the navigation enough contrast for white text, which the raw brand does not', () => {
-    // The measurement that produced NAVBAR_SHADE. If someone sets it back to 0 to get "the exact
-    // colour", this fails and says why.
+describe('brand palette contrast and ordering', () => {
+  it('gives darker accent shades enough contrast for small white text', () => {
+    // A palette index carrying small text must be darker than the untouched accent.
     expect(contrastAgainstWhite(DEFAULT_BRAND)).toBeLessThan(4.5)
 
-    const navBg = brandShade(DEFAULT_BRAND, NAVBAR_SHADE)
-    expect(contrastAgainstWhite(navBg)).toBeGreaterThanOrEqual(4.5)
-    expect(readableTextForeground(navBg)).toBe('white')
+    const accentBg = brandShade(DEFAULT_BRAND, BRAND_SHADE_FACTORS[7])
+    expect(contrastAgainstWhite(accentBg)).toBeGreaterThanOrEqual(4.5)
+    expect(readableTextForeground(accentBg)).toBe('white')
   })
 
-  it('keeps the header darker than the navigation', () => {
-    const navBg = brandShade(DEFAULT_BRAND, NAVBAR_SHADE)
-    const headerBg = brandShade(DEFAULT_BRAND, HEADER_SHADE)
-    expect(luminance(headerBg)).toBeLessThan(luminance(navBg))
-    expect(readableTextForeground(headerBg)).toBe('white')
+  it('orders the deeper accent below the lighter accent', () => {
+    const accentBg = brandShade(DEFAULT_BRAND, BRAND_SHADE_FACTORS[7])
+    const deeperBg = brandShade(DEFAULT_BRAND, BRAND_SHADE_FACTORS[8])
+    expect(luminance(deeperBg)).toBeLessThan(luminance(accentBg))
+    expect(readableTextForeground(deeperBg)).toBe('white')
   })
 
-  it('lets both surfaces carry the same foreground', () => {
-    // True of the untouched colour as well -- asserted so that a future change to the shades, or to
-    // the text-contrast threshold, cannot quietly leave the navigation and the header wearing
-    // different text colours.
-    const navFg = readableTextForeground(brandShade(DEFAULT_BRAND, NAVBAR_SHADE))
-    const headerFg = readableTextForeground(brandShade(DEFAULT_BRAND, HEADER_SHADE))
-    expect(navFg).toBe(headerFg)
+  it('lets adjacent dark accent shades carry the same foreground', () => {
+    // Palette or threshold changes must not silently invert text between adjacent accents.
+    const accentFg = readableTextForeground(brandShade(DEFAULT_BRAND, BRAND_SHADE_FACTORS[7]))
+    const deeperFg = readableTextForeground(brandShade(DEFAULT_BRAND, BRAND_SHADE_FACTORS[8]))
+    expect(accentFg).toBe(deeperFg)
   })
 
   it('orders the ten theme shades from lightest to darkest', () => {
@@ -94,8 +77,7 @@ describe('the shades the app shell paints with', () => {
     for (let i = 1; i < luminances.length; i += 1) {
       expect(luminances[i]).toBeLessThan(luminances[i - 1])
     }
-    // Mantine reads index 5 as the configured colour and index 6 as `filled`, which is why the header
-    // was already a shade off the brand before any of this.
+    // The configured colour stays intact even though filled accent controls use a darker shade.
     expect(shades[5]).toBe(DEFAULT_BRAND)
   })
 })

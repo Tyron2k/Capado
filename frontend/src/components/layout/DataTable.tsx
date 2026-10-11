@@ -1,9 +1,8 @@
 /**
  * Shared data table wrapper with consistent styling.
  *
- * Applies the standard table props used across all pages:
- * `striped`, `highlightOnHover`, `withTableBorder`.
- * Also handles the loading and empty states.
+ * Opaque surface, local horizontal scrolling and optional row density/striping.
+ * Also handles loading and empty states without changing feature-specific table state.
  */
 
 import type { ReactNode } from 'react'

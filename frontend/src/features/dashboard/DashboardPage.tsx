@@ -99,8 +99,8 @@ function deadlineStatus(iso: string): 'overdue' | 'soon' | 'normal' {
 /** Color for deadline text based on urgency status. */
 function deadlineColor(iso: string): string {
   const status = deadlineStatus(iso)
-  if (status === 'overdue') return 'var(--mantine-color-red-6)'
-  if (status === 'soon') return 'var(--mantine-color-yellow-7)'
+  if (status === 'overdue') return 'var(--capado-danger)'
+  if (status === 'soon') return 'var(--capado-warning)'
   return 'inherit'
 }
 
@@ -353,6 +353,7 @@ export function DashboardPage() {
               empty={projects.length === 0}
               emptyMessage={t('projectOverview.noProjects')}
               testId="project-overview-table"
+              minWidth={1320}
               head={
                 <Table.Tr>
                   <Table.Th>
@@ -412,7 +413,11 @@ export function DashboardPage() {
                   <Table.Td>
                     <Stack gap={2}>
                       <Text size="sm">{formatProgress(p.progress_percent, locale)}</Text>
-                      <Progress value={p.progress_percent} size="xs" />
+                      <Progress
+                        value={p.progress_percent}
+                        size="xs"
+                        aria-label={`${p.project_name}: ${t('projectOverview.progress')}`}
+                      />
                     </Stack>
                   </Table.Td>
                   <Table.Td>{p.active_work_package_count}</Table.Td>
@@ -426,16 +431,12 @@ export function DashboardPage() {
                       {deadlineStatus(p.next_deadline) === 'overdue' && (
                         <IconAlertCircle
                           size={14}
-                          color="var(--mantine-color-red-6)"
+                          color="var(--capado-danger)"
                           aria-hidden="true"
                         />
                       )}
                       {deadlineStatus(p.next_deadline) === 'soon' && (
-                        <IconClock
-                          size={14}
-                          color="var(--mantine-color-yellow-7)"
-                          aria-hidden="true"
-                        />
+                        <IconClock size={14} color="var(--capado-warning)" aria-hidden="true" />
                       )}
                       <Box style={{ color: deadlineColor(p.next_deadline) }}>
                         {formatDate(p.next_deadline, locale)}
@@ -658,7 +659,12 @@ export function DashboardPage() {
                       leftSection={<IconAlertCircle size={16} />}
                       onClick={() => navigate(`/planning?project=${p.project_id}`)}
                     >
-                      {t('dashboard.conflictCount', { count: p.open_conflict_count })}
+                      {t(
+                        p.open_conflict_count === 1
+                          ? 'dashboard.conflictCountOne'
+                          : 'dashboard.conflictCount',
+                        { count: p.open_conflict_count },
+                      )}
                     </Button>
                   </Group>
                 ))}

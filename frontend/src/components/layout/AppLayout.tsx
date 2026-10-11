@@ -4,7 +4,6 @@ import {
   AppShell,
   Badge,
   NavLink,
-  ScrollArea,
   Tooltip,
   Group,
   Text,
@@ -306,7 +305,7 @@ export function AppLayout() {
         className="capado-navigation"
         data-collapsed={navCollapsed || undefined}
       >
-        <AppShell.Section grow component={ScrollArea} type="auto" scrollbarSize={6}>
+        <AppShell.Section grow className="capado-nav-scroll">
           {NAV_GROUPS.map((group) => {
             const visible = group.items.filter((item) => !('adminOnly' in item) || isAdmin)
             if (visible.length === 0) return null

@@ -33,6 +33,10 @@
 .dashboard-projects .mantine-Table-root {
   font-variant-numeric: tabular-nums;
 }
+.dashboard-projects .mantine-Table-td:nth-child(2),
+.dashboard-projects .mantine-Table-td:nth-child(6) {
+  white-space: nowrap;
+}
 .dashboard-reports .mantine-Accordion-control {
   padding: 18px 24px;
   border-radius: var(--mantine-radius-lg);

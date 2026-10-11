@@ -1,15 +1,4 @@
-/**
- * Deriving shades from the operator's brand colour.
- *
- * This lived inside App.tsx as a local `hexToShades`, which was fine while the Mantine theme was the
- * only consumer. It is shared now because the app shell needs two SPECIFIC shades as hex — not as CSS
- * variables — so it can ask `readableTextForeground` which text colour each of those two surfaces can
- * carry. A CSS variable cannot answer that question; only the value can.
- *
- * Duplicating the mixing arithmetic in two files was the alternative, and it is the kind of thing that
- * drifts silently: the theme and the shell would tint by slightly different amounts and nobody would
- * know which was intended.
- */
+/** Build the Mantine accent palette from the configured company colour. */
 
 /**
  * Mix a hex colour toward white (positive factor) or black (negative factor).
@@ -39,33 +28,7 @@ export function brandShade(hex: string, factor: number): string {
 /**
  * The ten shades Mantine wants, lightest to darkest, with the operator's colour at index 5.
  *
- * Index 5 remains the untouched colour for the theme. The shell uses darker steps for both brand
- * surfaces; Mantine's own `filled` default is index 6.
+ * Index 5 preserves the configured colour; the theme uses index 7 for filled accent controls
+ * in both colour schemes so their foreground contrast remains consistent.
  */
 export const BRAND_SHADE_FACTORS = [0.9, 0.75, 0.6, 0.4, 0.2, 0, -0.1, -0.25, -0.4, -0.55] as const
-
-/**
- * The shade the app shell paints the navigation with — darker than the configured colour.
- *
- * NOT THE COLOUR UNTOUCHED: the navigation's labels are small text, where AA asks for 4.5:1.
- * The product's default #0d9488 gives white only 3.74:1 on the raw colour. At -0.25
- * the same colour gives 6.04:1, and the header at -0.4 gives 8.20:1.
- *
- * Both shades resolve to white text. The shade keeps the chosen hue while making labels legible.
- *
- * The operator's colour still sets the hue; both shell surfaces use darker shades of it.
- */
-export const NAVBAR_SHADE = -0.25
-
-/**
- * The shade the app shell paints the header with — three steps darker than the navigation.
- *
- * DARKER RATHER THAN LIGHTER, and that is a structural choice rather than a taste one. A light header
- * beside a saturated navigation only reads as one composition while the navigation is wide enough to
- * anchor it; collapse the navigation to icons and the coloured block shrinks to a stub with a pale band
- * running off it. A darker header is a full-width band whose relationship to the navigation does not
- * depend on the navigation's width, so it survives the collapse unchanged — and it needs no separate
- * treatment in dark mode, because both surfaces stay in the same hue rather than one of them turning
- * into a bright stripe.
- */
-export const HEADER_SHADE = -0.4

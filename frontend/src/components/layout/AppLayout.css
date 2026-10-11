@@ -142,3 +142,11 @@
     font-size: 0.75rem;
   }
 }
+
+.capado-nav-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #516077 transparent;
+}

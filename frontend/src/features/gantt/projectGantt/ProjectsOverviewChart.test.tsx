@@ -10,6 +10,7 @@
  */
 
 import type { ReactNode } from 'react'
+import '@testing-library/jest-dom/vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
 
 import { createTestQueryClient } from '../../../testUtils/queryClient'
@@ -18,6 +19,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getGanttData = vi.fn()
+const translation = vi.hoisted(() => ({ locale: 'de' as 'de' | 'en' }))
 
 vi.mock('../../../api/gantt', () => ({
   getGanttData: (id: string) => getGanttData(id),
@@ -25,7 +27,7 @@ vi.mock('../../../api/gantt', () => ({
 
 vi.mock('../../../i18n', () => {
   const t = (key: string) => key
-  return { useTranslation: () => ({ t }) }
+  return { useTranslation: () => ({ t, locale: translation.locale }) }
 })
 
 import { ProjectsOverviewChart } from './ProjectsOverviewChart'
@@ -75,12 +77,16 @@ const projects = [
   project('p-2', 'Order 4712', '2026-06-01', '2026-08-31'),
 ]
 
-function renderChart(items = projects) {
+function renderChart(items = projects, onConflictClick?: (bar: { id: string }) => void) {
   return render(
     (
       <QueryClientProvider client={createTestQueryClient()}>
         <MantineProvider>
-          <ProjectsOverviewChart projects={items} timeScale="month" />
+          <ProjectsOverviewChart
+            projects={items}
+            timeScale="month"
+            onConflictClick={onConflictClick}
+          />
         </MantineProvider>
       </QueryClientProvider>
     ) as ReactNode,
@@ -89,6 +95,7 @@ function renderChart(items = projects) {
 
 describe('ProjectsOverviewChart', () => {
   beforeEach(() => {
+    translation.locale = 'de'
     getGanttData.mockReset()
     getGanttData.mockResolvedValue({
       project_id: 'p-1',
@@ -105,6 +112,65 @@ describe('ProjectsOverviewChart', () => {
         },
       ],
     })
+  })
+
+  it.each([
+    {
+      locale: 'de' as const,
+      projectRange: '01.03.2026 – 31.05.2026',
+      packageRange: '05.03.2026 – 20.03.2026',
+    },
+    {
+      locale: 'en' as const,
+      projectRange: '2026-03-01 – 2026-05-31',
+      packageRange: '2026-03-05 – 2026-03-20',
+    },
+  ])(
+    'localizes project and work-package tooltips and accessible dates in $locale',
+    async ({ locale, projectRange, packageRange }) => {
+      translation.locale = locale
+      renderChart()
+      const projectBar = screen.getByTestId('project-bar-p-1')
+      expect(projectBar).toHaveAttribute('aria-label', `Order 4711, ${projectRange}`)
+      fireEvent.mouseEnter(projectBar)
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(projectRange)
+      fireEvent.mouseLeave(projectBar)
+      await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument())
+
+      fireEvent.click(screen.getByTestId('project-toggle-p-1'))
+      const packageBar = await screen.findByTestId('gantt-bar-wp-1')
+      expect(packageBar).toHaveAttribute('aria-label', `Painting, ${packageRange}`)
+      fireEvent.mouseEnter(packageBar)
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(packageRange)
+    },
+  )
+
+  it('opens work-package conflicts using Enter or Space', async () => {
+    getGanttData.mockResolvedValueOnce({
+      project_id: 'p-1',
+      project_name: 'Order 4711',
+      work_packages: [
+        {
+          id: 'wp-1',
+          name: 'Painting',
+          start_date: '2026-03-05',
+          end_date: '2026-03-20',
+          resources: [],
+          resource_assignments: [],
+          has_conflict: true,
+        },
+      ],
+    })
+    const onConflict = vi.fn()
+    renderChart(projects, onConflict)
+    fireEvent.click(screen.getByTestId('project-toggle-p-1'))
+    const bar = await screen.findByTestId('gantt-bar-wp-1')
+    expect(bar.getAttribute('role')).toBe('button')
+    expect(bar.getAttribute('tabindex')).toBe('0')
+    fireEvent.keyDown(bar, { key: 'Enter' })
+    fireEvent.keyDown(bar, { key: ' ' })
+    expect(onConflict).toHaveBeenCalledTimes(2)
+    expect(onConflict).toHaveBeenCalledWith(expect.objectContaining({ id: 'wp-1' }))
   })
 
   it('shows every project without being asked to select one', () => {
@@ -287,8 +353,11 @@ describe('ProjectsOverviewChart conflict counts', () => {
     fireEvent.click(screen.getByTestId('project-conflicts-p-1'))
 
     expect(onBadgeClick).toHaveBeenCalledWith('p-1')
-    // The badge sits inside the row that toggles expansion. Without stopPropagation the click
-    // would also collapse or expand the project the reader just decided to look into.
+    expect(screen.getByTestId('project-conflicts-p-1').tagName).toBe('BUTTON')
+    expect(
+      screen.getByTestId('project-conflicts-p-1').closest('[data-testid="project-toggle-p-1"]'),
+    ).toBeNull()
+    // Conflict navigation and project expansion remain independent controls.
     //
     // Asserted on aria-expanded, NOT on the absence of a work package bar: the bar arrives from
     // an awaited fetch, so it is absent one tick after any click and that assertion stayed green
