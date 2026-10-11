@@ -1,7 +1,7 @@
 /**
  * Authentication context providing user state, login/logout/refresh methods,
  * and automatic token refresh scheduling. Access tokens are stored in memory
- * (never localStorage) for security. Refresh tokens are stored in localStorage.
+ * (never localStorage) for security. Refresh tokens live in HttpOnly cookies.
  */
 
 import {
@@ -29,7 +29,7 @@ interface AuthContextValue {
   isLoading: boolean
   /** Authenticate with email and password. */
   login: (email: string, password: string) => Promise<UserInfo>
-  /** Establish session from an access token (OIDC callback; refresh token is
+  /** Establish session from an access token (initial setup; refresh token is
    * already set as an httpOnly cookie by the backend). */
   loginWithTokens: (accessToken: string) => void
   /** Clear auth state and redirect to login. */
@@ -94,7 +94,7 @@ function decodeUserFromToken(token: string): UserInfo | null {
 
 /**
  * Provides authentication state and methods to the component tree.
- * On mount, attempts to restore the session using a stored refresh token.
+ * On mount, restores the session through the HttpOnly refresh cookie.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null)
@@ -102,6 +102,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const refreshFnRef = useRef<() => Promise<string | null>>(() => Promise.resolve(null))
+  const refreshPromiseRef = useRef<Promise<string | null> | null>(null)
+  const refreshGenerationRef = useRef(0)
+  const logoutPromiseRef = useRef<Promise<void> | null>(null)
 
   /** Schedule a token refresh before the access token expires. */
   const scheduleRefresh = useCallback((token: string) => {
@@ -122,22 +125,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /** Attempt to refresh the access token using the httpOnly refresh cookie. */
-  const refreshToken = useCallback(async (): Promise<string | null> => {
-    try {
-      const response = await postRefresh()
-      setAccessToken(response.access_token)
-      const decoded = decodeUserFromToken(response.access_token)
-      if (decoded) {
-        setUser(decoded)
+  const refreshToken = useCallback((): Promise<string | null> => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current
+    const generation = refreshGenerationRef.current
+    const pending = (async () => {
+      try {
+        const response = await postRefresh()
+        if (generation !== refreshGenerationRef.current) return null
+        setAccessToken(response.access_token)
+        const decoded = decodeUserFromToken(response.access_token)
+        if (decoded) setUser(decoded)
+        scheduleRefresh(response.access_token)
+        return response.access_token
+      } catch {
+        if (generation === refreshGenerationRef.current) {
+          setUser(null)
+          setAccessToken(null)
+        }
+        return null
       }
-      scheduleRefresh(response.access_token)
-      return response.access_token
-    } catch {
-      // No valid refresh cookie (or refresh failed) — clear auth state.
-      setUser(null)
-      setAccessToken(null)
-      return null
-    }
+    })()
+    refreshPromiseRef.current = pending
+    void pending.finally(() => {
+      refreshPromiseRef.current = null
+    })
+    return pending
   }, [scheduleRefresh])
 
   // Keep the ref in sync so the timer always calls the latest version
@@ -148,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Authenticate with email and password. */
   const login = useCallback(
     async (email: string, password: string): Promise<UserInfo> => {
+      await logoutPromiseRef.current
       const response = await postLogin(email, password)
       setUser(response.user)
       setAccessToken(response.access_token)
@@ -157,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [scheduleRefresh],
   )
 
-  /** Establish session from an access token (OIDC callback). The refresh
+  /** Establish session from an access token (initial setup). The refresh
    * token is already stored as an httpOnly cookie by the backend. */
   const loginWithTokens = useCallback(
     (newAccessToken: string) => {
@@ -173,10 +186,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** Clear all auth state and revoke the refresh cookie server-side. */
   const logout = useCallback(() => {
+    refreshGenerationRef.current += 1
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current)
     }
-    void postLogout()
+    // A rotating refresh may set a newer cookie. Revoke that cookie after it
+    // finishes, while immediately clearing the visible session.
+    const pending = refreshPromiseRef.current
+    logoutPromiseRef.current = pending ? pending.then(() => postLogout()) : postLogout()
     setUser(null)
     setAccessToken(null)
   }, [])
@@ -186,21 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, must_change_password: false } : null))
   }, [])
 
-  /**
-   * On mount, attempt to restore the session from the refresh token.
-   *
-   * THIS IS THE LAST HAND-ROLLED FETCH IN THE APPLICATION, and the backend access log shows it: under
-   * `StrictMode` React invokes mount effects twice in development, so a dev page load produces TWO
-   * `POST /api/auth/refresh` calls. Measured, not assumed — removing `StrictMode` reduces it to one.
-   *
-   * Every other read in the app is immune to the same double-invoke because the query cache deduplicates
-   * concurrent observers of one key. This one is not query-backed, and cannot be: it is what produces the
-   * token the client needs before it can ask for anything, so it has nothing to be stale against.
-   *
-   * Harmless in a production build (effects run once), and harmless in development because the backend
-   * tolerates replay of a just-rotated refresh token inside a ten-second grace window. Worth knowing
-   * before reading the log and concluding something is wrong.
-   */
+  /** One shared bootstrap refresh, also during StrictMode effect replay. */
   useEffect(() => {
     void refreshFnRef.current().finally(() => setIsLoading(false))
   }, [])
@@ -242,11 +245,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current)
-      }
     }
   }, [accessToken, scheduleRefresh])
+
+  // Changing tokens must not cancel the timer just scheduled for the new
+  // token. Only an actual provider teardown owns this cleanup.
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    },
+    [],
+  )
 
   const value = useMemo(
     () => ({

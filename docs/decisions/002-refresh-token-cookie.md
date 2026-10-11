@@ -29,6 +29,16 @@ sessions.
   cookie; logout clears it.
 - The access token remains in the response body and is held only in memory on
   the client.
+- After OIDC authentication, the backend sets the refresh cookie and redirects
+  to `/auth/oidc/callback` without query parameters or fragments. `AuthProvider`
+  establishes the session through its existing `POST /api/auth/refresh`
+  bootstrap; the callback page waits for it rather than issuing a second request.
+  Concurrent refreshes in one provider, including StrictMode mount replay, share
+  one request. Scheduled rotation survives state changes; logout waits for any
+  pending rotation before revoking the latest cookie and ignores its late result.
+- Nginx access logs omit query strings and Referer values. OIDC error logs use
+  fixed descriptions and exception types, never provider error text or tokens.
+  Uvicorn's auth access logs also omit queries, including provider error fields.
 
 CSRF: `SameSite=lax` prevents the cookie from being attached to cross-site
 POST requests, so a forged cross-site call to `/api/auth/refresh` or `/logout`
@@ -60,4 +70,5 @@ rotated (not when it is revoked via logout). On replay of a revoked token:
 - Multi-tab concurrent refreshes no longer cause spurious full logouts, at the
   cost of a small (default 10s) window in which a replayed rotated token is
   tolerated.
-- Requires migration `003_add_refresh_token_replaced_by`.
+- The rotation chain is included in the consolidated migration `001`.
+  Apply the current full Alembic chain; this authentication change needs no new migration.

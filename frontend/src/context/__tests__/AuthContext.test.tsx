@@ -16,8 +16,8 @@
 // @vitest-environment jsdom
 
 import { renderHook, act, waitFor } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ReactNode } from 'react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { StrictMode, type ReactNode } from 'react'
 
 // --- Module mocks ---
 
@@ -81,6 +81,7 @@ const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{childr
 // --- Tests ---
 
 describe('AuthContext', () => {
+  afterEach(() => vi.useRealTimers())
   beforeEach(() => {
     vi.clearAllMocks()
     // Default: no valid refresh cookie → mount refresh rejects.
@@ -149,5 +150,68 @@ describe('AuthContext', () => {
     expect(result.current.accessToken).toBeNull()
     // Server-side revocation is best-effort and takes no argument (cookie-based).
     expect(mockedPostLogout).toHaveBeenCalledWith()
+  })
+
+  it('deduplicates bootstrap, manual refresh and StrictMode effect replay', async () => {
+    let resolve!: (value: { access_token: string }) => void
+    mockedPostRefresh.mockReturnValue(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    const strictWrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>
+        <AuthProvider>{children}</AuthProvider>
+      </StrictMode>
+    )
+    const { result } = renderHook(() => useAuth(), { wrapper: strictWrapper })
+    let pending!: Promise<string | null>
+    act(() => {
+      pending = result.current.refresh()
+    })
+    expect(mockedPostRefresh).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      resolve({ access_token: fakeAccessToken })
+      await pending
+    })
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.accessToken).toBe(fakeAccessToken)
+  })
+
+  it('keeps the scheduled refresh after the authenticated state changes', async () => {
+    vi.useFakeTimers()
+    const short = fakeJwt({ ...testUserPayload, exp: Math.floor(Date.now() / 1000) + 90 })
+    mockedPostRefresh
+      .mockResolvedValueOnce({ access_token: short })
+      .mockResolvedValue({ access_token: fakeAccessToken })
+    const { result } = renderHook(() => useAuth(), { wrapper })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.isLoading).toBe(false)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000)
+    })
+    expect(mockedPostRefresh).toHaveBeenCalledTimes(2)
+    expect(result.current.accessToken).toBe(fakeAccessToken)
+  })
+
+  it('does not restore a session when logout overlaps a rotating refresh', async () => {
+    let resolve!: (value: { access_token: string }) => void
+    mockedPostRefresh.mockReturnValue(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    mockedPostLogout.mockResolvedValue(undefined)
+    const { result } = renderHook(() => useAuth(), { wrapper })
+    act(() => result.current.logout())
+    await act(async () => {
+      resolve({ access_token: fakeAccessToken })
+      await Promise.resolve()
+    })
+    expect(result.current.user).toBeNull()
+    expect(result.current.accessToken).toBeNull()
+    expect(mockedPostLogout).toHaveBeenCalledTimes(1)
   })
 })

@@ -492,8 +492,8 @@ export interface paths {
          *
          *     Validates the state parameter against the signed cookie, exchanges the
          *     authorization code for tokens, fetches user info, and either links to
-         *     an existing user or creates a new one. Issues Capado JWT tokens and
-         *     redirects to the frontend with the tokens.
+         *     an existing user or creates a new one. Sets the HttpOnly refresh cookie
+         *     and redirects without credentials; the frontend bootstraps via refresh.
          *
          *     Args:
          *         code: Authorization code from the OIDC provider.
@@ -504,7 +504,7 @@ export interface paths {
          *         session: Database session.
          *
          *     Returns:
-         *         302 redirect to frontend with access_token and refresh_token as query params.
+         *         302 redirect to the frontend callback, without tokens in the URL.
          *
          *     Raises:
          *         HTTPException: 400 if state is invalid or code is missing.
@@ -7524,7 +7524,7 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Redirect to frontend with tokens */
+            /** @description Redirect to frontend with an HttpOnly session cookie */
             302: {
                 headers: {
                     [name: string]: unknown;

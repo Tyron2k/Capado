@@ -9,6 +9,7 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -16,6 +17,7 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import asyncpg
+import httpx
 from sqlalchemy.engine import make_url
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +36,11 @@ def environment(url):
         "JWT_SECRET_KEY": "capado-browser-tests-only-never-production-credentials",
         "CORS_ORIGINS": '["http://127.0.0.1:38600"]',
         "PYTHONUNBUFFERED": "1",
+        "OIDC_ISSUER_URL": "http://127.0.0.1:38602",
+        "OIDC_CLIENT_ID": "browser-test-client",
+        "OIDC_CLIENT_SECRET": "browser-tests-only",
+        "OIDC_REDIRECT_URI": "http://127.0.0.1:38600/api/auth/oidc/callback",
+        "FRONTEND_URL": "http://127.0.0.1:38600",
     }
 
 
@@ -48,7 +55,7 @@ async def seed(value):
     guarded_url(value)
     os.environ.update(environment(value))
     # Import after configuration; use actual application models and auth.
-    from sqlalchemy import text
+    from sqlalchemy import select, text
 
     import app.models
     from app.database import async_session_factory, engine
@@ -58,7 +65,7 @@ async def seed(value):
     from app.models.resource import PersonalResource
     from app.models.resource_group import ResourceGroup
     from app.models.user import User
-    from app.services.auth_service import hash_password
+    from app.services.auth_service import create_access_token, hash_password
 
     today = datetime.now(UTC).astimezone(ZoneInfo("Europe/Berlin")).date()
     start = today - timedelta(days=today.weekday())
@@ -110,18 +117,36 @@ async def seed(value):
             ]
         )
         await session.commit()
+        editor = await session.scalar(
+            select(User).where(User.email == "editor@example.test")
+        )
         data = json.loads(STATE.read_text())
         data.update(
             start=str(start), end=str(end), foreign=str(foreign.id), owned=str(owned.id)
+        )
+        data["expired_access_token"] = create_access_token(
+            user_id=editor.id,
+            role=editor.role,
+            scopes={},
+            email=editor.email,
+            expires_delta=timedelta(seconds=-60),
         )
         STATE.write_text(json.dumps(data))
     await engine.dispose()
 
 
 async def serve():
+    with tempfile.NamedTemporaryFile(
+        mode="w+", prefix="capado-e2e-api-", suffix=".log"
+    ) as api_log:
+        await _serve(api_log)
+
+
+async def _serve(api_log):
     name = f"capado-e2e-{uuid4().hex[:12]}"
     database = f"capado_e2e_{uuid4().hex}"
     api = None
+    provider = None
     stop = asyncio.Event()
     for signum in (signal.SIGINT, signal.SIGTERM):
         asyncio.get_running_loop().add_signal_handler(signum, stop.set)
@@ -163,7 +188,33 @@ async def serve():
                 await asyncio.sleep(0.25)
         else:
             raise RuntimeError("Disposable PostgreSQL did not become ready")
-        STATE.write_text(json.dumps({"url": url, "container": name}))
+        STATE.write_text(
+            json.dumps({"url": url, "container": name, "api_log": api_log.name})
+        )
+        provider = await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "tests.oidc_provider:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "38602",
+            cwd=ROOT,
+            env=environment(url),
+        )
+        async with httpx.AsyncClient() as client:
+            for _ in range(120):
+                try:
+                    result = await client.get(
+                        "http://127.0.0.1:38602/.well-known/openid-configuration"
+                    )
+                    result.raise_for_status()
+                    break
+                except httpx.HTTPError:
+                    await asyncio.sleep(0.25)
+            else:
+                raise RuntimeError("Disposable OIDC provider did not become ready")
         api = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
@@ -175,6 +226,8 @@ async def serve():
             "38601",
             cwd=ROOT,
             env=environment(url),
+            stdout=api_log,
+            stderr=subprocess.STDOUT,
         )
         waiter = asyncio.create_task(stop.wait())
         process = asyncio.create_task(api.wait())
@@ -183,16 +236,19 @@ async def serve():
         if api.returncode is not None and not stop.is_set():
             raise RuntimeError(f"API exited unexpectedly ({api.returncode})")
     finally:
-        if api and api.returncode is None:
-            api.terminate()
-            with suppress(TimeoutError):
-                await asyncio.wait_for(api.wait(), timeout=5)
-            if api.returncode is None:
-                api.kill()
-                await api.wait()
+        for process in (api, provider):
+            if process and process.returncode is None:
+                process.terminate()
+                with suppress(TimeoutError):
+                    await asyncio.wait_for(process.wait(), timeout=5)
+                if process.returncode is None:
+                    process.kill()
+                    await process.wait()
         subprocess.run(
             ["docker", "rm", "--force", name], check=False, stdout=subprocess.DEVNULL
         )
+        api_log.seek(0)
+        sys.stdout.write(api_log.read())
         STATE.unlink(missing_ok=True)
 
 
