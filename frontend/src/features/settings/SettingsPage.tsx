@@ -278,7 +278,7 @@ export function SettingsPage() {
                 <FileButton
                   resetRef={resetRef}
                   onChange={handleLogoUpload}
-                  accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
                 >
                   {(props) => (
                     <Button

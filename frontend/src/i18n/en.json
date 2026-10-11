@@ -89,7 +89,7 @@
     "logoUrl": "Logo URL",
     "logoUrlDesc": "URL to an image (PNG/SVG). Displayed as a 36×36 icon in the header.",
     "logoUpload": "Upload Logo",
-    "logoUploadDesc": "Upload an image file (PNG, JPEG, SVG, WebP, GIF; max 2 MB). Overrides the URL if set.",
+    "logoUploadDesc": "Upload an image file (PNG, JPEG, WebP, GIF; max 2 MB). Overrides the URL if set.",
     "logoUploadButton": "Choose File",
     "logoUploadSuccess": "Logo uploaded successfully.",
     "logoDeleteSuccess": "Logo removed.",

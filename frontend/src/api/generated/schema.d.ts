@@ -2654,13 +2654,13 @@ export interface paths {
         };
         /**
          * Get the uploaded company logo
-         * @description Returns the uploaded logo from the database, or 404 if none exists.
+         * @description Returns a supported uploaded logo, or 404. Existing SVG logos are served with a sandbox CSP; new SVG uploads are rejected.
          */
         get: operations["get_logo_api_settings_logo_get"];
         put?: never;
         /**
          * Upload a company logo
-         * @description Accepts PNG, JPEG, SVG, WebP, or GIF. Max 2 MB. Stored in the database.
+         * @description Accepts PNG, JPEG, WebP, or GIF with matching file signatures. Max 2 MB. Stored in the database.
          */
         post: operations["upload_logo_api_settings_logo_post"];
         /**
@@ -3972,7 +3972,7 @@ export interface components {
         Body_upload_logo_api_settings_logo_post: {
             /**
              * File
-             * @description Logo image file (PNG, JPEG, SVG, WebP, GIF)
+             * @description Logo image file (PNG, JPEG, WebP, GIF)
              */
             file: string;
         };

@@ -4,6 +4,7 @@ No public test endpoint, production credentials, or existing database is used.
 """
 
 import asyncio
+import base64
 import json
 import os
 import signal
@@ -106,6 +107,13 @@ async def seed(value):
                     end_date=end,
                 ),
                 User(
+                    email="admin@example.test",
+                    name="Browser Admin",
+                    role="admin",
+                    password_hash=hash_password(PASSWORD),
+                    must_change_password=False,
+                ),
+                User(
                     email="editor@example.test",
                     name="Browser Editor",
                     role="editor",
@@ -131,6 +139,13 @@ async def seed(value):
             email=editor.email,
             expires_delta=timedelta(seconds=-60),
         )
+        from tests.logo_fixtures import ACTIVE_SVG, RASTER_LOGOS
+
+        data["active_svg"] = base64.b64encode(ACTIVE_SVG).decode()
+        data["raster_logos"] = {
+            mime: base64.b64encode(content).decode()
+            for mime, content in RASTER_LOGOS.items()
+        }
         STATE.write_text(json.dumps(data))
     await engine.dispose()
 
@@ -252,10 +267,29 @@ async def _serve(api_log):
         STATE.unlink(missing_ok=True)
 
 
+async def seed_legacy_logo():
+    """Preserve an old active SVG in the guarded, disposable browser database."""
+    value = json.loads(STATE.read_text())["url"]
+    guarded_url(value)
+    os.environ.update(environment(value))
+    from app.database import async_session_factory, engine
+    from app.services.settings_service import get_organization_settings_with_logo
+    from tests.logo_fixtures import ACTIVE_SVG
+
+    async with async_session_factory() as session:
+        settings = await get_organization_settings_with_logo(session)
+        settings.logo_data = ACTIVE_SVG
+        settings.logo_mime_type = "image/svg+xml"
+        await session.commit()
+    await engine.dispose()
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["serve"]:
         asyncio.run(serve())
     elif sys.argv[1:] == ["reset"]:
         asyncio.run(seed(json.loads(STATE.read_text())["url"]))
+    elif sys.argv[1:] == ["legacy-logo"]:
+        asyncio.run(seed_legacy_logo())
     else:
-        raise SystemExit("Usage: python -m tests.e2e_server {serve|reset}")
+        raise SystemExit("Usage: python -m tests.e2e_server {serve|reset|legacy-logo}")
