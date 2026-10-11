@@ -52,7 +52,7 @@ export async function updateTenantSettings(
 /**
  * Upload a company logo image. Replaces any previously uploaded logo.
  *
- * @param file - The image file to upload (PNG, JPEG, SVG, WebP, GIF; max 2 MB).
+ * @param file - The image file to upload (PNG, JPEG, WebP, GIF; max 2 MB).
  */
 export async function uploadLogo(file: File): Promise<void> {
   const formData = new FormData()

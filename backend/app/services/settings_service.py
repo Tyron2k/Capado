@@ -10,6 +10,27 @@ from sqlalchemy.sql.base import ExecutableOption
 
 from app.models.organization_settings import OrganizationSettings
 
+RASTER_LOGO_MIME_TYPES = frozenset(
+    {"image/png", "image/jpeg", "image/webp", "image/gif"}
+)
+
+
+def is_raster_logo(data: bytes, mime_type: str) -> bool:
+    """Check the raster signature against the claimed MIME, without decoding images.
+
+    This rejects SVG/HTML disguised as raster files. Delivery also applies
+    nosniff and a sandbox CSP, including for pre-existing SVG logos.
+    """
+    if mime_type == "image/png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if mime_type == "image/jpeg":
+        return data.startswith(b"\xff\xd8\xff")
+    if mime_type == "image/gif":
+        return data.startswith((b"GIF87a", b"GIF89a"))
+    if mime_type == "image/webp":
+        return data.startswith(b"RIFF") and data[8:12] == b"WEBP"
+    return False
+
 
 async def _get_or_create_settings(
     session: AsyncSession, *options: ExecutableOption

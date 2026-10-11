@@ -351,6 +351,19 @@ columns hides which ones belong together.
 | `logo_data` | BYTEA | NULLABLE | Uploaded logo, max 2 MB, deferred on read |
 | `logo_mime_type` | VARCHAR(100) | NULLABLE | MIME type of the upload |
 
+New logo uploads accept PNG, JPEG, WebP and GIF only, with matching raster
+signatures and a 2 MB limit. SVG uploads are rejected. Existing SVG bytes
+remain stored and displayable, but `/api/settings/logo` serves them with a
+sandbox CSP that disables scripting, event handlers, external resources and
+same-origin access. Inline styles remain allowed for static rendering. The
+endpoint also sends `X-Content-Type-Options: nosniff`; SVG responses are not
+cached. Stored logos are served only when their MIME type and raster signature
+match this policy; other rows receive 404 without changing their stored data.
+Administrators can replace or explicitly
+delete their logo through the existing controls. CSV transfers preserve logo
+bytes; they do not bypass these serving checks. The trusted frontend favicon
+and external logo URLs are unchanged.
+
 **Retention and planning**
 
 | Column | Type | Constraints | Description |

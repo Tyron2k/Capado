@@ -13,9 +13,11 @@ from app.schemas.settings import (
 from app.services.mail_config import MailConfig, validation_errors
 from app.services.permissions import get_authenticated_user, require_admin
 from app.services.settings_service import (
+    RASTER_LOGO_MIME_TYPES,
     delete_logo,
     get_organization_settings,
     get_organization_settings_with_logo,
+    is_raster_logo,
     save_logo,
     update_organization_settings,
 )
@@ -173,13 +175,7 @@ async def put_settings(
 # ===========================================================================
 
 # Accepted MIME types for logo images.
-ALLOWED_MIME_TYPES = {
-    "image/png",
-    "image/jpeg",
-    "image/svg+xml",
-    "image/webp",
-    "image/gif",
-}
+ALLOWED_MIME_TYPES = RASTER_LOGO_MIME_TYPES
 
 # Maximum file size: 2 MB.
 MAX_LOGO_SIZE = 2 * 1024 * 1024
@@ -188,19 +184,17 @@ MAX_LOGO_SIZE = 2 * 1024 * 1024
 @router.post(
     "/logo",
     summary="Upload a company logo",
-    description="Accepts PNG, JPEG, SVG, WebP, or GIF. Max 2 MB. Stored in the database.",
+    description="Accepts PNG, JPEG, WebP, or GIF with matching file signatures. Max 2 MB. Stored in the database.",
     status_code=204,
 )
 async def upload_logo(
-    file: UploadFile = File(
-        ..., description="Logo image file (PNG, JPEG, SVG, WebP, GIF)"
-    ),
+    file: UploadFile = File(..., description="Logo image file (PNG, JPEG, WebP, GIF)"),
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
 ) -> None:
     """Upload a company logo image and store it in the database.
 
-    Validates MIME type and file size. Only one logo is kept — uploading
+    Validates MIME type, file signature and size. Only one logo is kept — uploading
     replaces the previous one.
 
     Args:
@@ -219,11 +213,17 @@ async def upload_logo(
             f"Allowed: {', '.join(sorted(ALLOWED_MIME_TYPES))}",
         )
 
-    content = await file.read()
+    content = await file.read(MAX_LOGO_SIZE + 1)
     if len(content) > MAX_LOGO_SIZE:
         raise HTTPException(
             status_code=400,
             detail=f"File too large ({len(content)} bytes). Maximum is {MAX_LOGO_SIZE} bytes (2 MB).",
+        )
+
+    if not is_raster_logo(content, file.content_type):
+        raise HTTPException(
+            status_code=400,
+            detail="File content does not match a supported raster image type.",
         )
 
     await save_logo(session, data=content, mime_type=file.content_type)
@@ -232,7 +232,7 @@ async def upload_logo(
 @router.get(
     "/logo",
     summary="Get the uploaded company logo",
-    description="Returns the uploaded logo from the database, or 404 if none exists.",
+    description="Returns a supported uploaded logo, or 404. Existing SVG logos are served with a sandbox CSP; new SVG uploads are rejected.",
 )
 async def get_logo(
     session: AsyncSession = Depends(get_session),
@@ -253,10 +253,22 @@ async def get_logo(
     if settings.logo_data is None or settings.logo_mime_type is None:
         raise HTTPException(status_code=404, detail="No logo uploaded.")
 
+    # Keep historical SVG bytes intact while disabling scripts, event handlers,
+    # external resources and same-origin access, even on direct navigation.
+    legacy_svg = settings.logo_mime_type == "image/svg+xml"
+    if not legacy_svg and not is_raster_logo(
+        settings.logo_data, settings.logo_mime_type
+    ):
+        raise HTTPException(status_code=404, detail="Unsupported stored logo.")
+
     return Response(
         content=settings.logo_data,
         media_type=settings.logo_mime_type,
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={
+            "Cache-Control": "no-store" if legacy_svg else "public, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+        },
     )
 
 

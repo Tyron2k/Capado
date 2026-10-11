@@ -29,6 +29,7 @@ from app.services.settings_service import (
     save_logo,
     update_organization_settings,
 )
+from tests.logo_fixtures import RASTER_LOGOS
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -265,11 +266,11 @@ class TestUploadLogoValidation:
         monkeypatch.setattr("app.routers.settings.save_logo", _fake_save_logo)
 
         session = AsyncMock()
-        file = _upload_file(b"pngbytes", "image/png")
+        file = _upload_file(RASTER_LOGOS["image/png"], "image/png")
 
         await upload_logo(file=file, session=session, current_user=MagicMock())
 
-        assert saved["data"] == b"pngbytes"
+        assert saved["data"] == RASTER_LOGOS["image/png"]
         assert saved["mime_type"] == "image/png"
 
 
@@ -302,7 +303,7 @@ class TestGetLogo:
 
         async def _fake_get_with_logo(session):
             return OrganizationSettings(
-                logo_data=b"pngbytes", logo_mime_type="image/png"
+                logo_data=RASTER_LOGOS["image/png"], logo_mime_type="image/png"
             )
 
         monkeypatch.setattr(
@@ -312,5 +313,5 @@ class TestGetLogo:
 
         response = await get_logo(session=AsyncMock())
 
-        assert response.body == b"pngbytes"
+        assert response.body == RASTER_LOGOS["image/png"]
         assert response.media_type == "image/png"

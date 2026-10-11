@@ -89,7 +89,7 @@
     "logoUrl": "Logo-URL",
     "logoUrlDesc": "URL zu einem Bild (PNG/SVG). Wird im Header als 36×36 Icon angezeigt.",
     "logoUpload": "Logo hochladen",
-    "logoUploadDesc": "Bilddatei hochladen (PNG, JPEG, SVG, WebP, GIF; max. 2 MB). Überschreibt die URL, falls gesetzt.",
+    "logoUploadDesc": "Bilddatei hochladen (PNG, JPEG, WebP, GIF; max. 2 MB). Überschreibt die URL, falls gesetzt.",
     "logoUploadButton": "Datei wählen",
     "logoUploadSuccess": "Logo erfolgreich hochgeladen.",
     "logoDeleteSuccess": "Logo entfernt.",
