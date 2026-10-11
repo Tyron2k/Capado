@@ -1,9 +1,11 @@
 name: CI
 
-# Full checks run only on PRs. Pushes and the weekly schedule run CodeQL alone
+# Full checks run on PRs and explicit release-candidate validation. Pushes and
+# the weekly schedule run CodeQL alone
 # to keep its main-branch baseline under the same workflow identity as PR scans.
 # Edge images are handled by the conditional nightly build in build-images.yml.
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main, "codex/**"] # Also validate the stacked stabilization PRs.
   push:
@@ -27,7 +29,7 @@ jobs:
   # --- Stage 1: Lint (fast gate, always runs) ---
   lint:
     name: Lint & Format
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     # Every job caps its runtime. Without a cap GitHub only stops a job after six
     # hours, wasting runner capacity and delaying useful feedback. The limits are
@@ -311,6 +313,7 @@ jobs:
 
     steps:
       - name: Review dependency changes
+        if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
@@ -378,7 +381,7 @@ jobs:
   # writable mount — fails a pull request instead of shipping.
   dockerfile-lint:
     name: Dockerfile & config lint
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -464,7 +467,7 @@ jobs:
 
   ci-passed:
     name: CI passed
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     needs:
       - lint
       - codeql

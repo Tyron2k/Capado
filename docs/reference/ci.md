@@ -5,7 +5,7 @@ crowded out what the README is for; it is maintainer detail, not a first impress
 
 ## Pull request checks
 
-The full checks in `.github/workflows/ci.yml` run on **pull requests only**. The fast lint gate
+The full checks in `.github/workflows/ci.yml` run on **pull requests and manual validation**. The fast lint gate
 runs first; Python type checks, frontend build and tests, backend tests on Python 3.12 and
 3.14, dependency audits and a real PostgreSQL migration smoke test follow. Dockerfiles are checked
 with hadolint and the production container configuration is scanned for misconfigurations.
@@ -22,13 +22,45 @@ succeed, including both backend and CodeQL matrix entries; failure, cancellation
 skip fails the gate. The `main` ruleset requires this single Actions check, with the branch up to
 date, plus CodeQL merge protection. Add any new required CI job to this gate's `needs` list.
 
-PRs do not build container images or run browser tests. Build and exercise the production targets
+The frontend job also runs the browser regression suite against real PostgreSQL and FastAPI,
+using synthetic data. PRs do not build production container images. Build and exercise the production targets
 locally on the feature branch for larger application or deployment changes. Routine Renovate
 minor/patch updates rely on the PR checks; image builds and scans follow after merge.
 
 That is worth being precise about, because it decides where a mistake surfaces. A commit that reaches
-`main` any other way than through a checked pull request is unverified, and nothing downstream re-checks
-it.
+`main` any other way than through a checked pull request is unverified until a full manual run passes.
+The active `main` ruleset requires a PR, an up-to-date branch, **CI passed** from GitHub Actions,
+linear history and CodeQL protection; ordinary direct pushes, force pushes and deletion are blocked.
+Repository administrators retain an **always** bypass. Use the required PR route even with that role.
+
+Pushes and the weekly schedule run **CodeQL only**. A green workflow result on `main` therefore
+does not prove that the full test suite ran on that commit. PR checks validate the proposed merged
+tree; squash/rebase publication produces a different commit SHA.
+
+## Exact release-candidate validation
+
+Run the existing CI manually on the intended branch or tag before publishing a release:
+
+```bash
+gh workflow run ci.yml --ref main
+gh run list --workflow ci.yml --event workflow_dispatch --branch main --limit 1
+gh run watch <run-id> --exit-status
+gh run view <run-id> --json headSha,conclusion
+```
+
+Use that successful run's **headSha**, not a later `main`, as the release target. The manual event
+runs all existing jobs and the same strict **CI passed** gate, including Python 3.12/3.14,
+PostgreSQL migrations, browser tests, locked dependency audits and CodeQL. The PR-only dependency
+diff review has no comparison on a manual run; the Python and npm vulnerability audits still run.
+There is no new test pipeline and no full test rerun on every `main` push.
+
+`release.yml` refuses image publication unless that exact source SHA has a successful manual
+CI run and a successful **CI passed** job. The source must be in `main` history. The workflow
+resolves the release tag once and passes its immutable SHA to the image builder, so moving a tag
+cannot change the tested source between validation and build. It reuses the successful run,
+rather than paying for the same suite a second time during publication. Run history must remain
+available; a deleted validation requires another manual run. A failed gate can be rerun after
+validation succeeds, without republishing the GitHub release.
 
 Every job sets `timeout-minutes`. GitHub otherwise lets a hung job run for six hours, delaying useful
 feedback and occupying runner capacity.

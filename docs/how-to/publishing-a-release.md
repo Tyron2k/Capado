@@ -4,7 +4,18 @@ What `release.yml` does on its own, and the one step it cannot do.
 
 ## Cutting the release
 
-Publishing a GitHub release triggers `release.yml`, which builds both images for `linux/amd64` and
+First run the [full candidate CI](../reference/ci.md#exact-release-candidate-validation) and
+wait for **CI passed** to succeed. Record its `headSha` and create the release tag on that
+exact commit in `main` history. A green CodeQL-only push run or a PR check on a different SHA
+does not satisfy this release gate.
+
+Publishing a GitHub release triggers `release.yml`. Before building, it verifies an existing
+successful manual full CI on the tag's resolved SHA. It does not rerun the suite. Without that
+proof, image publication stops; the GitHub release itself is already published, but existing
+container tags remain unchanged. After completing the missing validation, rerun the failed
+release workflow. Builds use the validated immutable SHA, rather than resolving the tag again.
+
+The workflow then builds both images for `linux/amd64` and
 `linux/arm64` from the `production` targets. It pushes candidates by digest, scans them, records a
 CycloneDX SBOM and build provenance, and only then promotes both images in GHCR. A stable release
 tagged `vMAJOR.MINOR.PATCH` produces five tags per image:
