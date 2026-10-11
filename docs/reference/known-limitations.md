@@ -163,7 +163,8 @@ and verifying an actual transitive alert's fix. See [CI](ci.md) for the bot conf
 
 ## Free-text fields defeat the enum work
 
-`Absence.note` (500 chars) and `AuditLog.reason` accept anything. Migration 013 removed the
+`Absence.note` (500 chars) and `AuditLog.reason` accept anything. Historical migration 013
+(consolidated into baseline 001) removed the
 `sick` absence reason precisely because it was health data, and a note reading
 "Krankmeldung liegt vor" puts it straight back — observed in testing against real-shaped
 data.

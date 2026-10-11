@@ -8,6 +8,10 @@ Capado is pre-1.0 and the schema still changes between releases. Read the releas
 you are moving to before starting; anything version-specific lives there, and the sections below are
 the procedure that applies every time.
 
+The current Alembic chain is `001`–`004`. Earlier migration numbers mentioned
+below are historical revisions consolidated into `001_consolidated_baseline_schema`;
+they are explicitly labelled and are not additional revisions to apply today.
+
 ## PostgreSQL 16 to 18
 
 The Compose defaults now use PostgreSQL 18. This is a **database engine upgrade**, separate from
@@ -77,7 +81,8 @@ are not automatically copied back.
 
 ## 1. Back up, without exception
 
-Not every migration is reversible. Migration 013, for example, collapsed absence reasons to
+Not every migration is reversible. Historical migration 013 (now part of baseline 001), for example,
+collapsed absence reasons to
 `planned` / `unplanned` and **deleted the original cause** — its downgrade restores the wider enum but
 fills in `vacation` / `other`, not the values that were there. Assume the release you are applying
 contains something equivalent unless you have checked that it does not.
@@ -282,7 +287,8 @@ concluding the image is absent.
 
 ## 4. Deploy backend and frontend together
 
-The two are versioned as a pair and a release may change the contract between them. Migration 013 is
+The two are versioned as a pair and a release may change the contract between them. Historical
+migration 013 (now part of baseline 001) is
 the illustration: it reduced the absence reason to a two-value enum, so an old frontend sent
 `reason: "vacation"` and the new backend answered 422 — absence management broke for exactly as long
 as the two were apart.
@@ -398,16 +404,21 @@ window become their own kind of conflict.
 
 ---
 
-# Upgrading from a revision older than the first public release
+# Historical upgrades before schema consolidation
 
-Relevant only to installations predating the first public release. The mechanical test is the schema
-revision, not a version number: **if `alembic_version` reads 003 or lower**, there is one check whose
-window closes with the upgrade.
+This section records the earlier migration chain, before its consolidation into
+baseline `001`. Its historical revisions `003`, `004` and `013` are distinct from
+the current `001`–`004` chain. The current baseline already uses the two absence
+reasons `planned` / `unplanned`; a current revision `003` does not mean the old
+part-time conversion is still pending. Only installations using the pre-baseline
+schema and its old absence reasons need the check described below.
 
 ## Part-time absences
 
-Run this **before** upgrading. Migration 004 removes the `part_time` absence reason and converts those
-rows to `other`; migration 013 then makes them `unplanned`. After that they are **indistinguishable
+Run this **before** upgrading that historical schema. Historical migration 004 removes the `part_time`
+absence reason and converts those
+rows to `other`; historical migration 013 then makes them `unplanned`. Both changes are now included
+in baseline 001. After conversion they are **indistinguishable
 from genuine other absences**.
 
 ```sql
@@ -429,6 +440,8 @@ rows after the profiles are in place.
 
 ## Verified against
 
-The migration chain has been run against **PostgreSQL 18**, forwards, back to 003 and forwards again,
-with representative data present — including absences using every pre-004 reason, so the mapping is
-exercised rather than assumed.
+The historical migration chain was tested against **PostgreSQL 18**, forwards,
+back to historical revision 003 and forwards again, with representative data
+including every pre-004 absence reason. This records that earlier verification;
+it is not a downgrade claim for the current chain. Current migration and
+backup/restore checks are described above.

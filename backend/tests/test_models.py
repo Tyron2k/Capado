@@ -1,13 +1,14 @@
 """
-Unit tests for SQLModel models.
+Unit tests for native SQLAlchemy models and their transfer schemas.
 
 Validates instantiation, defaults, enums, and validation rules for the
-current schema (Alembic head: 012):
+current schema (Alembic head: 004):
 
 - ``PersonalResource``: no free-text qualification field; management
   responsibility is derived from User scopes.
 - ``InfrastructureResource``: no ``type`` enum and no ``capacity_per_day``
-  anymore (Alembic 006). Equipment runs via ``equipment_types``.
+  anymore (historical migration 006, consolidated into baseline 001).
+  Equipment runs via ``equipment_types``.
   Absences and maintenance are managed as regular Assignments.
 - ``Assignment`` carries two shapes: Personal (start_date/end_date/
   allocation_percent) and Infrastructure (start_at/end_at).
