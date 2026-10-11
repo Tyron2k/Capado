@@ -241,111 +241,113 @@ export function SkillMatrix({ resourceId, resourceType = 'personal' }: Qualifica
           <Text fw={600} size="sm" mb="xs">
             {skill.name}
           </Text>
-          <Table striped highlightOnHover withTableBorder>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('skillMatrix.attribute')}</Table.Th>
-                <Table.Th style={{ width: 80, textAlign: 'center' }}>
-                  {t('skillMatrix.assigned')}
-                </Table.Th>
-                <Table.Th style={{ width: 190 }}>{t('skillMatrix.validUntil')}</Table.Th>
-                <Table.Th style={{ width: 130 }}>{t('skillMatrix.level')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {skill.attributes.map((attr) => {
-                const assignment = assignments.find((a) => a.skill_attribute_id === attr.id)
-                const isChecked = !!assignment
-                const isCellLoading = loadingCells.has(attr.id)
-                const isTemp = assignment?.id.startsWith('temp-') ?? false
-                const expiry = assignment?.valid_until ? new Date(assignment.valid_until) : null
+          <Table.ScrollContainer minWidth={520} type="native">
+            <Table striped highlightOnHover withTableBorder>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('skillMatrix.attribute')}</Table.Th>
+                  <Table.Th style={{ width: 80, textAlign: 'center' }}>
+                    {t('skillMatrix.assigned')}
+                  </Table.Th>
+                  <Table.Th style={{ width: 190 }}>{t('skillMatrix.validUntil')}</Table.Th>
+                  <Table.Th style={{ width: 130 }}>{t('skillMatrix.level')}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {skill.attributes.map((attr) => {
+                  const assignment = assignments.find((a) => a.skill_attribute_id === attr.id)
+                  const isChecked = !!assignment
+                  const isCellLoading = loadingCells.has(attr.id)
+                  const isTemp = assignment?.id.startsWith('temp-') ?? false
+                  const expiry = assignment?.valid_until ? new Date(assignment.valid_until) : null
 
-                // Compared against today deliberately: this badge answers "does this need
-                // attention now", which is a different question from whether the
-                // qualification covers a given piece of work. The planning check runs
-                // against the assignment's own dates on the backend.
-                const daysLeft = expiry
-                  ? Math.ceil((expiry.getTime() - Date.now()) / 86_400_000)
-                  : null
+                  // Compared against today deliberately: this badge answers "does this need
+                  // attention now", which is a different question from whether the
+                  // qualification covers a given piece of work. The planning check runs
+                  // against the assignment's own dates on the backend.
+                  const daysLeft = expiry
+                    ? Math.ceil((expiry.getTime() - Date.now()) / 86_400_000)
+                    : null
 
-                return (
-                  <Table.Tr key={attr.id}>
-                    <Table.Td>{attr.name}</Table.Td>
-                    <Table.Td style={{ textAlign: 'center' }}>
-                      <Checkbox
-                        checked={isChecked}
-                        disabled={isCellLoading}
-                        data-testid={`qualification-${attr.id}`}
-                        onChange={() => handleToggle(attr.id)}
-                        aria-label={`${skill.name} – ${attr.name}`}
-                      />
-                    </Table.Td>
-                    <Table.Td>
-                      {assignment && !isTemp ? (
-                        <Group gap="xs" wrap="nowrap">
-                          <DateInput
-                            // Mantine hands back a plain 'YYYY-MM-DD' string, which is
-                            // exactly what the API stores. Going via Date and
-                            // toISOString() would convert to UTC first and shift the day
-                            // backwards east of Greenwich — 1 March saved as 28 February.
-                            value={assignment.valid_until ?? null}
+                  return (
+                    <Table.Tr key={attr.id}>
+                      <Table.Td>{attr.name}</Table.Td>
+                      <Table.Td style={{ textAlign: 'center' }}>
+                        <Checkbox
+                          checked={isChecked}
+                          disabled={isCellLoading}
+                          data-testid={`qualification-${attr.id}`}
+                          onChange={() => handleToggle(attr.id)}
+                          aria-label={`${skill.name} – ${attr.name}`}
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        {assignment && !isTemp ? (
+                          <Group gap="xs" wrap="nowrap">
+                            <DateInput
+                              // Mantine hands back a plain 'YYYY-MM-DD' string, which is
+                              // exactly what the API stores. Going via Date and
+                              // toISOString() would convert to UTC first and shift the day
+                              // backwards east of Greenwich — 1 March saved as 28 February.
+                              value={assignment.valid_until ?? null}
+                              onChange={(value) =>
+                                void handleBoundsChange(assignment, {
+                                  valid_until: value || null,
+                                })
+                              }
+                              disabled={isCellLoading}
+                              clearable
+                              size="xs"
+                              valueFormat="DD.MM.YYYY"
+                              placeholder={t('skillMatrix.noExpiry')}
+                              aria-label={`${attr.name} – ${t('skillMatrix.validUntil')}`}
+                              style={{ minWidth: 110 }}
+                            />
+                            {daysLeft !== null && daysLeft < 0 && (
+                              <Badge color="red" size="sm" variant="light">
+                                {t('skillMatrix.expired')}
+                              </Badge>
+                            )}
+                            {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
+                              <Badge color="orange" size="sm" variant="light">
+                                {t('skillMatrix.expiringSoon', { days: daysLeft })}
+                              </Badge>
+                            )}
+                          </Group>
+                        ) : (
+                          <Text size="xs" c="dimmed">
+                            –
+                          </Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td>
+                        {assignment && !isTemp ? (
+                          <Select
+                            value={assignment.level !== null ? String(assignment.level) : null}
                             onChange={(value) =>
                               void handleBoundsChange(assignment, {
-                                valid_until: value || null,
+                                level: value ? Number(value) : null,
                               })
                             }
+                            data={['1', '2', '3', '4', '5']}
                             disabled={isCellLoading}
                             clearable
                             size="xs"
-                            valueFormat="DD.MM.YYYY"
-                            placeholder={t('skillMatrix.noExpiry')}
-                            aria-label={`${attr.name} – ${t('skillMatrix.validUntil')}`}
-                            style={{ minWidth: 110 }}
+                            placeholder={t('skillMatrix.noLevel')}
+                            aria-label={`${attr.name} – ${t('skillMatrix.level')}`}
                           />
-                          {daysLeft !== null && daysLeft < 0 && (
-                            <Badge color="red" size="sm" variant="light">
-                              {t('skillMatrix.expired')}
-                            </Badge>
-                          )}
-                          {daysLeft !== null && daysLeft >= 0 && daysLeft <= 90 && (
-                            <Badge color="orange" size="sm" variant="light">
-                              {t('skillMatrix.expiringSoon', { days: daysLeft })}
-                            </Badge>
-                          )}
-                        </Group>
-                      ) : (
-                        <Text size="xs" c="dimmed">
-                          –
-                        </Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td>
-                      {assignment && !isTemp ? (
-                        <Select
-                          value={assignment.level !== null ? String(assignment.level) : null}
-                          onChange={(value) =>
-                            void handleBoundsChange(assignment, {
-                              level: value ? Number(value) : null,
-                            })
-                          }
-                          data={['1', '2', '3', '4', '5']}
-                          disabled={isCellLoading}
-                          clearable
-                          size="xs"
-                          placeholder={t('skillMatrix.noLevel')}
-                          aria-label={`${attr.name} – ${t('skillMatrix.level')}`}
-                        />
-                      ) : (
-                        <Text size="xs" c="dimmed">
-                          –
-                        </Text>
-                      )}
-                    </Table.Td>
-                  </Table.Tr>
-                )
-              })}
-            </Table.Tbody>
-          </Table>
+                        ) : (
+                          <Text size="xs" c="dimmed">
+                            –
+                          </Text>
+                        )}
+                      </Table.Td>
+                    </Table.Tr>
+                  )
+                })}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </div>
       ))}
     </Stack>

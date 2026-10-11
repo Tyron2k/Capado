@@ -102,37 +102,39 @@ function RequirementSection({
       </Text>
 
       {filteredRequirements.length > 0 && (
-        <Table striped withTableBorder fz="xs">
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('requirements.skill')}</Table.Th>
-              <Table.Th>{t('requirements.attribute')}</Table.Th>
-              <Table.Th>{t('requirements.quantity')}</Table.Th>
-              <Table.Th style={{ width: 40 }} aria-label={t('common.actions')} />
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {filteredRequirements.map((req) => (
-              <Table.Tr key={req.id}>
-                <Table.Td>{req.skill_name}</Table.Td>
-                <Table.Td>{req.skill_attribute_name || '—'}</Table.Td>
-                <Table.Td>{req.quantity}</Table.Td>
-                <Table.Td>
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    size="xs"
-                    onClick={() => onRemove(req)}
-                    disabled={loading}
-                    aria-label={t('common.delete')}
-                  >
-                    <IconTrash size={12} />
-                  </ActionIcon>
-                </Table.Td>
+        <Table.ScrollContainer minWidth={560} type="native">
+          <Table striped withTableBorder fz="xs">
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('requirements.skill')}</Table.Th>
+                <Table.Th>{t('requirements.attribute')}</Table.Th>
+                <Table.Th>{t('requirements.quantity')}</Table.Th>
+                <Table.Th style={{ width: 40 }} aria-label={t('common.actions')} />
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {filteredRequirements.map((req) => (
+                <Table.Tr key={req.id}>
+                  <Table.Td>{req.skill_name}</Table.Td>
+                  <Table.Td>{req.skill_attribute_name || '—'}</Table.Td>
+                  <Table.Td>{req.quantity}</Table.Td>
+                  <Table.Td>
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size="xs"
+                      onClick={() => onRemove(req)}
+                      disabled={loading}
+                      aria-label={t('common.delete')}
+                    >
+                      <IconTrash size={12} />
+                    </ActionIcon>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
       )}
 
       <Group align="flex-end" gap="xs">

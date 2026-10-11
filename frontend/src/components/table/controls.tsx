@@ -1,7 +1,31 @@
 /** Small shared controls used by the project and resource tables. Columns stay in each feature. */
 import type { ReactNode } from 'react'
-import { Button, Group, Menu, UnstyledButton } from '@mantine/core'
+import { Button, Group, Menu, SegmentedControl, UnstyledButton } from '@mantine/core'
 import { IconArrowDown, IconArrowUp, IconColumns } from '@tabler/icons-react'
+import type { TableDensity } from '../layout/DataTable'
+import { useTranslation } from '../../i18n'
+
+export function TableDensityControl({
+  value,
+  onChange,
+}: {
+  value: TableDensity
+  onChange: (value: TableDensity) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <SegmentedControl
+      size="xs"
+      aria-label={t('tables.density')}
+      value={value}
+      onChange={(value) => onChange(value === 'compact' ? 'compact' : 'comfortable')}
+      data={[
+        { value: 'comfortable', label: t('tables.comfortable') },
+        { value: 'compact', label: t('tables.compact') },
+      ]}
+    />
+  )
+}
 
 export function ColumnPicker({
   label,

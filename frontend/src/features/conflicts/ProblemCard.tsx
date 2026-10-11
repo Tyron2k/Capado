@@ -396,67 +396,73 @@ export const ProblemCard = React.memo(function ProblemCard({
                       </Text>
                     </Alert>
                   ) : (
-                    <Table withTableBorder fz="xs" layout="fixed">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th style={{ width: '40%' }}>{t('conflicts.period')}</Table.Th>
-                          <Table.Th style={{ width: '20%' }}>{t('conflicts.severity')}</Table.Th>
-                          <Table.Th style={{ width: '25%' }}>
-                            {t('conflicts.assignedAvailable')}
-                          </Table.Th>
-                          <Table.Th style={{ width: '15%' }}>{t('conflicts.factor')}</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {conflicts
-                          .slice()
-                          .sort((a, b) => a.start_date.localeCompare(b.start_date))
-                          .map((c) => (
-                            <Table.Tr key={c.id}>
-                              <Table.Td>
-                                {formatDate(c.start_date)} – {formatDate(c.end_date)}
-                              </Table.Td>
-                              <Table.Td>
-                                <ConflictSeverityBadge severity={c.severity} />
-                              </Table.Td>
-                              <Table.Td>
-                                {c.total_assigned_percent.toFixed(0)}% /{' '}
-                                {c.available_percent.toFixed(0)}%
-                              </Table.Td>
-                              <Table.Td>
-                                {c.overload_ratio !== null
-                                  ? `${c.overload_ratio.toFixed(2)}×`
-                                  : '—'}
-                              </Table.Td>
-                            </Table.Tr>
-                          ))}
-                      </Table.Tbody>
-                    </Table>
+                    <Table.ScrollContainer minWidth={560} type="native">
+                      <Table withTableBorder fz="xs" layout="fixed">
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th style={{ width: '40%' }}>{t('conflicts.period')}</Table.Th>
+                            <Table.Th style={{ width: '20%' }}>{t('conflicts.severity')}</Table.Th>
+                            <Table.Th style={{ width: '25%' }}>
+                              {t('conflicts.assignedAvailable')}
+                            </Table.Th>
+                            <Table.Th style={{ width: '15%' }}>{t('conflicts.factor')}</Table.Th>
+                          </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {conflicts
+                            .slice()
+                            .sort((a, b) => a.start_date.localeCompare(b.start_date))
+                            .map((c) => (
+                              <Table.Tr key={c.id}>
+                                <Table.Td>
+                                  {formatDate(c.start_date)} – {formatDate(c.end_date)}
+                                </Table.Td>
+                                <Table.Td>
+                                  <ConflictSeverityBadge severity={c.severity} />
+                                </Table.Td>
+                                <Table.Td>
+                                  {c.total_assigned_percent.toFixed(0)}% /{' '}
+                                  {c.available_percent.toFixed(0)}%
+                                </Table.Td>
+                                <Table.Td>
+                                  {c.overload_ratio !== null
+                                    ? `${c.overload_ratio.toFixed(2)}×`
+                                    : '—'}
+                                </Table.Td>
+                              </Table.Tr>
+                            ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Table.ScrollContainer>
                   )}
                 </>
               ) : (
                 <>
                   {missingSkills.length > 0 ? (
-                    <Table withTableBorder fz="xs" layout="fixed">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th style={{ width: '50%' }}>{t('requirements.skill')}</Table.Th>
-                          <Table.Th style={{ width: '30%' }}>
-                            {t('requirements.attribute')}
-                          </Table.Th>
-                          <Table.Th style={{ width: '20%' }}>{t('requirements.quantity')}</Table.Th>
-                        </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {missingSkills.map((req) => (
-                          <Table.Tr key={req.id}>
-                            <Table.Td>{req.skill_name}</Table.Td>
-                            <Table.Td>{req.skill_attribute_name || '—'}</Table.Td>
-                            <Table.Td>{req.quantity}</Table.Td>
+                    <Table.ScrollContainer minWidth={560} type="native">
+                      <Table withTableBorder fz="xs" layout="fixed">
+                        <Table.Thead>
+                          <Table.Tr>
+                            <Table.Th style={{ width: '50%' }}>{t('requirements.skill')}</Table.Th>
+                            <Table.Th style={{ width: '30%' }}>
+                              {t('requirements.attribute')}
+                            </Table.Th>
+                            <Table.Th style={{ width: '20%' }}>
+                              {t('requirements.quantity')}
+                            </Table.Th>
                           </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
+                        </Table.Thead>
+                        <Table.Tbody>
+                          {missingSkills.map((req) => (
+                            <Table.Tr key={req.id}>
+                              <Table.Td>{req.skill_name}</Table.Td>
+                              <Table.Td>{req.skill_attribute_name || '—'}</Table.Td>
+                              <Table.Td>{req.quantity}</Table.Td>
+                            </Table.Tr>
+                          ))}
+                        </Table.Tbody>
+                      </Table>
+                    </Table.ScrollContainer>
                   ) : (
                     <Text size="sm" c="dimmed">
                       {t('suggestionList.loading')}

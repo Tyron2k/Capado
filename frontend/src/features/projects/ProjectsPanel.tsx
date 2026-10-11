@@ -304,7 +304,7 @@ export function ProjectsPanel() {
           as no feature. */}
       <Grid>
         <Grid.Col span={{ base: 12, md: 3 }}>
-          <Paper withBorder p="sm">
+          <Paper withBorder className="capado-folder-surface">
             <FolderTree
               folders={folders}
               projectCounts={projectCounts}

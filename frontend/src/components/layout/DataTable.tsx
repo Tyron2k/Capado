@@ -7,7 +7,10 @@
  */
 
 import type { ReactNode } from 'react'
-import { Center, Loader, Table, Text } from '@mantine/core'
+import { Center, Loader, Stack, Table, Text } from '@mantine/core'
+import { IconInbox } from '@tabler/icons-react'
+
+export type TableDensity = 'comfortable' | 'compact'
 
 interface DataTableProps {
   /** Whether data is currently loading. */
@@ -22,6 +25,9 @@ interface DataTableProps {
   children: ReactNode
   /** Optional data-testid for the table element. */
   testId?: string
+  density?: TableDensity
+  minWidth?: number
+  striped?: boolean
 }
 
 export function DataTable({
@@ -31,10 +37,13 @@ export function DataTable({
   head,
   children,
   testId,
+  density = 'comfortable',
+  minWidth = 640,
+  striped = false,
 }: DataTableProps) {
   if (loading) {
     return (
-      <Center py="xl">
+      <Center py="xl" mih={180} className="capado-surface" role="status">
         <Loader />
       </Center>
     )
@@ -42,15 +51,30 @@ export function DataTable({
 
   if (empty) {
     return (
-      <Text c="dimmed" ta="center" py="xl">
-        {emptyMessage ?? 'No data available.'}
-      </Text>
+      <Center py="xl" mih={180} className="capado-surface">
+        <Stack gap="sm" align="center">
+          <IconInbox size={32} stroke={1.3} color="var(--capado-muted)" aria-hidden="true" />
+          <Text c="dimmed" ta="center">
+            {emptyMessage ?? 'No data available.'}
+          </Text>
+        </Stack>
+      </Center>
     )
   }
 
   return (
-    <Table.ScrollContainer minWidth={640} type="native">
-      <Table striped highlightOnHover withTableBorder data-testid={testId}>
+    <Table.ScrollContainer
+      minWidth={minWidth}
+      type="native"
+      className="capado-data-table capado-surface"
+    >
+      <Table
+        striped={striped}
+        highlightOnHover
+        data-testid={testId}
+        data-density={density}
+        verticalSpacing={density === 'compact' ? 4 : 12}
+      >
         <Table.Thead>{head}</Table.Thead>
         <Table.Tbody>{children}</Table.Tbody>
       </Table>

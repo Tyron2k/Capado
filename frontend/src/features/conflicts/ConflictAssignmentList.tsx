@@ -69,79 +69,83 @@ export function ConflictAssignmentList({ assignments, onChanged, focusedWorkPack
               </Anchor>
             )}
           </Group>
-          <Table withTableBorder striped fz="xs" layout="fixed">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ width: canWrite ? '30%' : '35%' }}>
-                  {t('conflicts.workPackage')}
-                </Table.Th>
-                <Table.Th style={{ width: canWrite ? '30%' : '35%' }}>
-                  {t('conflicts.period')}
-                </Table.Th>
-                <Table.Th style={{ width: canWrite ? '20%' : '30%' }}>
-                  {t('conflicts.allocation')}
-                </Table.Th>
-                {canWrite && <Table.Th style={{ width: '20%' }} aria-label={t('common.actions')} />}
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {group.items.map((a) => {
-                const wasRemoved = !a.work_package_name && !a.start_date && !a.start_at
-                if (wasRemoved) {
+          <Table.ScrollContainer minWidth={640} type="native">
+            <Table withTableBorder striped fz="xs" layout="fixed">
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th style={{ width: canWrite ? '30%' : '35%' }}>
+                    {t('conflicts.workPackage')}
+                  </Table.Th>
+                  <Table.Th style={{ width: canWrite ? '30%' : '35%' }}>
+                    {t('conflicts.period')}
+                  </Table.Th>
+                  <Table.Th style={{ width: canWrite ? '20%' : '30%' }}>
+                    {t('conflicts.allocation')}
+                  </Table.Th>
+                  {canWrite && (
+                    <Table.Th style={{ width: '20%' }} aria-label={t('common.actions')} />
+                  )}
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {group.items.map((a) => {
+                  const wasRemoved = !a.work_package_name && !a.start_date && !a.start_at
+                  if (wasRemoved) {
+                    return (
+                      <Table.Tr key={a.assignment_id}>
+                        <Table.Td colSpan={canWrite ? 4 : 3}>
+                          <Text c="dimmed">{t('conflicts.assignmentRemoved')}</Text>
+                        </Table.Td>
+                      </Table.Tr>
+                    )
+                  }
+                  const period =
+                    a.start_at && a.end_at
+                      ? `${formatDateTime(a.start_at, settings.locale, settings.timeZone)} – ${formatDateTime(
+                          a.end_at,
+                          settings.locale,
+                          settings.timeZone,
+                        )}`
+                      : `${formatDate(a.start_date)} – ${formatDate(a.end_date)}`
                   return (
-                    <Table.Tr key={a.assignment_id}>
-                      <Table.Td colSpan={canWrite ? 4 : 3}>
-                        <Text c="dimmed">{t('conflicts.assignmentRemoved')}</Text>
+                    <Table.Tr
+                      key={a.assignment_id}
+                      data-focused={a.work_package_id === focusedWorkPackageId ? 'true' : undefined}
+                      style={
+                        a.work_package_id === focusedWorkPackageId
+                          ? { backgroundColor: 'var(--mantine-color-yellow-light)' }
+                          : undefined
+                      }
+                    >
+                      <Table.Td>
+                        <Group gap={4} wrap="nowrap">
+                          {a.work_package_name ?? '—'}
+                          {a.skill_mismatch && (
+                            <Tooltip label={t('planning.skillMismatch')} withArrow>
+                              <IconAlertTriangle
+                                size={12}
+                                color="var(--mantine-color-orange-6)"
+                                aria-label={t('planning.skillMismatch')}
+                              />
+                            </Tooltip>
+                          )}
+                        </Group>
                       </Table.Td>
+                      <Table.Td>{period}</Table.Td>
+                      <Table.Td>
+                        {a.allocation_percent != null ? `${a.allocation_percent}%` : '—'}
+                      </Table.Td>
+                      {canWrite && (
+                        <Table.Td>
+                          <ConflictResolutionActions assignment={a} onChanged={onChanged} />
+                        </Table.Td>
+                      )}
                     </Table.Tr>
                   )
-                }
-                const period =
-                  a.start_at && a.end_at
-                    ? `${formatDateTime(a.start_at, settings.locale, settings.timeZone)} – ${formatDateTime(
-                        a.end_at,
-                        settings.locale,
-                        settings.timeZone,
-                      )}`
-                    : `${formatDate(a.start_date)} – ${formatDate(a.end_date)}`
-                return (
-                  <Table.Tr
-                    key={a.assignment_id}
-                    data-focused={a.work_package_id === focusedWorkPackageId ? 'true' : undefined}
-                    style={
-                      a.work_package_id === focusedWorkPackageId
-                        ? { backgroundColor: 'var(--mantine-color-yellow-light)' }
-                        : undefined
-                    }
-                  >
-                    <Table.Td>
-                      <Group gap={4} wrap="nowrap">
-                        {a.work_package_name ?? '—'}
-                        {a.skill_mismatch && (
-                          <Tooltip label={t('planning.skillMismatch')} withArrow>
-                            <IconAlertTriangle
-                              size={12}
-                              color="var(--mantine-color-orange-6)"
-                              aria-label={t('planning.skillMismatch')}
-                            />
-                          </Tooltip>
-                        )}
-                      </Group>
-                    </Table.Td>
-                    <Table.Td>{period}</Table.Td>
-                    <Table.Td>
-                      {a.allocation_percent != null ? `${a.allocation_percent}%` : '—'}
-                    </Table.Td>
-                    {canWrite && (
-                      <Table.Td>
-                        <ConflictResolutionActions assignment={a} onChanged={onChanged} />
-                      </Table.Td>
-                    )}
-                  </Table.Tr>
-                )
-              })}
-            </Table.Tbody>
-          </Table>
+                })}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </Box>
       ))}
     </Stack>

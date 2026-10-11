@@ -183,79 +183,81 @@ export function CustomerPanel() {
           {t('customers.empty')}
         </Alert>
       ) : (
-        <Table striped withTableBorder>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('customers.name')}</Table.Th>
-              <Table.Th>{t('customers.reference')}</Table.Th>
-              <Table.Th style={{ width: 90 }}>{t('customers.folders')}</Table.Th>
-              <Table.Th style={{ width: 90 }}>{t('customers.projects')}</Table.Th>
-              <Table.Th style={{ width: 110 }} />
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {(customers ?? []).map((customer) => (
-              <Table.Tr key={customer.id}>
-                <Table.Td>
-                  <Group gap="xs" wrap="nowrap">
-                    <Text size="sm">{customer.name}</Text>
-                    {!customer.is_active && (
-                      <Badge size="sm" color="gray" variant="light">
-                        {t('customers.inactive')}
-                      </Badge>
-                    )}
-                  </Group>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c="dimmed">
-                    {customer.reference || '–'}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{customer.folder_count}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm">{customer.project_count}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap={4} wrap="nowrap">
-                    <ActionIcon
-                      variant="subtle"
-                      aria-label={t('customers.edit')}
-                      onClick={() =>
-                        setDraft({
-                          id: customer.id,
-                          name: customer.name,
-                          reference: customer.reference,
-                          note: customer.note,
-                        })
-                      }
-                    >
-                      <IconPencil size={16} />
-                    </ActionIcon>
-                    <Button
-                      size="compact-xs"
-                      variant="subtle"
-                      data-testid={`customer-retire-${customer.id}`}
-                      onClick={() => void retire(customer)}
-                    >
-                      {customer.is_active ? t('customers.inactive') : t('customers.active')}
-                    </Button>
-                    <ActionIcon
-                      variant="subtle"
-                      color="red"
-                      aria-label={t('common.delete')}
-                      data-testid={`customer-delete-${customer.id}`}
-                      onClick={() => void remove(customer)}
-                    >
-                      <IconTrash size={16} />
-                    </ActionIcon>
-                  </Group>
-                </Table.Td>
+        <Table.ScrollContainer minWidth={640} type="native">
+          <Table striped withTableBorder>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('customers.name')}</Table.Th>
+                <Table.Th>{t('customers.reference')}</Table.Th>
+                <Table.Th style={{ width: 90 }}>{t('customers.folders')}</Table.Th>
+                <Table.Th style={{ width: 90 }}>{t('customers.projects')}</Table.Th>
+                <Table.Th style={{ width: 110 }} />
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {(customers ?? []).map((customer) => (
+                <Table.Tr key={customer.id}>
+                  <Table.Td>
+                    <Group gap="xs" wrap="nowrap">
+                      <Text size="sm">{customer.name}</Text>
+                      {!customer.is_active && (
+                        <Badge size="sm" color="gray" variant="light">
+                          {t('customers.inactive')}
+                        </Badge>
+                      )}
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm" c="dimmed">
+                      {customer.reference || '–'}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{customer.folder_count}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text size="sm">{customer.project_count}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Group gap={4} wrap="nowrap">
+                      <ActionIcon
+                        variant="subtle"
+                        aria-label={t('customers.edit')}
+                        onClick={() =>
+                          setDraft({
+                            id: customer.id,
+                            name: customer.name,
+                            reference: customer.reference,
+                            note: customer.note,
+                          })
+                        }
+                      >
+                        <IconPencil size={16} />
+                      </ActionIcon>
+                      <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        data-testid={`customer-retire-${customer.id}`}
+                        onClick={() => void retire(customer)}
+                      >
+                        {customer.is_active ? t('customers.inactive') : t('customers.active')}
+                      </Button>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        aria-label={t('common.delete')}
+                        data-testid={`customer-delete-${customer.id}`}
+                        onClick={() => void remove(customer)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
       )}
 
       <Modal

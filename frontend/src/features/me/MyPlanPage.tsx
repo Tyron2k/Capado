@@ -101,30 +101,32 @@ export function MyPlanPage() {
             {t('myPlan.noAssignments')}
           </Text>
         ) : (
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('myPlan.project')}</Table.Th>
-                <Table.Th>{t('myPlan.workPackage')}</Table.Th>
-                <Table.Th>{t('myPlan.from')}</Table.Th>
-                <Table.Th>{t('myPlan.to')}</Table.Th>
-                <Table.Th>{t('myPlan.allocation')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {plan.assignments.map((a) => (
-                <Table.Tr key={a.id}>
-                  <Table.Td>{a.project_name ?? '—'}</Table.Td>
-                  <Table.Td>{a.work_package_name ?? '—'}</Table.Td>
-                  <Table.Td>{a.start_date ?? '—'}</Table.Td>
-                  <Table.Td>{a.end_date ?? '—'}</Table.Td>
-                  <Table.Td>
-                    {a.allocation_percent !== null ? `${a.allocation_percent} %` : '—'}
-                  </Table.Td>
+          <Table.ScrollContainer minWidth={640} type="native">
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('myPlan.project')}</Table.Th>
+                  <Table.Th>{t('myPlan.workPackage')}</Table.Th>
+                  <Table.Th>{t('myPlan.from')}</Table.Th>
+                  <Table.Th>{t('myPlan.to')}</Table.Th>
+                  <Table.Th>{t('myPlan.allocation')}</Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {plan.assignments.map((a) => (
+                  <Table.Tr key={a.id}>
+                    <Table.Td>{a.project_name ?? '—'}</Table.Td>
+                    <Table.Td>{a.work_package_name ?? '—'}</Table.Td>
+                    <Table.Td>{a.start_date ?? '—'}</Table.Td>
+                    <Table.Td>{a.end_date ?? '—'}</Table.Td>
+                    <Table.Td>
+                      {a.allocation_percent !== null ? `${a.allocation_percent} %` : '—'}
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         )}
       </Paper>
 
@@ -138,33 +140,35 @@ export function MyPlanPage() {
             {t('myPlan.noAbsences')}
           </Text>
         ) : (
-          <Table striped>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('myPlan.from')}</Table.Th>
-                <Table.Th>{t('myPlan.to')}</Table.Th>
-                <Table.Th>{t('myPlan.share')}</Table.Th>
-                <Table.Th>{t('myPlan.status')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {plan.absences.map((absence) => (
-                <Table.Tr key={absence.id}>
-                  <Table.Td>{absence.start_date}</Table.Td>
-                  <Table.Td>{absence.end_date}</Table.Td>
-                  <Table.Td>{absence.allocation_percent} %</Table.Td>
-                  <Table.Td>
-                    <Badge
-                      variant="light"
-                      color={absence.status === 'confirmed' ? 'green' : 'yellow'}
-                    >
-                      {t(`myPlan.absenceStatus.${absence.status}`)}
-                    </Badge>
-                  </Table.Td>
+          <Table.ScrollContainer minWidth={640} type="native">
+            <Table striped>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('myPlan.from')}</Table.Th>
+                  <Table.Th>{t('myPlan.to')}</Table.Th>
+                  <Table.Th>{t('myPlan.share')}</Table.Th>
+                  <Table.Th>{t('myPlan.status')}</Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {plan.absences.map((absence) => (
+                  <Table.Tr key={absence.id}>
+                    <Table.Td>{absence.start_date}</Table.Td>
+                    <Table.Td>{absence.end_date}</Table.Td>
+                    <Table.Td>{absence.allocation_percent} %</Table.Td>
+                    <Table.Td>
+                      <Badge
+                        variant="light"
+                        color={absence.status === 'confirmed' ? 'green' : 'yellow'}
+                      >
+                        {t(`myPlan.absenceStatus.${absence.status}`)}
+                      </Badge>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         )}
       </Paper>
 
@@ -179,27 +183,29 @@ export function MyPlanPage() {
             {t('myPlan.noQualifications')}
           </Text>
         ) : (
-          <Table striped>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('myPlan.skill')}</Table.Th>
-                <Table.Th>{t('myPlan.attribute')}</Table.Th>
-                <Table.Th>{t('myPlan.level')}</Table.Th>
-                <Table.Th>{t('myPlan.validUntil')}</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {plan.skills.map((skill) => (
-                <Table.Tr key={skill.id}>
-                  <Table.Td>{skill.skill_name}</Table.Td>
-                  <Table.Td>{skill.attribute_name}</Table.Td>
-                  {/* A null level is "nobody assessed it", which is not the same as 1. */}
-                  <Table.Td>{skill.level ?? t('myPlan.levelUnassessed')}</Table.Td>
-                  <Table.Td>{skill.valid_until ?? t('myPlan.noExpiry')}</Table.Td>
+          <Table.ScrollContainer minWidth={640} type="native">
+            <Table striped>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{t('myPlan.skill')}</Table.Th>
+                  <Table.Th>{t('myPlan.attribute')}</Table.Th>
+                  <Table.Th>{t('myPlan.level')}</Table.Th>
+                  <Table.Th>{t('myPlan.validUntil')}</Table.Th>
                 </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+              </Table.Thead>
+              <Table.Tbody>
+                {plan.skills.map((skill) => (
+                  <Table.Tr key={skill.id}>
+                    <Table.Td>{skill.skill_name}</Table.Td>
+                    <Table.Td>{skill.attribute_name}</Table.Td>
+                    {/* A null level is "nobody assessed it", which is not the same as 1. */}
+                    <Table.Td>{skill.level ?? t('myPlan.levelUnassessed')}</Table.Td>
+                    <Table.Td>{skill.valid_until ?? t('myPlan.noExpiry')}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         )}
       </Paper>
     </Stack>

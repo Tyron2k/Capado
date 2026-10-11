@@ -1,13 +1,12 @@
 import { masterTableFeatures } from '../../components/table/features'
 /** Project table pilot: stateful table behaviour, with the existing Mantine presentation. */
-import { ColumnPicker, SortHeader } from '../../components/table/controls'
+import { ColumnPicker, SortHeader, TableDensityControl } from '../../components/table/controls'
 import { useEffect, useMemo, useState } from 'react'
 import type { RowSelectionState } from '@tanstack/react-table'
 import { createColumnHelper, flexRender, useTable } from '@tanstack/react-table'
 import {
   ActionIcon,
   Badge,
-  Box,
   Button,
   Checkbox,
   Group,
@@ -57,6 +56,7 @@ export function ProjectsTable({
   onOpen,
 }: ProjectsTableProps) {
   const { t } = useTranslation()
+  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable')
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [onlySelected, setOnlySelected] = useState(false)
   const columns = useMemo(
@@ -218,7 +218,7 @@ export function ProjectsTable({
   }, [projects, t, customerFilter])
 
   return (
-    <>
+    <section className="capado-workspace">
       <FilterBar>
         <TextInput
           placeholder={t('projects.searchPlaceholder')}
@@ -253,6 +253,7 @@ export function ProjectsTable({
           w={140}
           disabled={loading}
         />
+        <TableDensityControl value={density} onChange={setDensity} />
         <ColumnPicker
           label={t('projects.columns')}
           columns={table
@@ -294,74 +295,72 @@ export function ProjectsTable({
           </Button>
         </Group>
       )}
-      <Box style={{ overflowX: 'auto' }}>
-        <Box miw={900}>
-          <DataTable
-            loading={loading}
-            empty={rows.length === 0}
-            emptyMessage={projects.length ? t('projects.noFilterMatch') : t('projects.noProjects')}
-            head={table.getHeaderGroups().map((group) => (
-              <Table.Tr key={group.id}>
-                {group.headers.map((header) => (
-                  <Table.Th
-                    key={header.id}
-                    aria-sort={
-                      header.column.getCanSort()
-                        ? header.column.getIsSorted() === 'asc'
-                          ? 'ascending'
-                          : header.column.getIsSorted() === 'desc'
-                            ? 'descending'
-                            : 'none'
-                        : undefined
-                    }
-                  >
-                    {header.id === 'select' ? (
-                      <Checkbox
-                        aria-label={t('projects.selectVisible')}
-                        checked={allSelected}
-                        indeterminate={!allSelected && rows.some((row) => row.getIsSelected())}
-                        onChange={(event) => {
-                          const checked = event.currentTarget.checked
-                          setSelection((previous) => {
-                            const next = { ...previous }
-                            for (const row of rows) {
-                              if (checked) next[row.id] = true
-                              else delete next[row.id]
-                            }
-                            return next
-                          })
-                        }}
-                      />
-                    ) : header.column.getCanSort() ? (
-                      <SortHeader
-                        direction={header.column.getIsSorted()}
-                        onClick={() => header.column.toggleSorting()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                      </SortHeader>
-                    ) : (
-                      flexRender(header.column.columnDef.header, header.getContext())
-                    )}
-                  </Table.Th>
-                ))}
-              </Table.Tr>
-            ))}
-          >
-            {rows.map((row) => (
-              <Table.Tr
-                key={row.id}
-                bg={row.getIsSelected() ? 'var(--mantine-color-blue-light)' : undefined}
+      <DataTable
+        minWidth={900}
+        density={density}
+        loading={loading}
+        empty={rows.length === 0}
+        emptyMessage={projects.length ? t('projects.noFilterMatch') : t('projects.noProjects')}
+        head={table.getHeaderGroups().map((group) => (
+          <Table.Tr key={group.id}>
+            {group.headers.map((header) => (
+              <Table.Th
+                key={header.id}
+                aria-sort={
+                  header.column.getCanSort()
+                    ? header.column.getIsSorted() === 'asc'
+                      ? 'ascending'
+                      : header.column.getIsSorted() === 'desc'
+                        ? 'descending'
+                        : 'none'
+                    : undefined
+                }
               >
-                {row.getVisibleCells().map((cell) => (
-                  <Table.Td key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </Table.Td>
-                ))}
-              </Table.Tr>
+                {header.id === 'select' ? (
+                  <Checkbox
+                    aria-label={t('projects.selectVisible')}
+                    checked={allSelected}
+                    indeterminate={!allSelected && rows.some((row) => row.getIsSelected())}
+                    onChange={(event) => {
+                      const checked = event.currentTarget.checked
+                      setSelection((previous) => {
+                        const next = { ...previous }
+                        for (const row of rows) {
+                          if (checked) next[row.id] = true
+                          else delete next[row.id]
+                        }
+                        return next
+                      })
+                    }}
+                  />
+                ) : header.column.getCanSort() ? (
+                  <SortHeader
+                    direction={header.column.getIsSorted()}
+                    onClick={() => header.column.toggleSorting()}
+                  >
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                  </SortHeader>
+                ) : (
+                  flexRender(header.column.columnDef.header, header.getContext())
+                )}
+              </Table.Th>
             ))}
-          </DataTable>
-        </Box>
-      </Box>
-    </>
+          </Table.Tr>
+        ))}
+      >
+        {rows.map((row) => (
+          <Table.Tr
+            key={row.id}
+            bg={row.getIsSelected() ? 'var(--mantine-color-blue-light)' : undefined}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <Table.Td key={cell.id}>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </Table.Td>
+            ))}
+          </Table.Tr>
+        ))}
+      </DataTable>
+    </section>
   )
 }

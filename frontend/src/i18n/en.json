@@ -1219,6 +1219,9 @@
     "noSite": "No site",
     "missingGroup": "Group no longer present",
     "conflictsOnly": "With conflicts only",
-    "openConflicts": "Open conflicts for {name}"
+    "openConflicts": "Open conflicts for {name}",
+    "density": "Table density",
+    "comfortable": "Comfortable",
+    "compact": "Compact"
   }
 }

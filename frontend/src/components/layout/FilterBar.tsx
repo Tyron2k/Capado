@@ -14,7 +14,13 @@ interface FilterBarProps {
 
 export function FilterBar({ children }: FilterBarProps) {
   return (
-    <Group justify="flex-start" gap="sm" mb="md" wrap="wrap">
+    <Group
+      justify="flex-start"
+      gap="sm"
+      mb="md"
+      wrap="wrap"
+      className="capado-filter-bar capado-glass"
+    >
       {children}
     </Group>
   )

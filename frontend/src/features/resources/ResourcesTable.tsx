@@ -1,7 +1,7 @@
 import { masterTableFeatures } from '../../components/table/features'
 /** Complete people/equipment lists; feature-specific columns and actions share small table controls. */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Badge, Box, Button, Checkbox, Group, Select, Table, Text, TextInput } from '@mantine/core'
+import { Badge, Button, Checkbox, Group, Select, Table, Text, TextInput } from '@mantine/core'
 import { IconPlus, IconSearch } from '@tabler/icons-react'
 import {
   createColumnHelper,
@@ -9,7 +9,7 @@ import {
   useTable,
   type RowSelectionState,
 } from '@tanstack/react-table'
-import { ColumnPicker, SortHeader } from '../../components/table/controls'
+import { ColumnPicker, SortHeader, TableDensityControl } from '../../components/table/controls'
 import { DataTable, FilterBar } from '../../components/layout'
 import { useTranslation } from '../../i18n'
 import type { FlatResource } from './utils/resourceTableUtils'
@@ -42,6 +42,7 @@ export function ResourcesTable({
   testId: string
 }) {
   const { t } = useTranslation()
+  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable')
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [onlySelected, setOnlySelected] = useState(false)
   const [conflictsOnly, setConflictsOnly] = useState(false)
@@ -182,7 +183,7 @@ export function ResourcesTable({
   const count = filtered.filter((row) => row.getIsSelected()).length
   const allSelected = rows.length > 0 && rows.every((row) => row.getIsSelected())
   return (
-    <>
+    <section className="capado-workspace">
       <FilterBar>
         <TextInput
           aria-label={searchLabel}
@@ -222,6 +223,7 @@ export function ResourcesTable({
           checked={conflictsOnly}
           onChange={(event) => setConflictsOnly(event.currentTarget.checked)}
         />
+        <TableDensityControl value={density} onChange={setDensity} />
         <ColumnPicker
           label={t('tables.columns')}
           columns={table
@@ -262,75 +264,73 @@ export function ResourcesTable({
           </Button>
         </Group>
       )}
-      <Box style={{ overflowX: 'auto' }}>
-        <Box miw={740}>
-          <DataTable
-            loading={loading}
-            empty={rows.length === 0}
-            emptyMessage={resources.length ? t('tables.noFilterMatch') : emptyLabel}
-            testId={testId}
-            head={table.getHeaderGroups().map((group) => (
-              <Table.Tr key={group.id}>
-                {group.headers.map((header) => (
-                  <Table.Th
-                    key={header.id}
-                    aria-sort={
-                      header.column.getCanSort()
-                        ? header.column.getIsSorted() === 'asc'
-                          ? 'ascending'
-                          : header.column.getIsSorted() === 'desc'
-                            ? 'descending'
-                            : 'none'
-                        : undefined
-                    }
-                  >
-                    {header.id === 'select' ? (
-                      <Checkbox
-                        aria-label={t('tables.selectVisible')}
-                        checked={allSelected}
-                        indeterminate={!allSelected && rows.some((row) => row.getIsSelected())}
-                        onChange={(event) => {
-                          const checked = event.currentTarget.checked
-                          setSelection((previous) => {
-                            const next = { ...previous }
-                            for (const row of rows) {
-                              if (checked) next[row.id] = true
-                              else delete next[row.id]
-                            }
-                            return next
-                          })
-                        }}
-                      />
-                    ) : header.column.getCanSort() ? (
-                      <SortHeader
-                        direction={header.column.getIsSorted()}
-                        onClick={() => header.column.toggleSorting()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                      </SortHeader>
-                    ) : (
-                      flexRender(header.column.columnDef.header, header.getContext())
-                    )}
-                  </Table.Th>
-                ))}
-              </Table.Tr>
-            ))}
-          >
-            {rows.map((row) => (
-              <Table.Tr
-                key={row.id}
-                bg={row.getIsSelected() ? 'var(--mantine-color-blue-light)' : undefined}
+      <DataTable
+        minWidth={740}
+        density={density}
+        loading={loading}
+        empty={rows.length === 0}
+        emptyMessage={resources.length ? t('tables.noFilterMatch') : emptyLabel}
+        testId={testId}
+        head={table.getHeaderGroups().map((group) => (
+          <Table.Tr key={group.id}>
+            {group.headers.map((header) => (
+              <Table.Th
+                key={header.id}
+                aria-sort={
+                  header.column.getCanSort()
+                    ? header.column.getIsSorted() === 'asc'
+                      ? 'ascending'
+                      : header.column.getIsSorted() === 'desc'
+                        ? 'descending'
+                        : 'none'
+                    : undefined
+                }
               >
-                {row.getVisibleCells().map((cell) => (
-                  <Table.Td key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </Table.Td>
-                ))}
-              </Table.Tr>
+                {header.id === 'select' ? (
+                  <Checkbox
+                    aria-label={t('tables.selectVisible')}
+                    checked={allSelected}
+                    indeterminate={!allSelected && rows.some((row) => row.getIsSelected())}
+                    onChange={(event) => {
+                      const checked = event.currentTarget.checked
+                      setSelection((previous) => {
+                        const next = { ...previous }
+                        for (const row of rows) {
+                          if (checked) next[row.id] = true
+                          else delete next[row.id]
+                        }
+                        return next
+                      })
+                    }}
+                  />
+                ) : header.column.getCanSort() ? (
+                  <SortHeader
+                    direction={header.column.getIsSorted()}
+                    onClick={() => header.column.toggleSorting()}
+                  >
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                  </SortHeader>
+                ) : (
+                  flexRender(header.column.columnDef.header, header.getContext())
+                )}
+              </Table.Th>
             ))}
-          </DataTable>
-        </Box>
-      </Box>
-    </>
+          </Table.Tr>
+        ))}
+      >
+        {rows.map((row) => (
+          <Table.Tr
+            key={row.id}
+            bg={row.getIsSelected() ? 'var(--mantine-color-blue-light)' : undefined}
+          >
+            {row.getVisibleCells().map((cell) => (
+              <Table.Td key={cell.id}>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </Table.Td>
+            ))}
+          </Table.Tr>
+        ))}
+      </DataTable>
+    </section>
   )
 }

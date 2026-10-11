@@ -32,3 +32,37 @@ test('collapsed desktop navigation remains usable on mobile, including keyboard 
   await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible()
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
+
+test('table density preserves filtering/editing and both report downloads remain available', async ({ page }) => {
+  execFileSync('uv', ['--directory', '../backend', 'run', '--frozen', '--no-dev', 'python', '-m', 'tests.e2e_server', 'reset'])
+  await page.addInitScript(() => localStorage.setItem('user-preferences', JSON.stringify({ locale: 'en', colorScheme: 'light', navCollapsed: false })))
+  await page.goto('/login')
+  await page.getByLabel(/^Email/).fill('admin@example.test')
+  await page.getByLabel(/^Password/).fill('browser-tests-only')
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click()
+  await expect(page).toHaveURL('/')
+  await page.getByRole('navigation').getByRole('link', { name: 'Projects', exact: true }).click()
+  const row = page.getByRole('row').filter({ hasText: 'Owned project' })
+  await expect(row).toBeVisible()
+  let comfortableHeight = 0
+  await expect.poll(async () => {
+    comfortableHeight = (await row.boundingBox())?.height ?? 0
+    return comfortableHeight
+  }).toBeGreaterThan(0)
+  await page.getByText('Compact', { exact: true }).click()
+  await expect(page.getByRole('radio', { name: 'Compact', exact: true })).toBeChecked()
+  await expect(page.getByRole('table')).toHaveAttribute('data-density', 'compact')
+  await expect.poll(() => row.evaluate(element => element.getBoundingClientRect().height)).toBeLessThan(comfortableHeight)
+  await page.getByRole('textbox', { name: /^Search projects/ }).fill('Owned')
+  await expect(page.getByRole('row').filter({ hasText: 'Foreign project' })).toHaveCount(0)
+  await row.getByRole('button', { name: 'Edit project', exact: true }).click()
+  await expect(page.getByRole('dialog').getByLabel(/^Name/)).toHaveValue('Owned project')
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('navigation').getByRole('link', { name: 'Dashboard', exact: true }).click()
+  await page.getByRole('button', { name: /Reports All projects/ }).click()
+  for (const name of ['Project status (Excel)', 'Utilization (Excel)']) {
+    const downloaded = page.waitForEvent('download')
+    await page.getByRole('button', { name, exact: true }).click()
+    expect((await downloaded).suggestedFilename()).toMatch(/\.xlsx$/)
+  }
+})

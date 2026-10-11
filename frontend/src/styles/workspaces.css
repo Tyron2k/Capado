@@ -1,0 +1,145 @@
+/* Dense content stays opaque. Never blur tables, forms or critical alerts. */
+.capado-filter-bar {
+  border: 1px solid var(--capado-border);
+  border-radius: var(--mantine-radius-lg);
+  padding: 16px;
+  box-shadow: var(--capado-shadow);
+  align-items: center;
+}
+
+.capado-filter-bar > * {
+  max-width: 100%;
+}
+.capado-workspace {
+  min-width: 0;
+}
+.capado-data-table {
+  background: var(--capado-surface);
+}
+.capado-data-table .mantine-Table-root {
+  background: var(--capado-surface);
+}
+.capado-shell .mantine-Table-thead {
+  background: var(--capado-subtle);
+}
+.capado-shell .mantine-Table-th {
+  color: var(--capado-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.capado-shell .mantine-Table-td {
+  font-size: 0.82rem;
+}
+.capado-shell .mantine-Table-th,
+.capado-shell .mantine-Table-td {
+  border-color: var(--capado-border);
+}
+.capado-data-table .mantine-Table-tr:last-child .mantine-Table-td {
+  border-bottom: 0;
+}
+.capado-data-table .mantine-Table-tr:hover {
+  background: var(--capado-subtle);
+}
+.capado-data-table .mantine-Table-th {
+  white-space: nowrap;
+}
+.capado-data-table .mantine-Badge-root {
+  max-width: none;
+  flex-shrink: 0;
+}
+.capado-data-table .mantine-Table-td .mantine-Group-root {
+  flex-wrap: nowrap;
+}
+.capado-data-table [data-selected] {
+  background: var(--mantine-primary-color-light);
+}
+.capado-folder-surface {
+  padding: 18px;
+}
+.capado-assignment-project {
+  padding: 20px;
+  border: 1px solid var(--capado-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--capado-surface);
+}
+.capado-work-package {
+  border-inline-start: 3px solid var(--mantine-primary-color-light-color);
+  padding-inline-start: 12px;
+  min-width: 0;
+}
+
+.mantine-InputWrapper-label {
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.mantine-Input-input:not([data-error]):not([data-disabled]):not(:disabled) {
+  background: var(--capado-surface);
+  color: var(--capado-text);
+  border-color: var(--capado-border);
+}
+.mantine-Input-input:not([data-error]):not([data-disabled]):not(:disabled):focus-within {
+  border-color: var(--capado-focus);
+}
+.mantine-Input-input::placeholder {
+  color: var(--capado-muted);
+  opacity: 1;
+}
+.mantine-InputWrapper-description {
+  color: var(--capado-muted);
+}
+.mantine-InputWrapper-error {
+  font-weight: 500;
+}
+.mantine-Modal-content,
+.mantine-Drawer-content {
+  background: var(--capado-surface);
+}
+.mantine-Modal-header,
+.mantine-Drawer-header {
+  background: var(--capado-surface);
+  border-bottom: 1px solid var(--capado-border);
+  margin-bottom: 16px;
+}
+.mantine-Modal-title,
+.mantine-Drawer-title {
+  font-weight: 600;
+}
+.mantine-Modal-body form > .mantine-Stack-root {
+  gap: 20px;
+}
+.mantine-Combobox-dropdown {
+  background: var(--capado-raised);
+  border-color: var(--capado-border);
+}
+.mantine-Combobox-option {
+  border-radius: 6px;
+}
+.mantine-Combobox-option[data-combobox-active] {
+  background: var(--mantine-primary-color-light);
+}
+.mantine-Notification-root {
+  background: var(--capado-raised);
+  border: 1px solid var(--capado-border);
+  border-inline-start-width: 4px;
+  box-shadow: var(--capado-shadow);
+}
+
+@media (max-width: 48em) {
+  .capado-filter-bar {
+    padding: 12px;
+  }
+  .capado-filter-bar > .mantine-InputWrapper-root {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .capado-assignment-project {
+    padding: 12px;
+  }
+  .capado-folder-surface {
+    padding: 12px;
+  }
+}
+
+.capado-shell .mantine-Table-th .mantine-UnstyledButton-root {
+  font-size: inherit;
+}

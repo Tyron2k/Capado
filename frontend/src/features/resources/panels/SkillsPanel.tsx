@@ -412,93 +412,95 @@ export function SkillsPanel({ resourceType = 'personal' }: SkillsPanelProps) {
                 </Group>
 
                 <Collapse expanded={isExpanded}>
-                  <Table striped withTableBorder ml="md" mt="xs">
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>{t('skills.attribute')}</Table.Th>
-                        <Table.Th style={{ width: 100 }}>{t('common.actions')}</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {skill.attributes.map((attr) => (
-                        <Table.Tr key={attr.id}>
-                          <Table.Td>
-                            {editAttrId === attr.id ? (
-                              <Group gap="xs">
-                                <TextInput
-                                  value={editAttrValue}
-                                  onChange={(e) => setEditAttrValue(e.currentTarget.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleUpdateAttribute()
-                                    if (e.key === 'Escape') setEditAttrId(null)
-                                  }}
-                                  autoFocus
-                                  size="xs"
-                                  style={{ flex: 1 }}
-                                />
-                                <ActionIcon
-                                  color="green"
-                                  variant="filled"
-                                  size="sm"
-                                  onClick={handleUpdateAttribute}
-                                  loading={editAttrSaving}
-                                  aria-label={t('common.save')}
-                                >
-                                  <IconCheck size={14} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  size="sm"
-                                  onClick={() => setEditAttrId(null)}
-                                  aria-label={t('common.cancel')}
-                                >
-                                  <IconX size={14} />
-                                </ActionIcon>
-                              </Group>
-                            ) : (
-                              attr.name
-                            )}
-                          </Table.Td>
-                          <Table.Td>
-                            {editAttrId !== attr.id && (
-                              <Group gap="xs">
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="blue"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditAttrId(attr.id)
-                                    setEditAttrValue(attr.name)
-                                  }}
-                                  aria-label={`${attr.name} ${t('common.edit').toLowerCase()}`}
-                                >
-                                  <IconEdit size={14} />
-                                </ActionIcon>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="red"
-                                  size="sm"
-                                  onClick={() => handleDeleteAttribute(attr.id, attr.name)}
-                                  aria-label={`${attr.name} ${t('common.delete').toLowerCase()}`}
-                                >
-                                  <IconTrash size={14} />
-                                </ActionIcon>
-                              </Group>
-                            )}
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                      {skill.attributes.length === 0 && (
+                  <Table.ScrollContainer minWidth={480} type="native">
+                    <Table striped withTableBorder ml="md" mt="xs">
+                      <Table.Thead>
                         <Table.Tr>
-                          <Table.Td colSpan={2}>
-                            <Text size="sm" c="dimmed">
-                              {t('skills.noAttributes')}
-                            </Text>
-                          </Table.Td>
+                          <Table.Th>{t('skills.attribute')}</Table.Th>
+                          <Table.Th style={{ width: 100 }}>{t('common.actions')}</Table.Th>
                         </Table.Tr>
-                      )}
-                    </Table.Tbody>
-                  </Table>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {skill.attributes.map((attr) => (
+                          <Table.Tr key={attr.id}>
+                            <Table.Td>
+                              {editAttrId === attr.id ? (
+                                <Group gap="xs">
+                                  <TextInput
+                                    value={editAttrValue}
+                                    onChange={(e) => setEditAttrValue(e.currentTarget.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleUpdateAttribute()
+                                      if (e.key === 'Escape') setEditAttrId(null)
+                                    }}
+                                    autoFocus
+                                    size="xs"
+                                    style={{ flex: 1 }}
+                                  />
+                                  <ActionIcon
+                                    color="green"
+                                    variant="filled"
+                                    size="sm"
+                                    onClick={handleUpdateAttribute}
+                                    loading={editAttrSaving}
+                                    aria-label={t('common.save')}
+                                  >
+                                    <IconCheck size={14} />
+                                  </ActionIcon>
+                                  <ActionIcon
+                                    variant="subtle"
+                                    size="sm"
+                                    onClick={() => setEditAttrId(null)}
+                                    aria-label={t('common.cancel')}
+                                  >
+                                    <IconX size={14} />
+                                  </ActionIcon>
+                                </Group>
+                              ) : (
+                                attr.name
+                              )}
+                            </Table.Td>
+                            <Table.Td>
+                              {editAttrId !== attr.id && (
+                                <Group gap="xs">
+                                  <ActionIcon
+                                    variant="subtle"
+                                    color="blue"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditAttrId(attr.id)
+                                      setEditAttrValue(attr.name)
+                                    }}
+                                    aria-label={`${attr.name} ${t('common.edit').toLowerCase()}`}
+                                  >
+                                    <IconEdit size={14} />
+                                  </ActionIcon>
+                                  <ActionIcon
+                                    variant="subtle"
+                                    color="red"
+                                    size="sm"
+                                    onClick={() => handleDeleteAttribute(attr.id, attr.name)}
+                                    aria-label={`${attr.name} ${t('common.delete').toLowerCase()}`}
+                                  >
+                                    <IconTrash size={14} />
+                                  </ActionIcon>
+                                </Group>
+                              )}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                        {skill.attributes.length === 0 && (
+                          <Table.Tr>
+                            <Table.Td colSpan={2}>
+                              <Text size="sm" c="dimmed">
+                                {t('skills.noAttributes')}
+                              </Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        )}
+                      </Table.Tbody>
+                    </Table>
+                  </Table.ScrollContainer>
                   {addAttrSkillId === skill.id ? (
                     <Group gap="xs" mt="xs" ml="md">
                       <TextInput
