@@ -18,7 +18,7 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ title, actions }: SectionHeaderProps) {
   return (
-    <Group justify="space-between" mb="md">
+    <Group justify="space-between" className="capado-section-header">
       <Title order={4}>{title}</Title>
       {actions}
     </Group>

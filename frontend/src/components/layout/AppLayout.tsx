@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import type { CSSProperties } from 'react'
 import {
   ActionIcon,
   AppShell,
@@ -17,7 +16,7 @@ import {
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { useMantineColorScheme } from '@mantine/core'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import {
   IconBriefcase,
   IconBuilding,
@@ -43,8 +42,6 @@ import { useSettings } from '../../context/SettingsContext'
 import { useTranslation, type Locale } from '../../i18n'
 import { useAuth } from '../../context/AuthContext'
 import { usePermissions } from '../../hooks/usePermissions'
-import { readableTextForeground } from '../../utils/contrast'
-import { brandShade, HEADER_SHADE, NAVBAR_SHADE } from '../../utils/brand'
 import { ChangePasswordModal } from '../../features/auth/ChangePasswordModal'
 import { HelpDrawer } from '../../features/help/HelpDrawer'
 import { getLogoUrl } from '../../api/settings'
@@ -137,100 +134,60 @@ const NAV_GROUPS = [
  * language switcher, color scheme toggle, and user menu.
  */
 export function AppLayout() {
-  const [opened, { toggle }] = useDisclosure()
+  const [opened, { toggle, close }] = useDisclosure()
   const [helpDrawerOpened, { open: openHelpDrawer, close: closeHelpDrawer }] = useDisclosure()
   const location = useLocation()
-  const navigate = useNavigate()
   const { settings, updatePreferences, hasUploadedLogo } = useSettings()
-  /**
-   * TWO BRAND SURFACES, TWO FOREGROUNDS, COMPUTED SEPARATELY.
-   *
-   * Both surfaces use shades of the operator's colour, and each picks an opaque foreground that
-   * clears 4.5:1 for its small labels. Their backgrounds can require different foregrounds for a
-   * pale brand, so the result must be calculated independently.
-   */
-  // 68px is the icon plus the navbar's own padding: wide enough that the icons are not touching the
-  // edges, narrow enough that the gain over 260px is worth the labels.
   const navCollapsed = settings.navCollapsed
-
-  const navBg = brandShade(settings.primaryColor, NAVBAR_SHADE)
-  const headerBg = brandShade(settings.primaryColor, HEADER_SHADE)
-  const onNav = readableTextForeground(navBg)
-  const onBrand = readableTextForeground(headerBg)
   const { t } = useTranslation()
+  const { colorScheme } = useMantineColorScheme()
+  const { user, logout } = useAuth()
+  const { isAdmin } = usePermissions()
 
-  // Ctrl+/ (⌘+/ on Mac) opens the help drawer
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === '/') {
         e.preventDefault()
         openHelpDrawer()
       }
+      if (e.key === 'Escape') close()
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [openHelpDrawer])
-  const { colorScheme } = useMantineColorScheme()
-  const { user, logout } = useAuth()
-  const { isAdmin } = usePermissions()
+  }, [openHelpDrawer, close])
 
-  const handleLocaleSwitch = (locale: Locale) => {
-    updatePreferences({ locale })
-  }
-
-  const handleColorSchemeToggle = () => {
-    const next = colorScheme === 'dark' ? 'light' : 'dark'
-    updatePreferences({ colorScheme: next })
-  }
+  const handleLocaleSwitch = (locale: Locale) => updatePreferences({ locale })
+  const handleColorSchemeToggle = () =>
+    updatePreferences({ colorScheme: colorScheme === 'dark' ? 'light' : 'dark' })
 
   return (
     <AppShell
-      header={{ height: 64 }}
+      className="capado-shell"
+      header={{ height: { base: 112, sm: 76 } }}
       navbar={{
-        // Two independent collapse conditions, and they must not share one flag. `mobile` is the
-        // burger: off-canvas, all-or-nothing, driven by `opened`. `desktop` is this feature: the bar
-        // stays in the layout and loses its labels. Wiring both to `opened` would mean opening the
-        // mobile drawer also un-collapses the desktop bar, and the two have nothing to do with
-        // each other.
-        width: navCollapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED,
+        width: {
+          base: NAV_WIDTH_EXPANDED,
+          sm: navCollapsed ? NAV_WIDTH_COLLAPSED : NAV_WIDTH_EXPANDED,
+        },
         breakpoint: 'sm',
         collapsed: { mobile: !opened },
       }}
-      footer={{ height: 36 }}
-      padding="md"
+      footer={{ height: 28 }}
+      padding={{ base: 'sm', md: 'xl' }}
     >
-      <AppShell.Header
-        // Inline, not a class. Both properties lived in AppLayout.css for one release and it cost a
-        // bug: a plain class competes with Mantine's own header rule at equal specificity, so
-        // stylesheet order decides — and it decided against ours. The header fell back to Mantine's
-        // light default while every icon and label inside it is painted for the brand colour, so they
-        // were invisible rather than merely wrong. An inline style beats every class rule, which is
-        // the property the white contents depend on, and it needs no !important to get it.
-        style={{ backgroundColor: headerBg, borderBottom: 'none' }}
-      >
-        {/* No LEFT padding on this row: the leading block below supplies its own, because it has to be
-            exactly as wide as the collapsed navbar rather than as wide as the header's own gutter. */}
-        <Group h="100%" pr="md" justify="space-between">
-          <Group gap="sm">
-            {/*
-              THE CONTROL SITS IN THE SIDEBAR'S OWN COLUMN. This block is `NAV_WIDTH_COLLAPSED` wide and
-              centres its single child, which lands the toggle on the same vertical line as the icons in
-              the bar it controls — the alignment is derived from the bar's width, not tuned by eye.
-
-              One child at a time, always: the burger is `hiddenFrom="sm"` and the toggle `visibleFrom="sm"`,
-              so centring is unambiguous and the two never share the space.
-            */}
-            <Group w={NAV_WIDTH_COLLAPSED} justify="center" gap={0}>
-              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" color={onBrand} />
-              {/*
-              The desktop counterpart of the burger, and shown exactly where the burger is not:
-              `visibleFrom="sm"` mirrors the burger's `hiddenFrom="sm"`, so there is always one control
-              and never two. Below the breakpoint the navigation is off-canvas and "collapse to icons"
-              has no meaning there.
-
-              Labelled for both states rather than with a static name: a toggle whose accessible name
-              does not change tells a screen-reader user which control it is but not what it will do.
-            */}
+      <AppShell.Header className="capado-header">
+        <div className="capado-header-inner">
+          <Group gap="sm" wrap="nowrap" className="capado-brand">
+            <Group w={{ base: 36, sm: NAV_WIDTH_COLLAPSED }} justify="center" gap={0}>
+              <Burger
+                opened={opened}
+                onClick={toggle}
+                hiddenFrom="sm"
+                size="sm"
+                aria-label={opened ? t('nav.collapse') : t('nav.expand')}
+                aria-expanded={opened}
+                aria-controls="capado-navigation"
+              />
               <Tooltip
                 label={navCollapsed ? t('nav.expand') : t('nav.collapse')}
                 position="bottom"
@@ -239,10 +196,12 @@ export function AppLayout() {
               >
                 <ActionIcon
                   variant="subtle"
-                  color={onBrand}
+                  color="var(--capado-muted)"
                   visibleFrom="sm"
+                  size="lg"
                   aria-label={navCollapsed ? t('nav.expand') : t('nav.collapse')}
                   aria-expanded={!navCollapsed}
+                  aria-controls="capado-navigation"
                   onClick={() => updatePreferences({ navCollapsed: !navCollapsed })}
                 >
                   {navCollapsed ? (
@@ -253,51 +212,42 @@ export function AppLayout() {
                 </ActionIcon>
               </Tooltip>
             </Group>
-            <Group gap="sm">
-              {settings.logoUrl || hasUploadedLogo ? (
-                <Image
-                  src={hasUploadedLogo ? getLogoUrl() : settings.logoUrl}
-                  alt="Logo"
-                  w={36}
-                  h={36}
-                  radius={6}
-                  fit="contain"
-                />
-              ) : (
-                <Image src="/favicon.svg" alt="Capado" w={36} h={36} fit="contain" />
-              )}
-              <div>
-                <Text size="md" fw={700} c={onBrand} lh={1.2}>
-                  {settings.companyName}
+            <Image
+              src={hasUploadedLogo ? getLogoUrl() : settings.logoUrl || '/favicon.svg'}
+              alt={settings.logoUrl || hasUploadedLogo ? 'Logo' : 'Capado'}
+              w={36}
+              h={36}
+              radius={8}
+              fit="contain"
+              className="capado-brand-logo"
+            />
+            <div className="capado-brand-text">
+              <Text size="md" fw={700} lh={1.3} truncate>
+                {settings.companyName}
+              </Text>
+              {settings.companySubtitle && (
+                <Text size="xs" c="dimmed" truncate>
+                  {settings.companySubtitle}
                 </Text>
-                {settings.companySubtitle && (
-                  <Text size="xs" c={onBrand} lh={1.2}>
-                    {settings.companySubtitle}
-                  </Text>
-                )}
-              </div>
-            </Group>
+              )}
+            </div>
           </Group>
-
-          <Group gap="xs">
-            {/* User indicator: name + role badge */}
+          <Group gap={4} wrap="nowrap" className="capado-header-actions">
             {user && (
-              <Group gap="xs">
-                <Text size="sm" c={onBrand} fw={500}>
+              <Group gap="xs" wrap="nowrap" className="capado-user">
+                <Text size="sm" fw={500} truncate>
                   {user.name}
                 </Text>
-                <Badge size="sm" variant="filled" color={ROLE_BADGE_COLORS[user.role] ?? 'gray'}>
+                <Badge size="sm" variant="light" color={ROLE_BADGE_COLORS[user.role] ?? 'gray'}>
                   {user.role}
                 </Badge>
               </Group>
             )}
-
-            {/* Language switcher */}
-            <Menu shadow="md" width={120}>
+            <Menu shadow="md" width={160}>
               <Menu.Target>
                 <ActionIcon
                   variant="subtle"
-                  color={onBrand}
+                  color="var(--capado-muted)"
                   size="lg"
                   aria-label={t('appLayout.language')}
                 >
@@ -319,33 +269,27 @@ export function AppLayout() {
                 </Menu.Item>
               </Menu.Dropdown>
             </Menu>
-
-            {/* Dark mode toggle */}
             <ActionIcon
               variant="subtle"
-              color={onBrand}
+              color="var(--capado-muted)"
               size="lg"
               onClick={handleColorSchemeToggle}
               aria-label={t('appLayout.toggleColorScheme')}
             >
               {colorScheme === 'dark' ? <IconSun size={20} /> : <IconMoon size={20} />}
             </ActionIcon>
-
-            {/* Context-sensitive help button */}
             <ActionIcon
               variant="subtle"
-              color={onBrand}
+              color="var(--capado-muted)"
               size="lg"
               onClick={openHelpDrawer}
               aria-label={t('appLayout.help')}
             >
               <IconHelp size={20} />
             </ActionIcon>
-
-            {/* Logout button */}
             <ActionIcon
               variant="subtle"
-              color={onBrand}
+              color="var(--capado-muted)"
               size="lg"
               onClick={logout}
               aria-label={t('appLayout.logout')}
@@ -353,61 +297,29 @@ export function AppLayout() {
               <IconLogout size={20} />
             </ActionIcon>
           </Group>
-        </Group>
+        </div>
       </AppShell.Header>
 
       <AppShell.Navbar
+        id="capado-navigation"
         p="sm"
-        // `--nav-fg` is read by the state rules in AppLayout.css. They cannot use Mantine's own
-        // hover/active variables any more: those are theme greys and the brand colour itself, which on a
-        // brand-coloured surface give an invisible hover and a brand-on-brand active row — the exact
-        // failure the reference mockup shipped, where its active entry was the least readable thing on
-        // the screen.
-        style={{ backgroundColor: navBg, borderRight: 'none', '--nav-fg': onNav } as CSSProperties}
+        className="capado-navigation"
+        data-collapsed={navCollapsed || undefined}
       >
-        {/*
-          A SCROLLING SECTION, because the list is taller than the navbar on a short viewport and the
-          last entry ran underneath the footer. That was invisible while the navbar was white — white
-          text clipped against a white surface looks like nothing at all — and painting the navbar
-          revealed it: "Audit log" sat on the footer's own background, outside the coloured area.
-
-          `grow` gives this section the leftover height rather than the natural height of its content,
-          which is what makes the overflow scroll instead of spill.
-        */}
         <AppShell.Section grow component={ScrollArea} type="auto" scrollbarSize={6}>
           {NAV_GROUPS.map((group) => {
             const visible = group.items.filter((item) => !('adminOnly' in item) || isAdmin)
-            // A group whose every entry is admin-gated must not leave its heading behind for a
-            // non-admin: an empty labelled block reads as a broken page, not as a hidden one.
             if (visible.length === 0) return null
             return (
-              <Box key={group.labelKey ?? 'entry'} mb="xs">
-                {group.labelKey &&
-                  (navCollapsed ? (
-                    /*
-                      A RULE INSTEAD OF THE HEADING, because at 68px the heading cannot be read: it
-                      would wrap into fragments of uppercase or be clipped mid-word, and a truncated
-                      category name looks like a rendering fault rather than a deliberate omission.
-
-                      The grouping is still worth keeping — twelve icons in one undifferentiated column
-                      are harder to scan than four short runs — so the line stays where the words were.
-
-                      `aria-label` carries the name the eye no longer gets. A bare separator would drop
-                      the grouping silently for anyone using a screen reader, who cannot see the line
-                      either.
-                    */
-                    <Divider
-                      my="xs"
-                      mx="sm"
-                      color={onNav}
-                      opacity={0.25}
-                      aria-label={t(group.labelKey)}
-                    />
-                  ) : (
-                    <Text size="xs" fw={600} c={onNav} tt="uppercase" px="sm" pt="sm" pb={4}>
+              <Box key={group.labelKey ?? 'entry'} className="capado-nav-group">
+                {group.labelKey && (
+                  <>
+                    <Text size="xs" fw={600} tt="uppercase" className="capado-nav-heading">
                       {t(group.labelKey)}
                     </Text>
-                  ))}
+                    <Divider className="capado-nav-separator" aria-label={t(group.labelKey)} />
+                  </>
+                )}
                 {visible.map((item) => {
                   const isActive =
                     location.pathname === item.path ||
@@ -418,35 +330,21 @@ export function AppLayout() {
                       label={t(item.labelKey)}
                       position="right"
                       withArrow
-                      // Only when there is no label to read. A tooltip repeating a visible label is
-                      // noise, and it covers the thing next to it while it does so.
-                      disabled={!navCollapsed}
-                      // Tooltips that appear on hover alone are invisible to anyone navigating by
-                      // keyboard, which in a collapsed sidebar means the names are simply gone.
+                      disabled={!navCollapsed || opened}
                       events={{ hover: true, focus: true, touch: true }}
                     >
                       <NavLink
+                        component={Link}
+                        to={item.path}
                         label={t(item.labelKey)}
-                        leftSection={<item.icon size={20} stroke={1.5} />}
+                        leftSection={<item.icon size={20} stroke={1.6} />}
                         active={isActive}
-                        onClick={() => {
-                          navigate(item.path)
-                          toggle()
-                        }}
-                        className={navCollapsed ? 'navLink navLinkCollapsed' : 'navLink'}
-                        // The accessible name survives the label being hidden. Without this a screen
-                        // reader announces twelve unnamed links, which is worse than a sighted user
-                        // guessing at an icon — they at least have the icon.
+                        onClick={close}
+                        className="capado-nav-link"
                         aria-label={t(item.labelKey)}
+                        aria-current={isActive ? 'page' : undefined}
                         variant="subtle"
-                        // INLINE, not in the stylesheet, and measured rather than assumed. `.navLink {
-                        // color: var(--nav-fg) }` was tried and lost: it competes with Mantine's own
-                        // NavLink rule at equal specificity, so source order decides and it decided
-                        // against us — the labels rendered rgb(0,0,0) on the brand surface while the
-                        // group headings beside them were correctly white, because those use this same
-                        // prop. It is the identical trap already documented for AppShell.Header in this
-                        // file. A style prop wins without needing !important.
-                        c={onNav}
+                        c="var(--capado-nav-text)"
                       />
                     </Tooltip>
                   )
@@ -455,46 +353,23 @@ export function AppLayout() {
             )
           })}
         </AppShell.Section>
-
-        {/* Outside the scrolling section: the subtitle is a footer for the navigation and should stay
-            put rather than scroll away with the links.
-
-            DROPPED ENTIRELY WHEN COLLAPSED. A company name is not navigation — it is decoration that
-            happens to sit in the navbar — so at 68px it is the one element with nothing to lose by
-            going. Keeping it would mean either truncating a proper noun (a name cut mid-word looks
-            broken, not abbreviated) or letting it wrap into a stack of fragments, and its divider
-            would then read as a rule under nothing. The name is still on screen: it sits beside the
-            logo in the header, which the collapse does not touch. */}
-        {!navCollapsed && (
-          <AppShell.Section>
-            {/* A theme divider is a grey line: on a brand surface it either vanishes or reads as dirt.
-                A transparency of the surface foreground sits correctly on any brand. */}
-            <Divider my="sm" color={onNav} opacity={0.25} />
-
-            <Box px="sm" py="xs">
-              {/* Keep small text opaque: fading a readable foreground can drop it below AA. */}
-              <Text size="xs" c={onNav}>
-                {settings.companySubtitle || settings.companyName}
-              </Text>
-            </Box>
-          </AppShell.Section>
-        )}
+        <AppShell.Section className="capado-nav-footer">
+          <Divider my="sm" color="rgba(255,255,255,0.12)" />
+          <Text size="xs" c="var(--capado-nav-muted)" px="sm" py="xs">
+            {settings.companySubtitle || settings.companyName}
+          </Text>
+        </AppShell.Section>
       </AppShell.Navbar>
 
-      <AppShell.Main>
-        {/* Suppress page rendering (and its data fetches) until the forced
-            password change is complete — protected endpoints reject users
-            flagged must_change_password with 403, so mounting pages here would
-            only trigger errors behind the blocking modal. */}
+      <AppShell.Main className="capado-main">
+        {/* Protected pages must not fetch before the required password change. */}
         {user?.must_change_password ? null : <Outlet />}
       </AppShell.Main>
-
-      <AppShell.Footer p="xs">
+      <AppShell.Footer className="capado-footer">
         <Text size="xs" c="dimmed" ta="center">
           Capado {APP_VERSION}
         </Text>
       </AppShell.Footer>
-
       {user?.must_change_password && <ChangePasswordModal />}
       <HelpDrawer opened={helpDrawerOpened} onClose={closeHelpDrawer} />
     </AppShell>

@@ -49,9 +49,11 @@ export function DataTable({
   }
 
   return (
-    <Table striped highlightOnHover withTableBorder data-testid={testId}>
-      <Table.Thead>{head}</Table.Thead>
-      <Table.Tbody>{children}</Table.Tbody>
-    </Table>
+    <Table.ScrollContainer minWidth={640} type="native">
+      <Table striped highlightOnHover withTableBorder data-testid={testId}>
+        <Table.Thead>{head}</Table.Thead>
+        <Table.Tbody>{children}</Table.Tbody>
+      </Table>
+    </Table.ScrollContainer>
   )
 }
