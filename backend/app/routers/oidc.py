@@ -15,7 +15,7 @@ from app.config import settings
 from app.database import get_session
 from app.models.user import RefreshToken, User, UserRole
 from app.schemas.auth import OIDCStatusResponse
-from app.services.auth_service import create_access_token, create_refresh_token
+from app.services.auth_service import create_refresh_token
 from app.services.oidc_service import (
     FRONTEND_URL,
     OIDC_ENABLED,
@@ -26,7 +26,6 @@ from app.services.oidc_service import (
     get_userinfo,
 )
 from app.utils.auth_cookies import set_refresh_cookie
-from app.utils.logging import quote_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +157,7 @@ async def oidc_login() -> RedirectResponse:
     "/callback",
     summary="Handle OIDC callback from identity provider",
     responses={
-        302: {"description": "Redirect to frontend with tokens"},
+        302: {"description": "Redirect to frontend with an HttpOnly session cookie"},
         400: {"description": "Invalid state or missing code"},
         503: {"description": "OIDC not configured"},
     },
@@ -175,8 +174,8 @@ async def oidc_callback(
 
     Validates the state parameter against the signed cookie, exchanges the
     authorization code for tokens, fetches user info, and either links to
-    an existing user or creates a new one. Issues Capado JWT tokens and
-    redirects to the frontend with the tokens.
+    an existing user or creates a new one. Sets the HttpOnly refresh cookie
+    and redirects without credentials; the frontend bootstraps via refresh.
 
     Args:
         code: Authorization code from the OIDC provider.
@@ -187,7 +186,7 @@ async def oidc_callback(
         session: Database session.
 
     Returns:
-        302 redirect to frontend with access_token and refresh_token as query params.
+        302 redirect to the frontend callback, without tokens in the URL.
 
     Raises:
         HTTPException: 400 if state is invalid or code is missing.
@@ -202,11 +201,9 @@ async def oidc_callback(
 
     # Handle provider errors
     if error:
-        logger.warning(
-            "OIDC provider error: %s — %s",
-            quote_log_value(error),
-            quote_log_value(error_description),
-        )
+        # Provider-controlled descriptions can contain credentials. Do not log
+        # their contents or reflect them into a redirect.
+        logger.warning("OIDC provider rejected authentication")
         return RedirectResponse(
             url=f"{FRONTEND_URL}/login?error=oidc_denied",
             status_code=302,
@@ -229,7 +226,7 @@ async def oidc_callback(
     try:
         token_response = await exchange_code_for_tokens(code)
     except Exception as exc:
-        logger.error("OIDC token exchange failed: %s", exc)
+        logger.error("OIDC token exchange failed (%s)", type(exc).__name__)
         return RedirectResponse(
             url=f"{FRONTEND_URL}/login?error=oidc_exchange_failed",
             status_code=302,
@@ -239,7 +236,7 @@ async def oidc_callback(
     try:
         userinfo = await get_userinfo(token_response["access_token"])
     except Exception as exc:
-        logger.error("OIDC userinfo fetch failed: %s", exc)
+        logger.error("OIDC userinfo fetch failed (%s)", type(exc).__name__)
         return RedirectResponse(
             url=f"{FRONTEND_URL}/login?error=oidc_userinfo_failed",
             status_code=302,
@@ -260,20 +257,8 @@ async def oidc_callback(
             status_code=302,
         )
 
-    # Issue Capado tokens
-    scopes = {
-        "scope_group_ids": user.scope_group_ids,
-        "scope_project_ids": user.scope_project_ids,
-    }
-    access_token = create_access_token(
-        user_id=user.id,
-        role=user.role,
-        scopes=scopes,
-        email=user.email,
-        name=user.name,
-        must_change_password=False,
-    )
-
+    # Issue only the cookie credential. Access tokens are obtained from the
+    # existing refresh endpoint and never transported in a navigation URL.
     raw_refresh, token_hash, expires_at = create_refresh_token()
     refresh_record = RefreshToken(
         user_id=user.id,
@@ -283,10 +268,7 @@ async def oidc_callback(
     session.add(refresh_record)
     await session.commit()
 
-    # Redirect to the frontend with only the short-lived access token in the
-    # URL. The long-lived refresh token is set as an httpOnly cookie so it
-    # never appears in browser history, logs, or the Referer header.
-    redirect_url = f"{FRONTEND_URL}/auth/oidc/callback?access_token={access_token}"
+    redirect_url = f"{FRONTEND_URL}/auth/oidc/callback"
     redirect = RedirectResponse(url=redirect_url, status_code=302)
     set_refresh_cookie(redirect, raw_refresh)
     return redirect

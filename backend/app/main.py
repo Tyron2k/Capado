@@ -43,12 +43,14 @@ from app.routers import (
 )
 from app.services.audit import register_audit_listener
 from app.services.scheduler import scheduler_loop
+from app.utils.logging import AuthQueryFilter
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+logging.getLogger("uvicorn.access").addFilter(AuthQueryFilter())
 
 # CORS origins are validated centrally in Settings (wildcards rejected).
 CORS_ORIGINS: list[str] = app_settings.cors_origins
