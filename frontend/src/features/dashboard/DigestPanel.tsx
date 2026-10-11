@@ -100,7 +100,7 @@ export function DigestPanel() {
 
   if (loading) {
     return (
-      <Card withBorder padding="md">
+      <Card withBorder padding="lg" className="dashboard-digest">
         <Skeleton height={18} width="30%" mb="sm" />
         <Skeleton height={70} />
       </Card>
@@ -111,7 +111,7 @@ export function DigestPanel() {
 
   if (digest.findings.length === 0) {
     return (
-      <Card withBorder padding="md">
+      <Card withBorder padding="lg" className="dashboard-digest">
         <Alert icon={<IconCheck size={16} />} color="green" title={t('digest.allClear')}>
           {t('digest.allClearDetail')}
         </Alert>
@@ -120,8 +120,8 @@ export function DigestPanel() {
   }
 
   return (
-    <Card withBorder padding="md">
-      <Group justify="space-between" mb="sm" wrap="nowrap">
+    <Card withBorder padding="lg" className="dashboard-digest">
+      <Group justify="space-between" mb="sm" wrap="wrap">
         <Title order={4}>{t('digest.title')}</Title>
         <Group gap="xs">
           {(['critical', 'warning', 'info'] as Severity[]).map((severity) =>
@@ -141,6 +141,7 @@ export function DigestPanel() {
           return (
             <Group
               key={`${finding.kind}-${finding.due}-${index}`}
+              className="dashboard-finding"
               gap="sm"
               wrap="nowrap"
               align="flex-start"
