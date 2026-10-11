@@ -81,7 +81,7 @@ repos:
         language: node # Also lets Renovate identify additional_dependencies as npm packages.
         files: ^frontend/(src|public)/.*\.(ts|tsx|js|jsx|css|scss|json|md|yaml|yml)$
         additional_dependencies:
-          - prettier@3.9.9
+          - prettier@3.9.10
 
   # GitHub accepts syntactically valid YAML that is nevertheless an invalid
   # workflow. actionlint catches event, expression, matrix and shell mistakes
