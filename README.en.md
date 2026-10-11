@@ -59,24 +59,25 @@ provider.
 
 ## What it looks like
 
-The screenshots show a demo instance with **invented data** — names, sites and vehicle designations
-bear no relation to any real operation.
+The screenshots show a demo instance with **invented data**. Names, sites and projects are fictional
+and bear no relation to any real operation.
 
-**The dashboard leads with what needs attention**, ordered by urgency rather than being a start menu:
-what is expiring, which commitment is uncovered, which requirement nobody staffs.
+**The dashboard combines figures and things that need attention.** Four cards show projects, active
+work packages, and people/infrastructure utilization. Charts show utilization by calendar week;
+the attention list brings upcoming problems together by urgency.
 
-![Capado dashboard: the "Needs attention" list with severity counters and relative deadlines](docs/assets/screenshots/dashboard-en.png)
+![Capado dashboard in light mode: four figures, attention list and utilization charts with expanded navigation](docs/assets/screenshots/dashboard-en.png)
 
-**The Gantt shows conflicts as colour.** A project bar is grey, because a project is a container and
-occupies no resource; a work package is blue, and red means there is a conflict. A collapsed project
-row carries the number of conflicts it is affected by.
+**The project Gantt shows work packages and conflicts.** Project bars stay neutral; regular
+work-package bars use the company accent. Red marks conflicts. Expanded projects show their work
+packages; collapsed rows show their conflict counts.
 
-![Capado Gantt: project overview with grey project bars, blue work packages and red conflicts](docs/assets/screenshots/gantt-projects-en.png)
+![Capado project Gantt: expanded work packages in the company accent, red conflicts and day axis with weekends](docs/assets/screenshots/gantt-projects-en.png)
 
-**People and machines live in one model** without being called the same thing. The conflict column
-shows, per person, where the plan does not work.
+**People and infrastructure have separate overviews.** Filters, groups and sites help narrow the
+selection. The people table shows conflicts and provides the corresponding editing actions.
 
-![Capado people list: grouped, with site and conflict columns](docs/assets/screenshots/people-en.png)
+![Capado people table: comfortable rows, filters, groups, sites, conflicts and editing actions](docs/assets/screenshots/people-en.png)
 
 ## Scope
 

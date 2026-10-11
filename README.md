@@ -59,24 +59,25 @@ willst, dein OIDC-Anbieter.
 
 ## Wie es aussieht
 
-Die Bilder zeigen eine Demo-Instanz mit **erfundenen Daten** — Namen, Betriebe und Fahrzeug­bezeichnungen
-haben keinen Bezug zu einem echten Betrieb.
+Die Bilder zeigen eine Demo-Instanz mit **erfundenen Daten**. Namen, Standorte und Projekte sind
+fiktiv und haben keinen Bezug zu einem echten Betrieb.
 
-**Das Dashboard führt mit dem Handlungsbedarf**, nach Dringlichkeit sortiert, statt mit einem Startmenü:
-was läuft ab, welche Zusage ist ungedeckt, welche Anforderung ist unbesetzt.
+**Das Dashboard verbindet Kennzahlen und Handlungsbedarf.** Vier Karten zeigen Projekte, aktive
+Arbeitspakete sowie Personal- und Infrastruktur-Auslastung. Diagramme zeigen die Auslastung je
+Kalenderwoche; der Handlungsbedarf bündelt anstehende Probleme nach Dringlichkeit.
 
-![Capado Dashboard: Liste „Handlungsbedarf" mit Schweregrad-Zählern und relativen Fristen](docs/assets/screenshots/dashboard-de.png)
+![Capado-Dashboard im Light Mode: vier Kennzahlen, Handlungsbedarf und Auslastungsdiagramme mit erweiterter Navigation](docs/assets/screenshots/dashboard-de.png)
 
-**Der Gantt zeigt Konflikte als Farbe.** Ein Projektbalken ist grau, weil ein Projekt ein Behälter ist
-und keine Ressource belegt; ein Arbeitspaket ist blau, und rot heißt: hier ist ein Konflikt. Eine
-eingeklappte Projektzeile trägt die Zahl der Konflikte, von denen sie betroffen ist.
+**Der Projekt-Gantt zeigt Arbeitspakete und Konflikte.** Projektbalken bleiben neutral; normale
+Arbeitspaketbalken verwenden die Firmenfarbe. Rot kennzeichnet Konflikte. Ausgeklappte Projekte zeigen
+ihre Arbeitspakete, eingeklappte Zeilen die Anzahl ihrer Konflikte.
 
-![Capado Gantt: Projektübersicht mit grauen Projektbalken, blauen Arbeitspaketen und roten Konflikten](docs/assets/screenshots/gantt-projects-de.png)
+![Capado-Projekt-Gantt: ausgeklappte Arbeitspakete in Firmenfarbe, rote Konflikte und Tagesachse mit Wochenenden](docs/assets/screenshots/gantt-projects-de.png)
 
-**Menschen und Maschinen liegen in einem Modell**, aber sie heißen nicht gleich: Personen sind Personen,
-Infrastruktur ist Infrastruktur. Die Konfliktspalte zeigt pro Person, wo es klemmt.
+**Personen und Infrastruktur haben eigene Übersichten.** Filter, Gruppen und Betriebsstätten helfen
+bei der Auswahl. Die Personenliste zeigt Konflikte und bietet die zugehörigen Bearbeitungsaktionen.
 
-![Capado Personenliste: nach Gruppen, mit Betriebsstätte und Konfliktspalte](docs/assets/screenshots/people-de.png)
+![Capado-Personenliste: komfortable Tabellenzeilen, Filter, Gruppen, Betriebsstätten, Konflikte und Bearbeitungsaktionen](docs/assets/screenshots/people-de.png)
 
 ## Funktionsumfang
 

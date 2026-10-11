@@ -57,23 +57,25 @@ Abwesenheiten und Qualifikationen selbst — nur lesend, und ohne den Vorgesetzt
 
 ## Wie es aussieht
 
-Eine Demo-Instanz mit **erfundenen Daten** — Namen, Betriebe und Fahrzeugbezeichnungen haben keinen
-Bezug zu einem echten Betrieb.
+Die Bilder zeigen eine Demo-Instanz mit **erfundenen Daten**. Namen, Standorte und Projekte sind
+fiktiv und haben keinen Bezug zu einem echten Betrieb.
 
-Das Dashboard führt mit dem Handlungsbedarf, nach Dringlichkeit sortiert, statt mit einem Startmenü.
+**Das Dashboard verbindet Kennzahlen und Handlungsbedarf.** Vier Karten zeigen Projekte, aktive
+Arbeitspakete sowie Personal- und Infrastruktur-Auslastung. Diagramme zeigen die Auslastung je
+Kalenderwoche; der Handlungsbedarf bündelt anstehende Probleme nach Dringlichkeit.
 
-![Capado Dashboard: Liste „Handlungsbedarf" mit Schweregrad-Zählern und relativen Fristen](assets/screenshots/dashboard-de.png)
+![Capado-Dashboard im Light Mode: vier Kennzahlen, Handlungsbedarf und Auslastungsdiagramme mit erweiterter Navigation](assets/screenshots/dashboard-de.png)
 
-Ein Projektbalken ist grau, weil ein Projekt ein Behälter ist und keine Ressource belegt; ein
-Arbeitspaket ist blau, und rot heißt: hier ist ein Konflikt. Eine eingeklappte Projektzeile trägt die
-Zahl der Konflikte, von denen sie betroffen ist.
+**Der Projekt-Gantt zeigt Arbeitspakete und Konflikte.** Projektbalken bleiben neutral; normale
+Arbeitspaketbalken verwenden die Firmenfarbe. Rot kennzeichnet Konflikte. Ausgeklappte Projekte zeigen
+ihre Arbeitspakete, eingeklappte Zeilen die Anzahl ihrer Konflikte.
 
-![Capado Gantt: Projektübersicht mit grauen Projektbalken, blauen Arbeitspaketen und roten Konflikten](assets/screenshots/gantt-projects-de.png)
+![Capado-Projekt-Gantt: ausgeklappte Arbeitspakete in Firmenfarbe, rote Konflikte und Tagesachse mit Wochenenden](assets/screenshots/gantt-projects-de.png)
 
-Menschen und Maschinen liegen in einem Modell, aber sie heißen nicht gleich: Personen sind Personen,
-Infrastruktur ist Infrastruktur.
+**Personen und Infrastruktur haben eigene Übersichten.** Filter, Gruppen und Betriebsstätten helfen
+bei der Auswahl. Die Personenliste zeigt Konflikte und bietet die zugehörigen Bearbeitungsaktionen.
 
-![Capado Personenliste: nach Gruppen, mit Betriebsstätte und Konfliktspalte](assets/screenshots/people-de.png)
+![Capado-Personenliste: komfortable Tabellenzeilen, Filter, Gruppen, Betriebsstätten, Konflikte und Bearbeitungsaktionen](assets/screenshots/people-de.png)
 
 ## Was es bewusst nicht tut
 
