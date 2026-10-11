@@ -408,10 +408,10 @@ window become their own kind of conflict.
 
 This section records the earlier migration chain, before its consolidation into
 baseline `001`. Its historical revisions `003`, `004` and `013` are distinct from
-the current `001`–`004` chain. The current baseline already uses the two absence
-reasons `planned` / `unplanned`; a current revision `003` does not mean the old
-part-time conversion is still pending. Only installations using the pre-baseline
-schema and its old absence reasons need the check described below.
+the current `001`–`004` chain. The [current baseline](https://github.com/Tyron2k/Capado/blob/main/backend/alembic/versions/001_consolidated_baseline_schema.py)
+already uses the two absence reasons `planned` / `unplanned`. All current revisions
+include the historical absence conversions through that baseline. The check below
+applies to installations using the pre-baseline schema and its old absence reasons.
 
 ## Part-time absences
 
