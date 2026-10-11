@@ -10,14 +10,59 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
+  validate:
+    name: Require full CI on the exact release commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      source-sha: ${{ steps.candidate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve immutable candidate
+        id: candidate
+        run: |
+          set -euo pipefail
+          sha=$(git rev-parse HEAD)
+          git merge-base --is-ancestor "$sha" origin/main
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Require successful full validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          set -euo pipefail
+          runs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SOURCE_SHA&event=workflow_dispatch&status=success&per_page=100")
+          if ! run_id=$(jq -ers --arg sha "$SOURCE_SHA" '[.[].workflow_runs[] | select(.head_sha == $sha and .event == "workflow_dispatch" and .status == "completed" and .conclusion == "success")][0].id // empty' <<< "$runs"); then
+            echo "::error::No successful full CI for $SOURCE_SHA. Run CI manually on this commit before publishing."
+            exit 1
+          fi
+          jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs?filter=latest&per_page=100")
+          if ! jq -es 'any(.[].jobs[]; .name == "CI passed" and .conclusion == "success")' <<< "$jobs" > /dev/null; then
+            echo "::error::The validation has no successful CI passed gate."
+            exit 1
+          fi
+          printf 'Full CI: https://github.com/%s/actions/runs/%s\nSource: %s\n' "$GITHUB_REPOSITORY" "$run_id" "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+
   publish:
     name: Build, scan and publish release images
+    needs: validate
+    permissions:
+      contents: read
+      packages: write
     uses: $/.github/workflows/publish-images.yml
     with:
       channel: release
       version: ${{ github.event.release.tag_name }}
-      source-ref: ${{ github.event.release.tag_name }}
+      source-ref: ${{ needs.validate.outputs.source-sha }}
       platforms: linux/amd64,linux/arm64
