@@ -1219,6 +1219,9 @@
     "noSite": "Kein Standort",
     "missingGroup": "Gruppe nicht mehr vorhanden",
     "conflictsOnly": "Nur mit Konflikten",
-    "openConflicts": "Konflikte von {name} öffnen"
+    "openConflicts": "Konflikte von {name} öffnen",
+    "density": "Tabellendichte",
+    "comfortable": "Komfortabel",
+    "compact": "Kompakt"
   }
 }

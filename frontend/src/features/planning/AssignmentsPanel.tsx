@@ -297,20 +297,14 @@ export function AssignmentsPanel() {
       ) : (
         <Stack gap="md">
           {groupedRows.map((proj) => (
-            <Stack key={proj.project_id} gap="xs">
+            <Stack key={proj.project_id} gap="sm" className="capado-assignment-project">
               <Text fw={600} size="sm">
                 {proj.project_name}
               </Text>
               {proj.workPackages
                 .sort((a, b) => a.wp_name.localeCompare(b.wp_name, 'de'))
                 .map((wp) => (
-                  <Box
-                    key={wp.wp_id}
-                    style={{
-                      borderLeft: '3px solid var(--mantine-color-blue-4)',
-                      paddingLeft: 12,
-                    }}
-                  >
+                  <Box key={wp.wp_id} className="capado-work-package">
                     <Text size="xs" c="dimmed" mb={4}>
                       {wp.wp_name}
                     </Text>

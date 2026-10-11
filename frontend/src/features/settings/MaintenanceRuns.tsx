@@ -64,42 +64,44 @@ export function MaintenanceRuns() {
       <Text size="sm" fw={600}>
         {t('maintenance.title')}
       </Text>
-      <Table striped withTableBorder>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>{t('maintenance.job')}</Table.Th>
-            <Table.Th>{t('maintenance.started')}</Table.Th>
-            <Table.Th>{t('maintenance.status')}</Table.Th>
-            <Table.Th>{t('maintenance.detail')}</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {runs.map((run, index) => (
-            <Table.Tr key={`${run.job_name}-${run.started_at}-${index}`}>
-              <Table.Td>
-                <Text size="xs">{run.job_name}</Text>
-              </Table.Td>
-              <Table.Td>
-                <Text size="xs">
-                  {formatDateTime(run.started_at, settings.locale, settings.timeZone, true)}
-                </Text>
-              </Table.Td>
-              <Table.Td>
-                <Group gap={4} wrap="nowrap">
-                  <Badge color={STATUS_COLOR[run.status]} size="sm" variant="light">
-                    {t(`maintenance.statusValue.${run.status}`)}
-                  </Badge>
-                </Group>
-              </Table.Td>
-              <Table.Td>
-                <Text size="xs" c="dimmed">
-                  {run.detail || '–'}
-                </Text>
-              </Table.Td>
+      <Table.ScrollContainer minWidth={640} type="native">
+        <Table striped withTableBorder>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>{t('maintenance.job')}</Table.Th>
+              <Table.Th>{t('maintenance.started')}</Table.Th>
+              <Table.Th>{t('maintenance.status')}</Table.Th>
+              <Table.Th>{t('maintenance.detail')}</Table.Th>
             </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
+          </Table.Thead>
+          <Table.Tbody>
+            {runs.map((run, index) => (
+              <Table.Tr key={`${run.job_name}-${run.started_at}-${index}`}>
+                <Table.Td>
+                  <Text size="xs">{run.job_name}</Text>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="xs">
+                    {formatDateTime(run.started_at, settings.locale, settings.timeZone, true)}
+                  </Text>
+                </Table.Td>
+                <Table.Td>
+                  <Group gap={4} wrap="nowrap">
+                    <Badge color={STATUS_COLOR[run.status]} size="sm" variant="light">
+                      {t(`maintenance.statusValue.${run.status}`)}
+                    </Badge>
+                  </Group>
+                </Table.Td>
+                <Table.Td>
+                  <Text size="xs" c="dimmed">
+                    {run.detail || '–'}
+                  </Text>
+                </Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </Table.ScrollContainer>
     </Stack>
   )
 }

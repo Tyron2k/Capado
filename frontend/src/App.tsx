@@ -24,6 +24,7 @@ import '@mantine/notifications/styles.css'
 import '@mantine/charts/styles.css'
 import './styles/tokens.css'
 import './styles/surfaces.css'
+import './styles/workspaces.css'
 
 import 'dayjs/locale/de'
 
@@ -58,6 +59,9 @@ const SHARED_TOKENS = {
     Menu: { defaultProps: { radius: 'md' } },
     Popover: { defaultProps: { radius: 'md', shadow: 'md' } },
     Tooltip: { defaultProps: { radius: 'sm' } },
+    Table: {
+      defaultProps: { highlightOnHover: true, horizontalSpacing: 'md', verticalSpacing: 'sm' },
+    },
   },
   shadows: {
     xs: '0 1px 2px rgba(0, 0, 0, 0.06)',
