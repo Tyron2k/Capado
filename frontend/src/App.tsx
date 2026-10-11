@@ -22,6 +22,8 @@ import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
 import '@mantine/notifications/styles.css'
 import '@mantine/charts/styles.css'
+import './styles/tokens.css'
+import './styles/surfaces.css'
 
 import 'dayjs/locale/de'
 
@@ -45,7 +47,18 @@ const SHARED_TOKENS = {
   },
   focusRing: 'auto' as const,
   defaultRadius: 'md' as const,
-  radius: { xs: '4px', sm: '6px', md: '10px', lg: '14px', xl: '20px' },
+  radius: { xs: '4px', sm: '8px', md: '10px', lg: '16px', xl: '18px' },
+  autoContrast: true,
+  components: {
+    Card: { defaultProps: { radius: 'lg', padding: 'lg' } },
+    Paper: { defaultProps: { radius: 'lg' } },
+    Button: { defaultProps: { radius: 'sm' } },
+    ActionIcon: { defaultProps: { radius: 'sm' } },
+    Modal: { defaultProps: { radius: 'lg', centered: true } },
+    Menu: { defaultProps: { radius: 'md' } },
+    Popover: { defaultProps: { radius: 'md', shadow: 'md' } },
+    Tooltip: { defaultProps: { radius: 'sm' } },
+  },
   shadows: {
     xs: '0 1px 2px rgba(0, 0, 0, 0.06)',
     sm: '0 2px 6px rgba(0, 0, 0, 0.07)',

@@ -1,0 +1,61 @@
+/* Shared surface tokens. Status colours continue to come from Mantine. */
+:root {
+  --capado-bg: #f5f7fb;
+  --capado-surface: #ffffff;
+  --capado-raised: #ffffff;
+  --capado-subtle: #eef2f7;
+  --capado-border: #dde4ee;
+  --capado-text: #202b3d;
+  --capado-muted: #596a80;
+  --capado-nav: #172033;
+  --capado-nav-text: #f1f5f9;
+  --capado-nav-muted: #b2bfd1;
+  --capado-shadow: 0 4px 24px rgb(23 32 51 / 5%);
+  --capado-atmosphere: radial-gradient(ellipse at 85% 0%, #e7eefb 0%, transparent 55%);
+  --capado-focus: var(--mantine-primary-color-9);
+}
+
+[data-mantine-color-scheme='dark'] {
+  --capado-bg: #0e1420;
+  --capado-surface: #172131;
+  --capado-raised: #1d2a3d;
+  --capado-subtle: #131d2d;
+  --capado-border: #304057;
+  --capado-text: #f1f5f9;
+  --capado-muted: #a5b4c8;
+  --capado-nav: #111827;
+  --capado-shadow: 0 4px 24px rgb(0 0 0 / 15%);
+  --capado-atmosphere: radial-gradient(ellipse at 85% 0%, #1b2942 0%, transparent 55%);
+  --capado-focus: var(--mantine-primary-color-2);
+}
+
+body {
+  background: var(--capado-atmosphere), var(--capado-bg);
+  color: var(--capado-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--capado-focus);
+  outline-offset: 3px;
+}
+
+/* Mantine owns colour-scheme detection; these aliases keep every component consistent. */
+:root[data-mantine-color-scheme] {
+  --mantine-color-body: var(--capado-bg);
+  --mantine-color-text: var(--capado-text);
+  --mantine-color-dimmed: var(--capado-muted);
+  --mantine-color-default: var(--capado-surface);
+  --mantine-color-default-hover: var(--capado-subtle);
+  --mantine-color-default-border: var(--capado-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

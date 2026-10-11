@@ -7,7 +7,8 @@
  */
 
 import { useState, type ReactNode } from 'react'
-import { Container, Group, Tabs, Title } from '@mantine/core'
+import { Tabs } from '@mantine/core'
+import { PageLayout } from './PageLayout'
 import type { Icon } from '@tabler/icons-react'
 
 export interface TabDefinition {
@@ -41,13 +42,9 @@ export function PageTabs({ title, tabs, defaultTab, actions }: PageTabsProps) {
   const [activeTab, setActiveTab] = useState<string | null>(defaultTab ?? tabs[0]?.value ?? null)
 
   return (
-    <Container size="xl">
-      <Group justify="space-between" mb="md">
-        <Title order={2}>{title}</Title>
-        {actions}
-      </Group>
+    <PageLayout title={title} headerActions={actions}>
       <Tabs value={activeTab} onChange={setActiveTab}>
-        <Tabs.List mb="md">
+        <Tabs.List className="capado-tabs-list">
           {tabs.map((tab) => (
             <Tabs.Tab key={tab.value} value={tab.value} leftSection={<tab.icon size={16} />}>
               {tab.label}
@@ -61,6 +58,6 @@ export function PageTabs({ title, tabs, defaultTab, actions }: PageTabsProps) {
           </Tabs.Panel>
         ))}
       </Tabs>
-    </Container>
+    </PageLayout>
   )
 }

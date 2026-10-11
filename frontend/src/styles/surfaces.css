@@ -1,0 +1,109 @@
+/* Opaque defaults protect tables, long forms and warnings. Glass is opt-in. */
+.mantine-Paper-root {
+  background-color: var(--capado-surface);
+  border-color: var(--capado-border);
+}
+
+.mantine-Card-root {
+  box-shadow: var(--capado-shadow);
+}
+
+.capado-surface {
+  border: 1px solid var(--capado-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--capado-surface);
+  box-shadow: var(--capado-shadow);
+}
+
+/* Translucency reveals the page atmosphere. Only floating overlays have content
+   behind them to blur; AppShell offsets keep the header/sidebar separate. */
+@supports (background: color-mix(in srgb, white, transparent)) {
+  .capado-glass {
+    background: color-mix(in srgb, var(--capado-surface) 92%, transparent);
+  }
+}
+
+@supports (backdrop-filter: blur(8px)) {
+  .mantine-Menu-dropdown,
+  .mantine-Popover-dropdown {
+    background: color-mix(in srgb, var(--capado-raised) 96%, transparent);
+    backdrop-filter: blur(8px);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .capado-glass,
+  .mantine-Menu-dropdown,
+  .mantine-Popover-dropdown {
+    background: var(--capado-surface);
+    backdrop-filter: none;
+  }
+}
+
+.capado-page {
+  width: 100%;
+  min-width: 0;
+  padding-block: 12px 32px;
+}
+
+.capado-page-header {
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.capado-page-title {
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.capado-page-description {
+  margin-top: 8px;
+  max-width: 70ch;
+  color: var(--capado-muted);
+}
+
+.capado-section-header {
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.capado-section-header h4 {
+  letter-spacing: -0.02em;
+  font-size: 1.05rem;
+}
+
+.capado-tabs-list {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--capado-border);
+  margin-bottom: 24px;
+}
+
+.capado-tabs-list .mantine-Tabs-tab {
+  flex-shrink: 0;
+  padding: 13px 18px;
+  font-weight: 500;
+  color: var(--capado-muted);
+}
+
+.capado-tabs-list .mantine-Tabs-tab[data-active] {
+  color: var(--capado-text);
+  background: var(--mantine-primary-color-light);
+}
+
+.mantine-Tabs-panel {
+  min-width: 0;
+}
+
+@media (max-width: 48em) {
+  .capado-page {
+    padding-inline: 0;
+    padding-top: 8px;
+  }
+
+  .capado-page-header {
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+}
