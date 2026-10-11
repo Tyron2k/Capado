@@ -25,6 +25,7 @@ import {
   type TimeSlot,
 } from './timeAxis'
 import { useTranslation } from '../../i18n'
+import { formatDate } from '../../utils/date'
 import type { DayAnchor } from '../../utils/date'
 import './ResourceGanttChart.css'
 
@@ -63,7 +64,7 @@ export function ResourceGanttChart({
 
   return (
     <Stack gap="sm">
-      <Group>
+      <Group className="capado-gantt-toolbar">
         {/* Time scale control */}
         {onTimeScaleChange && (
           <SegmentedControl
@@ -89,31 +90,25 @@ export function ResourceGanttChart({
         />
       </Group>
 
-      <Paper
-        withBorder
-        p="md"
-        style={{ overflowX: 'auto', backgroundColor: 'var(--mantine-color-body)' }}
-      >
+      <Paper withBorder p={0} className="capado-gantt-chart">
         <Box style={{ minWidth: totalWidth + 200 }}>
           {/* Time axis header */}
           <Box
+            className="gantt-axis-header"
             style={{
               display: 'grid',
               gridTemplateColumns: `200px 1fr`,
               gap: 0,
-              backgroundColor:
-                'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))',
+              backgroundColor: 'var(--capado-subtle)',
             }}
           >
             <Box
               style={{
-                borderBottom:
-                  '1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))',
+                borderBottom: '1px solid var(--capado-border)',
                 padding: '4px 8px',
                 fontWeight: 600,
                 fontSize: '0.85rem',
-                backgroundColor:
-                  'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))',
+                backgroundColor: 'var(--capado-subtle)',
               }}
             >
               {t('gantt.workPackage')}
@@ -122,8 +117,7 @@ export function ResourceGanttChart({
               style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${timeSlots.length}, ${getSlotWidth(timeScale)}px)`,
-                borderBottom:
-                  '1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))',
+                borderBottom: '1px solid var(--capado-border)',
               }}
             >
               {timeSlots.map((slot) => {
@@ -131,6 +125,10 @@ export function ResourceGanttChart({
                 return (
                   <Box
                     key={slot.label}
+                    className="gantt-axis-slot"
+                    data-weekend={
+                      (timeScale === 'day' && [0, 6].includes(slot.start.getUTCDay())) || undefined
+                    }
                     data-testid={
                       timeScale === 'day' ? `axis-slot-${formatIsoDate(slot.start)}` : undefined
                     }
@@ -139,13 +137,9 @@ export function ResourceGanttChart({
                       padding: '4px 2px',
                       textAlign: 'center',
                       fontSize: '0.75rem',
-                      borderLeft:
-                        '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
+                      borderLeft: '1px solid var(--capado-border)',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
-                      backgroundColor: isCurrent
-                        ? 'light-dark(var(--mantine-color-blue-1), var(--mantine-color-blue-9))'
-                        : undefined,
                       fontWeight: isCurrent ? 700 : undefined,
                     }}
                   >
@@ -180,10 +174,8 @@ export function ResourceGanttChart({
               <Box
                 style={{
                   padding: '8px',
-                  backgroundColor:
-                    'light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-6))',
-                  borderBottom:
-                    '1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))',
+                  backgroundColor: 'var(--capado-subtle)',
+                  borderBottom: '1px solid var(--capado-border)',
                   fontWeight: 600,
                   fontSize: '0.9rem',
                 }}
@@ -265,7 +257,10 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
 }: ResourceGanttRowProps) {
   const { leftPx, widthPx } = computeBarGeometry(bar, { minDate, timeSlots }, timeScale)
 
-  const barColor = bar.has_conflict ? 'var(--mantine-color-red-6)' : 'var(--mantine-color-blue-6)'
+  const { t, locale } = useTranslation()
+  const barColor = bar.has_conflict
+    ? 'var(--mantine-color-red-6)'
+    : 'var(--mantine-primary-color-filled)'
 
   const showLabel = widthPx > 120
 
@@ -278,24 +273,20 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
   // row light up together — they are siblings in the grid, not children of a row element, so
   // :hover on one cannot reach the other. Re-rendering on mousemove would also be wasteful on a
   // chart with hundreds of rows.
-  const zebra = striped
-    ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))'
-    : undefined
 
   return (
-    <Box className="gantt-row" style={{ display: 'contents' }}>
+    <Box className="gantt-row" data-striped={striped || undefined} style={{ display: 'contents' }}>
       {/* Label cell */}
       <Box
         className="gantt-row-cell"
         data-row-id={bar.id}
         style={{
           padding: '8px',
-          borderBottom:
-            '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
+          borderBottom: '1px solid var(--capado-border)',
           fontSize: '0.85rem',
           display: 'flex',
           alignItems: 'center',
-          backgroundColor: zebra,
+          backgroundColor: 'var(--gantt-row-bg)',
         }}
       >
         <Text size="sm" truncate style={{ maxWidth: 180 }}>
@@ -310,11 +301,10 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
         style={{
           position: 'relative',
           height: 40,
-          borderBottom:
-            '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
+          borderBottom: '1px solid var(--capado-border)',
           display: 'grid',
           gridTemplateColumns: `repeat(${timeSlots.length}, ${getSlotWidth(timeScale)}px)`,
-          backgroundColor: zebra,
+          backgroundColor: 'var(--gantt-row-bg)',
         }}
       >
         {/* Background cells */}
@@ -324,18 +314,18 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
           return (
             <Box
               key={i}
+              className="gantt-grid-slot"
+              data-weekend={
+                (timeScale === 'day' && [0, 6].includes(slot.start.getUTCDay())) || undefined
+              }
               data-testid={
                 timeScale === 'day' ? `gantt-cell-${formatIsoDate(slot.start)}` : undefined
               }
               data-current={isCurrent ? 'true' : undefined}
               style={{
                 position: 'relative',
-                borderLeft:
-                  '1px solid light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))',
+                borderLeft: '1px solid var(--capado-border)',
                 height: '100%',
-                backgroundColor: isCurrent
-                  ? 'light-dark(var(--mantine-color-blue-1), var(--mantine-color-blue-9))'
-                  : undefined,
               }}
             />
           )
@@ -348,14 +338,18 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
               <Text size="xs" fw={600}>
                 {bar.name}
               </Text>
-              <Text size="xs">Resource: {bar.resource_name}</Text>
               <Text size="xs">
-                {bar.start_date} – {bar.end_date}
+                {t('gantt.tooltipResource')}: {bar.resource_name}
               </Text>
-              <Text size="xs">Allocation: {bar.allocation_percent}%</Text>
+              <Text size="xs">
+                {formatDate(bar.start_date, locale)} – {formatDate(bar.end_date, locale)}
+              </Text>
+              <Text size="xs">
+                {t('gantt.tooltipAllocation')}: {bar.allocation_percent}%
+              </Text>
               {bar.has_conflict && (
-                <Text size="xs" c="red">
-                  ⚠ Conflict detected
+                <Text size="xs" c="var(--capado-danger)">
+                  {t('gantt.conflictDetected')}
                 </Text>
               )}
             </Stack>
@@ -363,15 +357,18 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
           multiline
           withArrow
           position="top"
+          events={{ hover: true, focus: true, touch: true }}
         >
           <Box
             data-testid={`gantt-bar-${bar.id}`}
-            role={bar.has_conflict && onConflictClick ? 'button' : undefined}
-            tabIndex={bar.has_conflict && onConflictClick ? 0 : undefined}
+            className="gantt-bar"
+            data-conflict={bar.has_conflict || undefined}
+            role={bar.has_conflict && onConflictClick ? 'button' : 'img'}
+            tabIndex={0}
             aria-label={
               bar.has_conflict
-                ? `Konflikt: ${bar.name} von ${bar.start_date} bis ${bar.end_date}`
-                : undefined
+                ? `${t('gantt.conflictDetected')}: ${bar.name}, ${formatDate(bar.start_date, locale)} – ${formatDate(bar.end_date, locale)}`
+                : `${bar.name}, ${formatDate(bar.start_date, locale)} – ${formatDate(bar.end_date, locale)}`
             }
             onClick={() => {
               if (bar.has_conflict && onConflictClick) {
@@ -392,8 +389,8 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
               width: widthPx,
               height: 24,
               backgroundColor: barColor,
-              borderRadius: 4,
-              cursor: 'pointer',
+              borderRadius: 6,
+              cursor: bar.has_conflict && onConflictClick ? 'pointer' : 'default',
               display: 'flex',
               alignItems: 'center',
               paddingLeft: 6,
@@ -404,7 +401,7 @@ const ResourceGanttRow = React.memo(function ResourceGanttRow({
             {showLabel && (
               <Text
                 size="xs"
-                c="white"
+                c={bar.has_conflict ? '#172033' : 'var(--mantine-primary-color-contrast)'}
                 truncate
                 style={{
                   lineHeight: 1,

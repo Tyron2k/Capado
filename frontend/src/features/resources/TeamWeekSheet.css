@@ -9,6 +9,8 @@
  */
 
 .team-week-sheet {
+  color: var(--capado-text);
+  background: var(--capado-surface);
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
@@ -16,14 +18,14 @@
 
 .team-week-sheet th,
 .team-week-sheet td {
-  border: 1px solid var(--mantine-color-gray-4);
+  border: 1px solid var(--capado-border);
   padding: 4px 6px;
   vertical-align: top;
   text-align: left;
 }
 
 .team-week-sheet th {
-  background: var(--mantine-color-gray-1);
+  background: var(--capado-subtle);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -42,7 +44,7 @@
 .team-week-closed {
   /* Distinguishable in colour AND by the em-dash the component renders, so the meaning
      survives a black-and-white printer. */
-  background: var(--mantine-color-gray-2);
+  background: var(--capado-subtle);
 }
 
 @media print {
@@ -58,6 +60,8 @@
   }
 
   .team-week-sheet {
+    color: #000;
+    background: #fff;
     position: absolute;
     left: 0;
     top: 0;

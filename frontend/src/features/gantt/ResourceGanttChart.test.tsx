@@ -231,14 +231,14 @@ describe('ResourceGanttChart', () => {
       expect(conflictBar.style.backgroundColor).toBe('var(--mantine-color-red-6)')
     })
 
-    it('shows bars without conflict in blue', () => {
+    it('shows bars without conflict in the company accent', () => {
       renderWithMantine(<ResourceGanttChart data={mockData} timeScale="week" />)
 
       const normalBar = screen.getByTestId('gantt-bar-aaaa1111-1111-1111-1111-111111111111')
-      expect(normalBar.style.backgroundColor).toBe('var(--mantine-color-blue-6)')
+      expect(normalBar.style.backgroundColor).toBe('var(--mantine-primary-color-filled)')
 
       const normalBar2 = screen.getByTestId('gantt-bar-bbbb1111-1111-1111-1111-111111111111')
-      expect(normalBar2.style.backgroundColor).toBe('var(--mantine-color-blue-6)')
+      expect(normalBar2.style.backgroundColor).toBe('var(--mantine-primary-color-filled)')
     })
   })
 

@@ -31,6 +31,7 @@ import {
   Stack,
   Text,
   Tooltip,
+  UnstyledButton,
 } from '@mantine/core'
 import {
   IconAlertCircle,
@@ -53,6 +54,7 @@ import {
   type TimeScale,
   type TimeSlot,
 } from '../timeAxis'
+import { formatDate } from '../../../utils/date'
 import type { DayAnchor } from '../../../utils/date'
 import '../ResourceGanttChart.css'
 
@@ -193,7 +195,7 @@ export function ProjectsOverviewChart({
 
   return (
     <Stack gap="sm">
-      <Group>
+      <Group className="capado-gantt-toolbar">
         {onTimeScaleChange && (
           <SegmentedControl
             value={timeScale}
@@ -219,20 +221,16 @@ export function ProjectsOverviewChart({
         />
       </Group>
 
-      <Paper
-        withBorder
-        p="md"
-        style={{ overflowX: 'auto', backgroundColor: 'var(--mantine-color-body)' }}
-      >
+      <Paper withBorder p={0} className="capado-gantt-chart">
         <Box style={{ minWidth: totalWidth + LABEL_COLUMN_PX }}>
           {/* Time axis header */}
           <Box
+            className="gantt-axis-header"
             style={{
               display: 'grid',
               gridTemplateColumns: `${LABEL_COLUMN_PX}px 1fr`,
               gap: 0,
-              backgroundColor:
-                'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))',
+              backgroundColor: 'var(--capado-subtle)',
             }}
           >
             <Box
@@ -240,8 +238,7 @@ export function ProjectsOverviewChart({
                 padding: '4px 8px',
                 fontWeight: 600,
                 fontSize: '0.85rem',
-                borderBottom:
-                  '1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))',
+                borderBottom: '1px solid var(--capado-border)',
               }}
             >
               {t('gantt.project')}
@@ -250,19 +247,22 @@ export function ProjectsOverviewChart({
               style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${timeSlots.length}, ${getSlotWidth(timeScale)}px)`,
-                borderBottom:
-                  '1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4))',
+                borderBottom: '1px solid var(--capado-border)',
               }}
             >
               {timeSlots.map((slot, i) => (
                 <Box
                   key={i}
+                  className="gantt-axis-slot"
+                  data-current={isCurrentSlot(slot, timeScale) || undefined}
+                  data-weekend={
+                    (timeScale === 'day' && [0, 6].includes(slot.start.getUTCDay())) || undefined
+                  }
                   style={{
                     padding: '4px 2px',
                     fontSize: '0.7rem',
                     textAlign: 'center',
-                    borderLeft:
-                      '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5))',
+                    borderLeft: '1px solid var(--capado-border)',
                   }}
                 >
                   {slot.label}
@@ -352,38 +352,45 @@ function ProjectBlock({
   return (
     <>
       {/* The project's own row */}
-      <Box className="gantt-row" style={{ display: 'contents' }}>
+      <Box
+        className="gantt-row"
+        data-striped={striped || undefined}
+        style={{ display: 'contents' }}
+      >
         <Box
           className="gantt-row-cell"
-          component="button"
-          type="button"
-          onClick={onToggle}
-          aria-expanded={isOpen}
-          data-testid={`project-toggle-${project.id}`}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 4,
             padding: '8px',
             border: 'none',
-            background: 'transparent',
+            background: 'var(--gantt-row-bg)',
+            color: 'var(--capado-text)',
             cursor: 'pointer',
             textAlign: 'left',
             font: 'inherit',
-            borderBottom:
-              '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
+            borderBottom: '1px solid var(--capado-border)',
           }}
         >
-          {isOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-          {/* Tooltip on the NAME, not only on the bar: the bar's tooltip is unreachable when you are
-              trying to work out which row you are looking at, which is exactly when a truncated name
-              is the problem. */}
-          <Tooltip label={project.name} withArrow openDelay={300}>
-            <Text size="sm" fw={600} truncate style={{ maxWidth: LABEL_TEXT_MAX_PX }}>
-              {project.name}
-            </Text>
+          <Tooltip
+            label={project.name}
+            withArrow
+            events={{ hover: true, focus: true, touch: true }}
+          >
+            <UnstyledButton
+              onClick={onToggle}
+              aria-expanded={isOpen}
+              data-testid={`project-toggle-${project.id}`}
+              className="gantt-project-toggle"
+            >
+              {isOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+              <Text size="sm" fw={600} truncate style={{ maxWidth: LABEL_TEXT_MAX_PX }}>
+                {project.name}
+              </Text>
+              {isLoading && <Loader size={12} />}
+            </UnstyledButton>
           </Tooltip>
-          {isLoading && <Loader size={12} />}
           {conflictCount > 0 && (
             // On the NAME, not on the bar. The project bar is grey because it is a container that
             // occupies no resource; colouring it red would claim the project itself is the
@@ -397,6 +404,7 @@ function ProjectBlock({
             // arithmetic disagree with the dashboard.
             <Tooltip label={conflictLabel} withArrow>
               <Badge
+                component={onProjectConflictClick ? 'button' : 'span'}
                 color="red"
                 variant="light"
                 size="xs"
@@ -405,12 +413,9 @@ function ProjectBlock({
                 style={{ cursor: onProjectConflictClick ? 'pointer' : 'default' }}
                 role={onProjectConflictClick ? 'button' : undefined}
                 aria-label={conflictLabel}
-                onClick={(event) => {
-                  // The row's own handler toggles expansion; a click meant for the badge must not
-                  // also collapse the project the reader just decided to look at.
-                  event.stopPropagation()
-                  onProjectConflictClick?.(project.id)
-                }}
+                onClick={
+                  onProjectConflictClick ? () => onProjectConflictClick(project.id) : undefined
+                }
               >
                 {conflictCount}
               </Badge>
@@ -423,13 +428,7 @@ function ProjectBlock({
           )}
         </Box>
 
-        <BarLane
-          minDate={minDate}
-          timeSlots={timeSlots}
-          timeScale={timeScale}
-          striped={striped}
-          height={40}
-        >
+        <BarLane minDate={minDate} timeSlots={timeSlots} timeScale={timeScale} height={40}>
           <Tooltip
             label={
               <Stack gap={2}>
@@ -442,9 +441,14 @@ function ProjectBlock({
               </Stack>
             }
             withArrow
+            events={{ hover: true, focus: true, touch: true }}
           >
             <Box
               data-testid={`project-bar-${project.id}`}
+              className="gantt-bar"
+              role="img"
+              tabIndex={0}
+              aria-label={`${project.name}, ${project.start_date} – ${project.end_date}`}
               style={{
                 position: 'absolute',
                 top: 10,
@@ -456,7 +460,7 @@ function ProjectBlock({
                 // itself occupies a resource, which it does not.
                 backgroundColor:
                   'light-dark(var(--mantine-color-gray-5), var(--mantine-color-gray-7))',
-                borderRadius: 4,
+                borderRadius: 6,
               }}
             />
           </Tooltip>
@@ -466,7 +470,12 @@ function ProjectBlock({
       {/* Work package rows, only while expanded */}
       {isOpen &&
         bars.map((bar, index) => (
-          <Box key={bar.id} className="gantt-row" style={{ display: 'contents' }}>
+          <Box
+            key={bar.id}
+            className="gantt-row"
+            data-striped={index % 2 === 1 || undefined}
+            style={{ display: 'contents' }}
+          >
             <Box
               className="gantt-row-cell"
               style={{
@@ -474,12 +483,8 @@ function ProjectBlock({
                 fontSize: '0.85rem',
                 display: 'flex',
                 alignItems: 'center',
-                borderBottom:
-                  '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
-                backgroundColor:
-                  index % 2 === 1
-                    ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))'
-                    : undefined,
+                borderBottom: '1px solid var(--capado-border)',
+                backgroundColor: 'var(--gantt-row-bg)',
               }}
             >
               <Tooltip label={bar.name} withArrow openDelay={300}>
@@ -488,13 +493,7 @@ function ProjectBlock({
                 </Text>
               </Tooltip>
             </Box>
-            <BarLane
-              minDate={minDate}
-              timeSlots={timeSlots}
-              timeScale={timeScale}
-              striped={index % 2 === 1}
-              height={36}
-            >
+            <BarLane minDate={minDate} timeSlots={timeSlots} timeScale={timeScale} height={36}>
               <WorkPackageBar
                 bar={bar}
                 minDate={minDate}
@@ -512,8 +511,7 @@ function ProjectBlock({
             className="gantt-row-cell"
             style={{
               padding: '8px 8px 8px 28px',
-              borderBottom:
-                '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
+              borderBottom: '1px solid var(--capado-border)',
             }}
           >
             <Text size="xs" c="dimmed">
@@ -523,8 +521,7 @@ function ProjectBlock({
           <Box
             className="gantt-row-cell"
             style={{
-              borderBottom:
-                '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
+              borderBottom: '1px solid var(--capado-border)',
             }}
           />
         </>
@@ -537,40 +534,36 @@ interface BarLaneProps {
   minDate: DayAnchor
   timeSlots: TimeSlot[]
   timeScale: TimeScale
-  striped: boolean
   height: number
   children: React.ReactNode
 }
 
 /** The right-hand cell: background grid for one row, with the bar positioned on top. */
-function BarLane({ timeSlots, timeScale, striped, height, children }: BarLaneProps) {
+function BarLane({ timeSlots, timeScale, height, children }: BarLaneProps) {
   return (
     <Box
       className="gantt-row-cell"
       style={{
         position: 'relative',
         height,
-        borderBottom:
-          '1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-4))',
+        borderBottom: '1px solid var(--capado-border)',
         display: 'grid',
         gridTemplateColumns: `repeat(${timeSlots.length}, ${getSlotWidth(timeScale)}px)`,
-        backgroundColor: striped
-          ? 'light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7))'
-          : undefined,
+        backgroundColor: 'var(--gantt-row-bg)',
       }}
     >
       {timeSlots.map((slot, i) => (
         <Box
           key={i}
+          className="gantt-grid-slot"
+          data-weekend={
+            (timeScale === 'day' && [0, 6].includes(slot.start.getUTCDay())) || undefined
+          }
           data-testid={timeScale === 'day' ? `gantt-cell-${formatIsoDate(slot.start)}` : undefined}
           data-current={isCurrentSlot(slot, timeScale) ? 'true' : undefined}
           style={{
-            borderLeft:
-              '1px solid light-dark(var(--mantine-color-gray-1), var(--mantine-color-dark-5))',
+            borderLeft: '1px solid var(--capado-border)',
             height: '100%',
-            backgroundColor: isCurrentSlot(slot, timeScale)
-              ? 'light-dark(var(--mantine-color-blue-1), var(--mantine-color-blue-9))'
-              : undefined,
           }}
         />
       ))}
@@ -596,7 +589,10 @@ function WorkPackageBar({
 }: WorkPackageBarProps) {
   const { leftPx, widthPx } = computeBarGeometry(bar, { minDate, timeSlots }, timeScale)
   // Red still means conflict, exactly as in the other charts. Nothing else claims a colour.
-  const color = bar.has_conflict ? 'var(--mantine-color-red-6)' : 'var(--mantine-color-blue-6)'
+  const { t, locale } = useTranslation()
+  const color = bar.has_conflict
+    ? 'var(--mantine-color-red-6)'
+    : 'var(--mantine-primary-color-filled)'
 
   return (
     <Tooltip
@@ -611,9 +607,21 @@ function WorkPackageBar({
         </Stack>
       }
       withArrow
+      events={{ hover: true, focus: true, touch: true }}
     >
       <Box
         data-testid={`gantt-bar-${bar.id}`}
+        className="gantt-bar"
+        data-conflict={bar.has_conflict || undefined}
+        role={bar.has_conflict && onConflictClick ? 'button' : 'img'}
+        tabIndex={0}
+        aria-label={`${bar.has_conflict ? t('gantt.conflictDetected') + ': ' : ''}${bar.name}, ${formatDate(bar.start_date, locale)} – ${formatDate(bar.end_date, locale)}`}
+        onKeyDown={(event) => {
+          if (bar.has_conflict && onConflictClick && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault()
+            onConflictClick(bar)
+          }
+        }}
         onClick={() => bar.has_conflict && onConflictClick?.(bar)}
         style={{
           position: 'absolute',
@@ -622,7 +630,7 @@ function WorkPackageBar({
           width: widthPx,
           height: 20,
           backgroundColor: color,
-          borderRadius: 4,
+          borderRadius: 6,
           cursor: bar.has_conflict ? 'pointer' : 'default',
         }}
       />

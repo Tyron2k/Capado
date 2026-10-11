@@ -74,7 +74,9 @@
     "end": "End",
     "status": "Status",
     "add": "Add",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "close": "Close",
+    "clear": "Clear selection"
   },
   "settings": {
     "title": "Settings",
@@ -118,7 +120,8 @@
     "schedulerEnabled": "Run maintenance jobs automatically",
     "schedulerEnabledDesc": "Checks capacity conflicts every 15 minutes and cleans audit logs and baselines daily according to retention settings. Checks immediately after edits and imports always remain active.",
     "maintenanceHour": "Hour for maintenance jobs",
-    "maintenanceHourDesc": "Hour in the server's timezone, normally UTC. A missed day is made up once on the next start, not once per missed day."
+    "maintenanceHourDesc": "Hour in the server's timezone, normally UTC. A missed day is made up once on the next start, not once per missed day.",
+    "chooseColor": "Pick color from screen"
   },
   "settingsPage": {
     "companyNamePlaceholder": "e.g. Acme Corp",
@@ -324,7 +327,10 @@
     "weekPrefix": "CW",
     "projectConflictsTooltip": "Affected by {count} conflicts — go to planning",
     "projectConflictsUnavailable": "Conflict counts could not be loaded — the project rows do not show them.",
-    "projectConflictsTooltipOne": "Affected by 1 conflict — go to planning"
+    "projectConflictsTooltipOne": "Affected by 1 conflict — go to planning",
+    "tooltipResource": "Resource",
+    "tooltipAllocation": "Allocation",
+    "conflictDetected": "Conflict detected"
   },
   "suggestions": {
     "title": "Resolution Suggestions",
@@ -517,6 +523,7 @@
       "unavailable": "Data unavailable"
     },
     "projectConflicts": "Conflicts in projects",
+    "conflictCountOne": "1 conflict",
     "conflictCount": "{count} conflicts"
   },
   "userManagement": {

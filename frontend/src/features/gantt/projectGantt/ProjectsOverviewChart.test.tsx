@@ -75,12 +75,16 @@ const projects = [
   project('p-2', 'Order 4712', '2026-06-01', '2026-08-31'),
 ]
 
-function renderChart(items = projects) {
+function renderChart(items = projects, onConflictClick?: (bar: { id: string }) => void) {
   return render(
     (
       <QueryClientProvider client={createTestQueryClient()}>
         <MantineProvider>
-          <ProjectsOverviewChart projects={items} timeScale="month" />
+          <ProjectsOverviewChart
+            projects={items}
+            timeScale="month"
+            onConflictClick={onConflictClick}
+          />
         </MantineProvider>
       </QueryClientProvider>
     ) as ReactNode,
@@ -105,6 +109,34 @@ describe('ProjectsOverviewChart', () => {
         },
       ],
     })
+  })
+
+  it('opens work-package conflicts using Enter or Space', async () => {
+    getGanttData.mockResolvedValueOnce({
+      project_id: 'p-1',
+      project_name: 'Order 4711',
+      work_packages: [
+        {
+          id: 'wp-1',
+          name: 'Painting',
+          start_date: '2026-03-05',
+          end_date: '2026-03-20',
+          resources: [],
+          resource_assignments: [],
+          has_conflict: true,
+        },
+      ],
+    })
+    const onConflict = vi.fn()
+    renderChart(projects, onConflict)
+    fireEvent.click(screen.getByTestId('project-toggle-p-1'))
+    const bar = await screen.findByTestId('gantt-bar-wp-1')
+    expect(bar.getAttribute('role')).toBe('button')
+    expect(bar.getAttribute('tabindex')).toBe('0')
+    fireEvent.keyDown(bar, { key: 'Enter' })
+    fireEvent.keyDown(bar, { key: ' ' })
+    expect(onConflict).toHaveBeenCalledTimes(2)
+    expect(onConflict).toHaveBeenCalledWith(expect.objectContaining({ id: 'wp-1' }))
   })
 
   it('shows every project without being asked to select one', () => {
@@ -287,8 +319,11 @@ describe('ProjectsOverviewChart conflict counts', () => {
     fireEvent.click(screen.getByTestId('project-conflicts-p-1'))
 
     expect(onBadgeClick).toHaveBeenCalledWith('p-1')
-    // The badge sits inside the row that toggles expansion. Without stopPropagation the click
-    // would also collapse or expand the project the reader just decided to look into.
+    expect(screen.getByTestId('project-conflicts-p-1').tagName).toBe('BUTTON')
+    expect(
+      screen.getByTestId('project-conflicts-p-1').closest('[data-testid="project-toggle-p-1"]'),
+    ).toBeNull()
+    // Conflict navigation and project expansion remain independent controls.
     //
     // Asserted on aria-expanded, NOT on the absence of a work package bar: the bar arrives from
     // an awaited fetch, so it is absent one tick after any click and that assertion stayed green

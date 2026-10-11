@@ -13,6 +13,8 @@
   --capado-shadow: 0 4px 24px rgb(23 32 51 / 5%);
   --capado-atmosphere: radial-gradient(ellipse at 85% 0%, #e7eefb 0%, transparent 55%);
   --capado-focus: var(--mantine-primary-color-9);
+  --capado-danger: var(--mantine-color-red-8);
+  --capado-warning: #9a3412;
 }
 
 [data-mantine-color-scheme='dark'] {
@@ -27,6 +29,13 @@
   --capado-shadow: 0 4px 24px rgb(0 0 0 / 15%);
   --capado-atmosphere: radial-gradient(ellipse at 85% 0%, #1b2942 0%, transparent 55%);
   --capado-focus: var(--mantine-primary-color-2);
+  --capado-danger: var(--mantine-color-red-4);
+  --capado-warning: var(--mantine-color-orange-4);
+}
+
+:root[data-mantine-color-scheme='light'] {
+  --mantine-color-orange-light-color: #9a3412;
+  --mantine-color-yellow-light-color: #854d0e;
 }
 
 body {

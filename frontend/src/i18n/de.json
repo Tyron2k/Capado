@@ -74,7 +74,9 @@
     "end": "Ende",
     "status": "Status",
     "add": "Hinzufügen",
-    "loading": "Wird geladen…"
+    "loading": "Wird geladen…",
+    "close": "Schließen",
+    "clear": "Auswahl löschen"
   },
   "settings": {
     "title": "Einstellungen",
@@ -118,7 +120,8 @@
     "schedulerEnabled": "Wartungsläufe automatisch ausführen",
     "schedulerEnabledDesc": "Prüft Belegungskonflikte alle 15 Minuten und bereinigt Änderungsprotokoll und Planstände täglich gemäß den Aufbewahrungsfristen. Prüfungen direkt nach Änderungen und Importen bleiben immer aktiv.",
     "maintenanceHour": "Stunde für Wartungsläufe",
-    "maintenanceHourDesc": "Stunde in der Zeitzone des Servers, üblicherweise UTC. Ein ausgelassener Tag wird beim nächsten Start einmal nachgeholt, nicht einmal pro versäumtem Tag."
+    "maintenanceHourDesc": "Stunde in der Zeitzone des Servers, üblicherweise UTC. Ein ausgelassener Tag wird beim nächsten Start einmal nachgeholt, nicht einmal pro versäumtem Tag.",
+    "chooseColor": "Farbe vom Bildschirm aufnehmen"
   },
   "settingsPage": {
     "companyNamePlaceholder": "z. B. Acme Corp",
@@ -324,7 +327,10 @@
     "weekPrefix": "KW",
     "projectConflictsTooltip": "Von {count} Konflikten betroffen — zur Planung",
     "projectConflictsUnavailable": "Konfliktzahlen konnten nicht geladen werden — die Projektzeilen zeigen sie nicht an.",
-    "projectConflictsTooltipOne": "Von 1 Konflikt betroffen — zur Planung"
+    "projectConflictsTooltipOne": "Von 1 Konflikt betroffen — zur Planung",
+    "tooltipResource": "Ressource",
+    "tooltipAllocation": "Auslastung",
+    "conflictDetected": "Konflikt erkannt"
   },
   "suggestions": {
     "title": "Lösungsvorschläge",
@@ -517,6 +523,7 @@
       "unavailable": "Daten nicht verfügbar"
     },
     "projectConflicts": "Konflikte in Projekten",
+    "conflictCountOne": "1 Konflikt",
     "conflictCount": "{count} Konflikte"
   },
   "userManagement": {

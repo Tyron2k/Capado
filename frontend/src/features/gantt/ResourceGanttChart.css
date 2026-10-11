@@ -1,23 +1,63 @@
-/*
- * Row highlight for the resource Gantt.
- *
- * This is the answer to "can the bars have colours". The reported need was not telling work packages
- * apart — it was not losing your row while reading sideways across a wide chart. Zebra striping plus
- * a hover highlight solves that and costs no colour, which matters because colour here already means
- * something: a red bar is a conflict. Per-work-package hues would overwrite the one signal that says
- * where it hurts.
- *
- * Why a wrapper with `display: contents` rather than :hover on each cell: the label cell and the bar
- * area are SIBLING grid items, not parent and child, so :hover on one cannot reach the other and only
- * half the row would light up. A wrapper still receives :hover from its children while generating no
- * box of its own, so its children stay direct grid items and keep the 200px / 1fr layout.
- *
- * Doing this in CSS rather than React state is also what keeps a chart with hundreds of rows from
- * re-rendering on every mousemove.
- */
-
-.gantt-row:hover > .gantt-row-cell {
-  /* Deliberately stronger than the zebra stripe, so hover wins on both odd and even rows —
-     otherwise every second row would appear not to respond. */
-  background-color: light-dark(var(--mantine-color-blue-0), var(--mantine-color-dark-5)) !important;
+/* Row hover changes one inherited variable, so sibling grid cells highlight
+   together without mousemove state, rerenders, blur or !important. */
+.gantt-row {
+  --gantt-row-bg: var(--capado-surface);
+}
+.gantt-row[data-striped] {
+  --gantt-row-bg: var(--capado-subtle);
+}
+.gantt-row:hover {
+  --gantt-row-bg: color-mix(in srgb, var(--mantine-primary-color-filled) 8%, var(--capado-surface));
+}
+.capado-gantt-chart {
+  overflow-x: auto;
+  background: var(--capado-surface);
+  box-shadow: var(--capado-shadow);
+}
+.gantt-axis-header {
+  color: var(--capado-muted);
+}
+.gantt-axis-slot {
+  min-height: 36px;
+  display: grid;
+  place-items: center;
+}
+.gantt-axis-slot[data-weekend],
+.gantt-grid-slot[data-weekend] {
+  background: color-mix(in srgb, var(--capado-muted) 7%, transparent);
+}
+.gantt-axis-slot[data-weekend] {
+  color: var(--capado-text);
+}
+.gantt-axis-slot[data-current],
+.gantt-grid-slot[data-current] {
+  background: var(--mantine-primary-color-light);
+  box-shadow: inset 2px 0 var(--mantine-primary-color-filled);
+  color: var(--capado-text);
+  font-weight: 700;
+}
+.gantt-bar {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+.gantt-bar:focus-visible {
+  outline: 2px solid var(--capado-focus);
+  outline-offset: 3px;
+}
+.gantt-project-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  min-height: 26px;
+}
+.capado-gantt-toolbar {
+  padding: 12px;
+  background: var(--capado-surface);
+  border: 1px solid var(--capado-border);
+  border-radius: 12px;
+}
+.capado-gantt .mantine-SegmentedControl-root {
+  max-width: 100%;
+  overflow-x: auto;
 }

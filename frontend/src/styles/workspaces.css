@@ -123,6 +123,9 @@
   border-inline-start-width: 4px;
   box-shadow: var(--capado-shadow);
 }
+.mantine-Notification-root .mantine-Notification-description {
+  color: var(--capado-muted);
+}
 
 @media (max-width: 48em) {
   .capado-filter-bar {
@@ -142,4 +145,16 @@
 
 .capado-shell .mantine-Table-th .mantine-UnstyledButton-root {
   font-size: inherit;
+}
+
+.mantine-Button-root[data-variant='filled']:not([data-disabled]):not(:disabled):hover {
+  color: var(--capado-filled-hover-color);
+}
+
+.mantine-SegmentedControl-root {
+  background: var(--capado-subtle);
+}
+.mantine-SegmentedControl-indicator {
+  background: var(--capado-raised);
+  box-shadow: var(--capado-shadow);
 }

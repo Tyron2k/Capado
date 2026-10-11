@@ -75,7 +75,7 @@ export function isHexColor(value: string): boolean {
  * luminance from a colour name would be inventing a number.
  *
  * Do not use this for normal-sized labels: its 3:1 threshold is intentionally lower than the 4.5:1
- * that those labels require. The app shell uses `readableTextForeground` for text on brand surfaces.
+ * that those labels require. Use `readableTextForeground` when choosing small text on a custom surface.
  */
 export function readableForeground(brandColor: string): 'white' | typeof DARK_FOREGROUND {
   if (!isHexColor(brandColor)) return 'white'

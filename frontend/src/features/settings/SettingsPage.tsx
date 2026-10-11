@@ -248,6 +248,7 @@ export function SettingsPage() {
               onChange={(e) => setCompanySubtitle(e.currentTarget.value)}
             />
             <ColorInput
+              eyeDropperButtonProps={{ 'aria-label': t('settings.chooseColor') }}
               label={t('settings.primaryColor')}
               description={t('settings.primaryColorDesc')}
               value={primaryColor}

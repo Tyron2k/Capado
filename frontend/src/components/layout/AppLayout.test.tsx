@@ -40,9 +40,7 @@ vi.mock('../../context/SettingsContext', () => ({
 }))
 
 beforeAll(() => {
-  // The navbar's link list sits in a Mantine ScrollArea, which measures itself. jsdom has no
-  // ResizeObserver, and without this stub every test in this file fails on the layout rather than on
-  // anything it is asserting.
+  // Mantine popovers/tooltips measure their targets; jsdom has no ResizeObserver.
   global.ResizeObserver = class {
     observe() {}
     unobserve() {}

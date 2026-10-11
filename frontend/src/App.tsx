@@ -6,8 +6,16 @@
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { DEFAULT_THEME, MantineProvider, createTheme, useMantineColorScheme } from '@mantine/core'
-import type { MantineColorsTuple } from '@mantine/core'
+import {
+  DEFAULT_THEME,
+  MantineProvider,
+  createTheme,
+  darken,
+  getContrastColor,
+  parseThemeColor,
+  useMantineColorScheme,
+} from '@mantine/core'
+import type { ButtonProps, MantineColorsTuple, MantineTheme } from '@mantine/core'
 import { DatesProvider } from '@mantine/dates'
 import { Notifications } from '@mantine/notifications'
 import { RouterProvider } from 'react-router-dom'
@@ -17,6 +25,8 @@ import { SettingsProvider, useSettings } from './context/SettingsContext'
 import { createQueryClient } from './api/queryClient'
 import { AuthProvider } from './context/AuthContext'
 import { I18nProvider } from './i18n'
+import de from './i18n/de.json'
+import en from './i18n/en.json'
 
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
@@ -50,10 +60,32 @@ const SHARED_TOKENS = {
   defaultRadius: 'md' as const,
   radius: { xs: '4px', sm: '8px', md: '10px', lg: '16px', xl: '18px' },
   autoContrast: true,
+  luminanceThreshold: 0.179,
+  // Mantine's variant resolver measures the light shade; using the same filled
+  // shade in both schemes keeps that foreground correct in dark mode too.
+  primaryShade: 7 as const,
   components: {
     Card: { defaultProps: { radius: 'lg', padding: 'lg' } },
     Paper: { defaultProps: { radius: 'lg' } },
-    Button: { defaultProps: { radius: 'sm' } },
+    Button: {
+      defaultProps: { radius: 'sm' },
+      vars: (theme: MantineTheme, props: ButtonProps) => {
+        const parsed = parseThemeColor({ color: props.color ?? theme.primaryColor, theme })
+        const shade = parsed.shade ?? 7
+        const hover = parsed.isThemeColor
+          ? theme.colors[parsed.color][shade === 9 ? 8 : shade + 1]
+          : darken(parsed.value, 0.1)
+        return {
+          root: {
+            '--capado-filled-hover-color': getContrastColor({
+              color: hover,
+              theme,
+              autoContrast: props.autoContrast,
+            }),
+          },
+        }
+      },
+    },
     ActionIcon: { defaultProps: { radius: 'sm' } },
     Modal: { defaultProps: { radius: 'lg', centered: true } },
     Menu: { defaultProps: { radius: 'md' } },
@@ -101,21 +133,22 @@ function ThemedApp() {
     const isHex = /^#[0-9a-fA-F]{6}$/.test(settings.primaryColor)
     const colorName = 'app-primary'
 
-    if (isHex) {
-      const shades = hexToShades(settings.primaryColor)
-      return createTheme({
-        ...SHARED_TOKENS,
-        primaryColor: colorName,
-        colors: { [colorName]: shades },
-      })
-    }
-
     const builtIn = settings.primaryColor in DEFAULT_THEME.colors ? settings.primaryColor : 'blue'
     return createTheme({
       ...SHARED_TOKENS,
-      primaryColor: builtIn,
+      primaryColor: isHex ? colorName : builtIn,
+      ...(isHex ? { colors: { [colorName]: hexToShades(settings.primaryColor) } } : {}),
+      components: {
+        ...SHARED_TOKENS.components,
+        CloseButton: {
+          defaultProps: { 'aria-label': (settings.locale === 'de' ? de : en).common.close },
+        },
+        InputClearButton: {
+          defaultProps: { 'aria-label': (settings.locale === 'de' ? de : en).common.clear },
+        },
+      },
     })
-  }, [settings.primaryColor])
+  }, [settings.primaryColor, settings.locale])
 
   return (
     <MantineProvider theme={theme} defaultColorScheme="light">
