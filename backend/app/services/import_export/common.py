@@ -32,6 +32,7 @@ from app.models.skill import (
 from app.schemas.transfer.calendar import ResourceWorkProfileTransfer
 from app.schemas.transfer.resource import ResourceGroupTransfer
 from app.services.conflict_refresh import refresh_resources
+from app.utils.xlsx import write_cell
 
 from .csv_format import entity
 
@@ -270,7 +271,7 @@ def _build_skill_matrix_xlsx(data: _MatrixData, sheet_title: str) -> bytes:
                     )
                 current_skill = skill_name
                 merge_start = col
-                ws.cell(row=1, column=col, value=skill_name)
+                write_cell(ws, row=1, column=col, value=skill_name)
 
         last_col = num_fixed_cols + num_attr_cols
         if current_skill is not None and last_col > merge_start:
@@ -290,11 +291,11 @@ def _build_skill_matrix_xlsx(data: _MatrixData, sheet_title: str) -> bytes:
 
     # --- Row 2: "Name", "Group", attribute names (light blue) ---
     ws.row_dimensions[2].height = 20
-    ws.cell(row=2, column=1, value="Name")
-    ws.cell(row=2, column=2, value="Group")
+    write_cell(ws, row=2, column=1, value="Name")
+    write_cell(ws, row=2, column=2, value="Group")
 
     for col_idx, (_skill_name, attr_name) in enumerate(data.columns):
-        ws.cell(row=2, column=num_fixed_cols + 1 + col_idx, value=attr_name)
+        write_cell(ws, row=2, column=num_fixed_cols + 1 + col_idx, value=attr_name)
 
     for col in range(1, total_cols + 1):
         cell = ws.cell(row=2, column=col)
@@ -314,7 +315,7 @@ def _build_skill_matrix_xlsx(data: _MatrixData, sheet_title: str) -> bytes:
             current_group = group
             row_in_group = 0
             ws.row_dimensions[current_row].height = 20
-            ws.cell(row=current_row, column=1, value=group)
+            write_cell(ws, row=current_row, column=1, value=group)
             if total_cols > 1:
                 ws.merge_cells(
                     start_row=current_row,
@@ -332,9 +333,9 @@ def _build_skill_matrix_xlsx(data: _MatrixData, sheet_title: str) -> bytes:
 
         # Data row with zebra striping
         is_stripe = row_in_group % 2 == 1
-        ws.cell(row=current_row, column=1, value=name).font = font_data
+        write_cell(ws, row=current_row, column=1, value=name).font = font_data
         ws.cell(row=current_row, column=1).alignment = align_left
-        ws.cell(row=current_row, column=2, value=group).font = font_data
+        write_cell(ws, row=current_row, column=2, value=group).font = font_data
         ws.cell(row=current_row, column=2).alignment = align_left
 
         for col in range(1, total_cols + 1):
@@ -346,7 +347,7 @@ def _build_skill_matrix_xlsx(data: _MatrixData, sheet_title: str) -> bytes:
         for col_idx, attr_id in enumerate(data.attr_id_order):
             col = num_fixed_cols + 1 + col_idx
             if attr_id in attr_ids:
-                cell = ws.cell(row=current_row, column=col, value="X")
+                cell = write_cell(ws, row=current_row, column=col, value="X")
                 cell.font = font_x
                 cell.alignment = align_center
                 cell.fill = fill_x
@@ -393,10 +394,9 @@ def _build_flat_resource_xlsx(rows: list[tuple], sheet_title: str) -> bytes:
     assert isinstance(ws, Worksheet)
     ws.title = sheet_title
     ws.append(["Name", "Group", "Skill", "Attribute", "Site"])
-    for name, group_name, skill_name, attr_name, site_name in rows:
-        ws.append(
-            [name, group_name, skill_name or "", attr_name or "", site_name or ""]
-        )
+    for row_index, values in enumerate(rows, start=2):
+        for column, value in enumerate(values, start=1):
+            write_cell(ws, row=row_index, column=column, value=value or "")
     output = io.BytesIO()
     wb.save(output)
     return output.getvalue()

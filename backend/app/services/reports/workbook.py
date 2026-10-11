@@ -29,6 +29,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.services.time_zone import local_time, planning_zone
+from app.utils.xlsx import write_cell
 
 _HEADER_FILL = PatternFill("solid", fgColor="DDDDDD")
 _HEADER_FONT = Font(bold=True)
@@ -61,8 +62,8 @@ def write_title(ws: Worksheet, title: str, subtitle: str) -> int:
     The subtitle carries the coverage and generation date. Not optional: a spreadsheet
     circulating by email without them gets quoted six weeks later as if it were current.
     """
-    ws.cell(row=1, column=1, value=title).font = _TITLE_FONT
-    ws.cell(row=2, column=1, value=subtitle)
+    write_cell(ws, row=1, column=1, value=title).font = _TITLE_FONT
+    write_cell(ws, row=2, column=1, value=subtitle)
     return 4
 
 
@@ -73,7 +74,7 @@ def write_header(ws: Worksheet, columns: Sequence[Column], row: int) -> int:
     which column is which, and then misreads a number rather than asking.
     """
     for index, column in enumerate(columns, start=1):
-        cell = ws.cell(row=row, column=index, value=column.header)
+        cell = write_cell(ws, row=row, column=index, value=column.header)
         cell.font = _HEADER_FONT
         cell.fill = _HEADER_FILL
         cell.alignment = Alignment(vertical="top", wrap_text=True)
@@ -98,7 +99,7 @@ def write_row(
     for index, (column, value) in enumerate(
         zip(columns, values, strict=False), start=1
     ):
-        cell = ws.cell(row=row, column=index, value=value)
+        cell = write_cell(ws, row=row, column=index, value=value)
         if column.number_format and value is not None:
             cell.number_format = column.number_format
     return row + 1
