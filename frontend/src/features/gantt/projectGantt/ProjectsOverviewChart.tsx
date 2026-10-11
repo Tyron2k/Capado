@@ -340,7 +340,7 @@ function ProjectBlock({
   conflictCount,
   onProjectConflictClick,
 }: ProjectBlockProps) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const geometry = computeBarGeometry(project, { minDate, timeSlots }, timeScale)
   // Two keys rather than one with a plural suffix: German needs "1 Konflikt" but
   // "2 Konflikten", and `interpolate` has no plural rules to lean on.
@@ -436,7 +436,7 @@ function ProjectBlock({
                   {project.name}
                 </Text>
                 <Text size="xs">
-                  {project.start_date} – {project.end_date}
+                  {formatDate(project.start_date, locale)} – {formatDate(project.end_date, locale)}
                 </Text>
               </Stack>
             }
@@ -448,7 +448,7 @@ function ProjectBlock({
               className="gantt-bar"
               role="img"
               tabIndex={0}
-              aria-label={`${project.name}, ${project.start_date} – ${project.end_date}`}
+              aria-label={`${project.name}, ${formatDate(project.start_date, locale)} – ${formatDate(project.end_date, locale)}`}
               style={{
                 position: 'absolute',
                 top: 10,
@@ -602,7 +602,7 @@ function WorkPackageBar({
             {bar.name}
           </Text>
           <Text size="xs">
-            {bar.start_date} – {bar.end_date}
+            {formatDate(bar.start_date, locale)} – {formatDate(bar.end_date, locale)}
           </Text>
         </Stack>
       }
