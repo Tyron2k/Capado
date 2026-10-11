@@ -507,7 +507,17 @@
     "utilization": "Auslastung",
     "overbooked": "Überbucht",
     "deadlineOverdue": "Überfällig",
-    "deadlineSoon": "Bald fällig"
+    "deadlineSoon": "Bald fällig",
+    "intro": "Deine Planung im Überblick: Kapazitäten, Projekte und anstehender Handlungsbedarf.",
+    "metrics": {
+      "projects": "Projekte",
+      "allProjects": "Alle Projekte in der Übersicht",
+      "workPackages": "Aktive Arbeitspakete",
+      "inProjects": "Über alle aufgeführten Projekte",
+      "unavailable": "Daten nicht verfügbar"
+    },
+    "projectConflicts": "Konflikte in Projekten",
+    "conflictCount": "{count} Konflikte"
   },
   "userManagement": {
     "title": "Benutzerverwaltung",

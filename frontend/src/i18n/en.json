@@ -507,7 +507,17 @@
     "utilization": "Utilization",
     "overbooked": "Overbooked",
     "deadlineOverdue": "Overdue",
-    "deadlineSoon": "Due soon"
+    "deadlineSoon": "Due soon",
+    "intro": "Your plan at a glance: capacity, projects and the things that need attention.",
+    "metrics": {
+      "projects": "Projects",
+      "allProjects": "All projects in the overview",
+      "workPackages": "Active work packages",
+      "inProjects": "Across the listed projects",
+      "unavailable": "Data unavailable"
+    },
+    "projectConflicts": "Conflicts in projects",
+    "conflictCount": "{count} conflicts"
   },
   "userManagement": {
     "title": "User Management",

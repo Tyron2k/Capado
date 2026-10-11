@@ -13,7 +13,7 @@
 import { useMemo, useState } from 'react'
 
 import { useQuery } from '@tanstack/react-query'
-import { Button, Card, Group, Select, Stack, Text, Title } from '@mantine/core'
+import { Accordion, Button, Card, Group, Select, Stack, Text } from '@mantine/core'
 import { DateInput } from '@mantine/dates'
 import { IconFileSpreadsheet } from '@tabler/icons-react'
 import { downloadProjectReport, downloadUtilizationReport } from '../../api/reports'
@@ -60,65 +60,74 @@ export function ReportCard() {
   }
 
   return (
-    <Card withBorder padding="md">
-      <Title order={4} mb="xs">
-        {t('reports.title')}
-      </Title>
-      <Stack gap="sm">
-        <Group gap="xs" align="flex-end" wrap="wrap">
-          <DateInput
-            label={t('reports.from')}
-            placeholder={t('reports.currentWeek')}
-            value={start}
-            onChange={(value) => setStart(value || null)}
-            clearable
-            size="xs"
-            valueFormat="DD.MM.YYYY"
-          />
-          <DateInput
-            label={t('reports.to')}
-            placeholder={t('reports.twelveWeeks')}
-            value={end}
-            onChange={(value) => setEnd(value || null)}
-            clearable
-            size="xs"
-            valueFormat="DD.MM.YYYY"
-          />
-          {groups.length > 0 && (
-            <Select
-              label={t('reports.group')}
-              placeholder={t('reports.allGroups')}
-              data={groups}
-              value={groupId}
-              onChange={setGroupId}
-              clearable
-              size="xs"
-            />
-          )}
-          <Button
-            leftSection={<IconFileSpreadsheet size={16} />}
-            size="xs"
-            loading={busy === 'utilization'}
-            onClick={() => void run('utilization')}
-          >
-            {t('reports.utilization')}
-          </Button>
-        </Group>
-        <Group gap="xs">
-          <Button
-            leftSection={<IconFileSpreadsheet size={16} />}
-            size="xs"
-            variant="default"
-            loading={busy === 'projects'}
-            onClick={() => void run('projects')}
-          >
-            {t('reports.projects')}
-          </Button>
-          <Text size="xs" c="dimmed">
-            {t('reports.projectsHint')}
-          </Text>
-        </Group>
-      </Stack>
+    <Card withBorder padding={0} className="dashboard-reports">
+      <Accordion>
+        <Accordion.Item value="reports">
+          <Accordion.Control icon={<IconFileSpreadsheet size={20} />}>
+            <Text fw={600}>{t('reports.title')}</Text>
+            <Text size="sm" c="dimmed">
+              {t('reports.projectsHint')}
+            </Text>
+          </Accordion.Control>
+          <Accordion.Panel>
+            <Stack gap="sm">
+              <Group gap="sm" align="flex-end" wrap="wrap" className="dashboard-report-filters">
+                <DateInput
+                  label={t('reports.from')}
+                  placeholder={t('reports.currentWeek')}
+                  value={start}
+                  onChange={(value) => setStart(value || null)}
+                  clearable
+                  size="sm"
+                  valueFormat="DD.MM.YYYY"
+                />
+                <DateInput
+                  label={t('reports.to')}
+                  placeholder={t('reports.twelveWeeks')}
+                  value={end}
+                  onChange={(value) => setEnd(value || null)}
+                  clearable
+                  size="sm"
+                  valueFormat="DD.MM.YYYY"
+                />
+                {groups.length > 0 && (
+                  <Select
+                    label={t('reports.group')}
+                    placeholder={t('reports.allGroups')}
+                    data={groups}
+                    value={groupId}
+                    onChange={setGroupId}
+                    clearable
+                    size="sm"
+                  />
+                )}
+                <Button
+                  leftSection={<IconFileSpreadsheet size={16} />}
+                  size="sm"
+                  loading={busy === 'utilization'}
+                  onClick={() => void run('utilization')}
+                >
+                  {t('reports.utilization')}
+                </Button>
+              </Group>
+              <Group gap="xs">
+                <Button
+                  leftSection={<IconFileSpreadsheet size={16} />}
+                  size="sm"
+                  variant="default"
+                  loading={busy === 'projects'}
+                  onClick={() => void run('projects')}
+                >
+                  {t('reports.projects')}
+                </Button>
+                <Text size="sm" c="dimmed">
+                  {t('reports.projectsHint')}
+                </Text>
+              </Group>
+            </Stack>
+          </Accordion.Panel>
+        </Accordion.Item>
+      </Accordion>
     </Card>
   )
 }
