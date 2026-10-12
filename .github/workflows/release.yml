@@ -59,10 +59,10 @@ jobs:
     needs: validate
     permissions:
       contents: read
+      actions: read
       packages: write
     uses: $/.github/workflows/publish-images.yml
     with:
       channel: release
       version: ${{ github.event.release.tag_name }}
-      source-ref: ${{ needs.validate.outputs.source-sha }}
-      platforms: linux/amd64,linux/arm64
+      source-sha: ${{ needs.validate.outputs.source-sha }}

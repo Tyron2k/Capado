@@ -12,6 +12,11 @@ with hadolint and the production container configuration is scanned for misconfi
 
 The existing lint job also checks the generated HTTP contract with `npm run api:check`. Its offline
 exporter uses locked backend dependencies without application startup; no extra CI job is needed.
+It runs the offline release/edge regression suite in `.github/scripts/tests`, actionlint
+through prek, and zizmor over workflows **and composite actions**. The two setup composites share
+uv and Node/npm configuration and lockfile caches; each caller still chooses its environment
+and checks. Python setup remains explicit so Renovate can discover interpreter versions and keep
+the Python 3.12 minimum exclusion working. The audit job reads the npm lockfile without installing frontend dependencies.
 
 The frontend job installs dependencies once and runs `npm run build` (TypeScript build mode and
 Vite) before the coverage tests. CI skips the local `vite-build` pre-commit hook, avoiding a second
@@ -36,6 +41,9 @@ Repository administrators retain an **always** bypass. Use the required PR route
 Pushes and the weekly schedule run **CodeQL only**. A green workflow result on `main` therefore
 does not prove that the full test suite ran on that commit. PR checks validate the proposed merged
 tree; squash/rebase publication produces a different commit SHA.
+CI concurrency includes the event type so a CodeQL-only push cannot cancel a manual full candidate
+validation on the same ref. Python coverage stays at 57%; frontend lines/functions/branches stay at
+62%/53%/55%. All eight dependencies remain required by **CI passed**.
 
 ## Exact release-candidate validation
 
@@ -67,29 +75,53 @@ feedback and occupying runner capacity.
 
 ## Edge images are built when needed
 
-`.github/workflows/build-images.yml` starts every night at 01:30 UTC. Its first job only consults the
-Actions API. The expensive multi-platform build runs when `main` has moved since the last successful
+`.github/workflows/build-images.yml` starts every night at 01:30 UTC. Its first job reads the
+Actions API with GitHub CLI pagination and evaluates publication receipts with `jq` directly in
+the workflow. The expensive multi-platform build runs when `main` has moved since the last successful
 publication or when that publication is at least seven days old. The latter refreshes moving base
 images even when Capado itself did not change.
+Both scheduled and manual edge runs require `main`. The decision joins paginated successful runs
+with paginated `publication-edge` artifacts, instead of querying jobs or matching their display
+names. Only a completed successful publication with a non-expired receipt counts; skipped builds,
+failed promotions and unrelated artifacts do not. Receipt creation time handles reruns correctly.
+API failures stop the decision rather than pretending that publication succeeded. When no receipt
+is retained (including the first run after this migration), a fresh build is required.
 
 ```bash
 gh workflow run build-images.yml --ref main -f force=true
 ```
 
-Backend and frontend candidates are pushed by digest, not by a public tag. Both must pass Trivy's
-fixable HIGH/CRITICAL gate before the promotion job moves `:edge` and `edge-<sha>`. Each run also
-stores a CycloneDX SBOM and build provenance. A failed build or scan therefore leaves the previous
-good tags untouched.
+Backend and frontend candidates are pushed by digest, not by a public tag. Both runtime
+architectures of both images must pass Trivy's fixable HIGH/CRITICAL gate before promotion.
+Each run stores CycloneDX SBOMs and the images retain BuildKit SBOM/provenance attestations.
+A failed build or scan leaves public tags untouched. `edge-<sha>` retains its **first** approved
+digest; security refreshes of the same source update only `edge`. Production OS package layers
+are rebuilt without cache, while builder/dependency caches are shared by component under the publication lock. This keeps
+main edge caches available to release-tag builds through GitHub's default-branch cache access.
 
 Published releases use the same reusable build-and-scan workflow. Stable releases move the exact,
-major/minor, major and `latest` tags; prereleases only receive exact and SHA tags. See
+major/minor, major and `latest` tags; prereleases only receive exact and SHA tags. All edge and
+release publications share a repository-wide lock with cancellation disabled. Release aliases
+advance only to a greater SemVer; queued edge runs recheck the current main SHA before writing.
+The shared publisher uses `queue: max`: up to 100 publications can wait while one runs.
+GitHub cancels additional runs when that queue is full. Rerun a canceled publication when necessary;
+waiting order does not guarantee dispatch order, and version checks still prevent a downgrade. See
 [publishing a release](../how-to/publishing-a-release.md).
+
+To exercise publication policy locally without registry access:
+
+```bash
+python3 -m unittest discover -s .github/scripts/tests -v
+```
 
 ## The project site
 
 `.github/workflows/docs.yml` builds the MkDocs site and deploys it to GitHub Pages. It is **path
 filtered** on `docs/**`, `.github/mkdocs.yml` and its own requirements file, so a push that only
 touches application code does not rebuild a site that did not change.
+PR builds and manual runs on other branches cannot upload a deployment artifact or deploy.
+Only `refs/heads/main` can deploy, and only the deployment job receives Pages/OIDC write access.
+PR concurrency is separate so a preview cannot displace a production deployment.
 
 The build runs `mkdocs build -f .github/mkdocs.yml --strict`, which turns a broken internal link into
 a failed build. The config lives under `.github/` rather than the repo root, so the `-f` flag is
@@ -119,6 +151,9 @@ paid Advanced Security license.
 run on `main`, with a read-only full dry run selected by default. It does not run on PR code.
 Both the action and the Renovate version are pinned; the GitHub Actions manager also tracks
 the `renovate-version` input, keeping the bot itself up to date.
+Release Drafter's writing job also requires `main`; PR note previews use a read-only token and
+never execute PR code. Renovate's app token remains restricted to this repository, and its
+minor/patch auto-merge rules still depend on the complete CI and CodeQL gates.
 
 `renovate.json` enables npm, Python/uv, GitHub Actions, Dockerfiles/Compose, pip requirements
 and pre-commit. All minor/patch updates and existing hash refreshes share
@@ -209,3 +244,10 @@ gh workflow run renovate.yml --ref main -f dry_run=false
 
 Close any remaining Dependabot PR only after Renovate has produced an equivalent replacement
 or the update is already on `main`. The nightly schedule uses writing mode automatically.
+
+## Inactive discussions
+
+The weekly stale workflow only **labels** inactive issues and PRs. It never closes them
+automatically. Security, pinned, bug, enhancement and dependency labels, assigned discussions,
+milestones and draft PRs are exempt. A maintainer decides when an important open item is resolved.
+Manual stale runs require `main`; write permissions are limited to the stale job.

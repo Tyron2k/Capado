@@ -67,6 +67,14 @@ repos:
       - id: ruff-format
         name: ruff format (backend)
         files: ^backend/.*\.py$
+      - id: ruff
+        name: ruff (workflow scripts)
+        args: [--fix, --config, .github/scripts/ruff.toml]
+        files: ^\.github/scripts/.*\.py$
+      - id: ruff-format
+        name: ruff format (workflow scripts)
+        args: [--config, .github/scripts/ruff.toml]
+        files: ^\.github/scripts/.*\.py$
 
   # ---------------------------------------------------------------------------
   # Frontend (frontend/)
@@ -90,11 +98,11 @@ repos:
     rev: 914e7df21a07ef503a81201c76d2b11c789d3fca # frozen: v1.7.12
     hooks:
       - id: actionlint
-        # actionlint 1.7.12 predates GitHub's recommended $/ self-repository
-        # syntax. Ignore only that known parser gap; all other checks stay on.
+        # actionlint 1.7.12 predates self-repository syntax and concurrency.queue.
+        # Ignore only these parser gaps; publication tests validate queue: max.
         args:
           - -ignore
-          - 'reusable workflow call "\$/\.github/workflows/(publish-images|codeql)\.yml"'
+          - '(reusable workflow call "\$/\.github/workflows/(publish-images|codeql)\.yml"|specifying action "\$/\.github/actions/setup-(uv|node)" in invalid format because ref is missing|unexpected key "queue" for "concurrency" section)'
 
   - repo: local
     hooks:

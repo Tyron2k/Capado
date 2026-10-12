@@ -26,6 +26,7 @@ permissions:
 
 jobs:
   decide:
+    if: github.ref == 'refs/heads/main'
     name: Decide whether edge needs rebuilding
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -34,59 +35,38 @@ jobs:
       reason: ${{ steps.decision.outputs.reason }}
 
     steps:
-      - name: Inspect previous successful publications
+      - name: Inspect verified publication receipts
         id: decision
         env:
           GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          CURRENT_SHA: ${{ github.sha }}
           FORCE: ${{ inputs.force || false }}
         run: |
           set -euo pipefail
-
-          if [ "$FORCE" = "true" ]; then
-            echo "build=true" >> "$GITHUB_OUTPUT"
-            echo "reason=manual force build" >> "$GITHUB_OUTPUT"
+          if [ "$FORCE" = true ]; then
+            echo 'build=true' >> "$GITHUB_OUTPUT"
+            echo 'reason=manual force build' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
-          last_sha=""
-          last_started=""
-          run_ids=$(gh api "repos/${REPO}/actions/workflows/build-images.yml/runs?status=success&per_page=20" \
-            --jq '.workflow_runs[].id')
-
-          for run_id in $run_ids; do
-            built=$(gh api "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" \
-              --jq 'any(.jobs[]; (.name | contains("Build and scan (backend)")) and .conclusion == "success")')
-            if [ "$built" = "true" ]; then
-              read -r last_sha last_started < <(
-                gh api "repos/${REPO}/actions/runs/${run_id}" --jq '[.head_sha, .run_started_at] | @tsv'
-              )
-              break
-            fi
-          done
-
-          if [ -z "$last_sha" ]; then
-            build=true
-            reason="no previous successful edge publication"
-          elif [ "$last_sha" != "$CURRENT_SHA" ]; then
-            build=true
-            reason="main advanced since the last edge publication"
-          else
-            last_epoch=$(date -u -d "$last_started" +%s)
-            now_epoch=$(date -u +%s)
-            if [ $((now_epoch - last_epoch)) -ge 604800 ]; then
-              build=true
-              reason="edge images are at least seven days old"
-            else
-              build=false
-              reason="edge images already match main and are less than seven days old"
-            fi
-          fi
-
-          echo "build=$build" >> "$GITHUB_OUTPUT"
-          echo "reason=$reason" >> "$GITHUB_OUTPUT"
-          echo "$reason" >> "$GITHUB_STEP_SUMMARY"
+          gh api --paginate --slurp \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/build-images.yml/runs?status=success&branch=main&per_page=100" > runs.json
+          gh api --paginate --slurp \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=publication-edge&per_page=100" > artifacts.json
+          jq -nr --slurpfile runs runs.json --slurpfile artifacts artifacts.json \
+            --arg sha "$GITHUB_SHA" --argjson now "$(date +%s)" '
+            [$runs[0][].workflow_runs[] | select(.status == "completed" and
+              .conclusion == "success" and .head_branch == "main" and
+              (.event == "schedule" or .event == "workflow_dispatch"))]
+            | INDEX(.id) as $successful
+            | [$artifacts[0][].artifacts[] | select(.name == "publication-edge" and .expired == false)
+              | $successful[(.workflow_run.id | tostring)] as $run | select($run != null)
+              | {sha: $run.head_sha, time: (.created_at | fromdateiso8601)}]
+            | if any(.time > $now) then error("Publication receipt has a future timestamp") else . end
+            | max_by(.time)
+            | if . == null then {build: true, reason: "no retained successful edge publication"}
+              elif .sha != $sha then {build: true, reason: "main advanced since the last edge publication"}
+              elif $now - .time >= 604800 then {build: true, reason: "edge images are at least seven days old"}
+              else {build: false, reason: "edge images already match main and are less than seven days old"} end
+            | to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_OUTPUT"
 
   publish:
     name: Publish edge images
@@ -94,8 +74,9 @@ jobs:
     if: needs.decide.outputs.build == 'true'
     permissions:
       contents: read
+      actions: read
       packages: write
     uses: $/.github/workflows/publish-images.yml
     with:
       channel: edge
-      platforms: linux/amd64,linux/arm64
+      source-sha: ${{ github.sha }}

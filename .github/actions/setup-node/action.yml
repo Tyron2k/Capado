@@ -1,0 +1,18 @@
+name: Set up Node and npm
+description: Cache locked frontend dependencies and optionally install them
+inputs:
+  install:
+    description: Install the locked frontend dependencies
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      with:
+        node-version: 26
+        cache: npm
+        cache-dependency-path: frontend/package-lock.json
+    - if: inputs.install == 'true'
+      shell: bash
+      working-directory: frontend
+      run: npm ci
