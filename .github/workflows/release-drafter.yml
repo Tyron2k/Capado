@@ -1,6 +1,6 @@
 name: Release Drafter
 
-on: # zizmor: ignore[dangerous-triggers] API-only; never checks out or executes PR code.
+on:
   push:
     branches: [main]
   pull_request:
@@ -32,7 +32,7 @@ jobs:
 
   update-release-draft:
     name: Update release draft
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
