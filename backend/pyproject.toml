@@ -10,7 +10,7 @@ description = "Capado backend service"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi==0.143.0",
+    "fastapi==0.143.1",
     "uvicorn[standard]==0.54.0",  # CLI entry point: uv run uvicorn app.main:app
     "asyncpg==0.32.0",  # Engine driver loaded via postgresql+asyncpg:// URI
     "sqlalchemy[asyncio]==2.1.4",
@@ -21,7 +21,7 @@ dependencies = [
     "openpyxl==3.1.5",
     "python-multipart==0.0.32",  # Required by FastAPI for UploadFile/Form parsing
     "httpx==0.28.1",  # HTTP client for OIDC token exchange and userinfo requests
-    "pydantic-settings==2.15.0",  # BaseSettings for centralized app.config.settings
+    "pydantic-settings==2.16.0",  # BaseSettings for centralized app.config.settings
     "tzdata==2026.5",  # IANA zones, including in slim images without OS tzdata
     # Not imported by the app — pinned only to lift the version the base image ships. The
     # python:3.12-slim layer carried setuptools 70.3.0, which Trivy flags for CVE-2025-47273
