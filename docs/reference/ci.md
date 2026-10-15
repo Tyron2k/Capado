@@ -7,7 +7,7 @@ crowded out what the README is for; it is maintainer detail, not a first impress
 
 The full checks in `.github/workflows/ci.yml` run on **pull requests and manual validation**. The fast lint gate
 runs first; Python type checks, frontend build and tests, backend tests on Python 3.12 and
-3.14, dependency audits and a real PostgreSQL migration smoke test follow. Dockerfiles are checked
+3.15, dependency audits and a real PostgreSQL migration smoke test follow. Dockerfiles are checked
 with hadolint and the production container configuration is scanned for misconfigurations.
 
 The existing lint job also checks the generated HTTP contract with `npm run api:check`. Its offline
@@ -57,7 +57,7 @@ gh run view <run-id> --json headSha,conclusion
 ```
 
 Use that successful run's **headSha**, not a later `main`, as the release target. The manual event
-runs all existing jobs and the same strict **CI passed** gate, including Python 3.12/3.14,
+runs all existing jobs and the same strict **CI passed** gate, including Python 3.12/3.15,
 PostgreSQL migrations, browser tests, locked dependency audits and CodeQL. The PR-only dependency
 diff review has no comparison on a manual run; the Python and npm vulnerability audits still run.
 There is no new test pipeline and no full test rerun on every `main` push.
@@ -163,6 +163,16 @@ PR limits. Major updates are separated and stay manual; TypeScript major updates
 existing exclusion until the lint tooling supports them. Docker tags retain their existing
 precision and are not converted into digest pins. Weekly lockfile maintenance refreshes
 indirect npm/Python dependencies in its own PR and can also auto-merge after checks pass.
+
+Python interpreter minor/major upgrades are an exception: Docker images and Actions Python
+versions share a separate `Python runtime` PR with auto-merge disabled. Keep the minimum
+test version at 3.12 and update the other matrix entry to match the production Dockerfile.
+Before merging a runtime upgrade, build the backend and frontend production targets locally
+for both `linux/amd64` and `linux/arm64`, check native dependency imports, and exercise an
+isolated production Compose stack with disposable data. Also build the backend `dev` target
+and install its locked development dependencies, since a new interpreter can require native
+compilation there too. Record the results in the PR. Routine dependency updates retain the
+shared group and existing CI budget.
 
 Keep Dependabot **security updates** enabled alongside Renovate for targeted transitive fixes
 in `uv.lock` and `package-lock.json`; see the
