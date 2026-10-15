@@ -38,8 +38,8 @@
 # systems. Accepted knowingly — the alternative is carrying a base we do not update, and
 # a security update we do not take is a security update we do not have.
 #
-# Renovate tracks these tags without adding digest pins. Major version updates remain
-# manual; minor/patch updates use the shared CI-gated dependency group.
+# Renovate tracks these tags without adding digest pins. Python minor/major upgrades
+# have a separate, manually reviewed PR and require local multi-platform validation.
 #
 # --- Builder stage: compile native extensions (asyncpg, etc.) --------------
 #
@@ -51,8 +51,11 @@ FROM python:3.15-slim AS builder
 
 WORKDIR /app
 
+# New Python minors may need source builds before wheels are available. With
+# --no-install-recommends, gcc does not bring the standard C headers itself.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libc6-dev \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -67,11 +70,14 @@ FROM python:3.15-slim AS dev
 WORKDIR /app
 
 # Upgraded in the same layer as the install, so the package index is fetched once and
-# discarded once. A separate RUN would leave the pre-upgrade layer in the image.
+# discarded once. uv run also needs the native build dependencies on a fresh
+# development volume when wheels are unavailable for the selected Python.
 RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
-    libpq5 \
     curl \
+    gcc \
+    libc6-dev \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
