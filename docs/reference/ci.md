@@ -10,6 +10,12 @@ runs first; Python type checks, frontend build and tests, backend tests on Pytho
 3.15, dependency audits and a real PostgreSQL migration smoke test follow. Dockerfiles are checked
 with hadolint and the production container configuration is scanned for misconfigurations.
 
+PostgreSQL test services use the official images mirrored at
+`ghcr.io/tyron2k/capado/ci-postgres:18` and `:18-alpine`, authenticated with the job's
+read-only package token. Browser tests use the same mirror in CI; local browser runs
+default to Docker's official `postgres:18` and accept `CAPADO_E2E_POSTGRES_IMAGE` as an override.
+Production Compose images and developer data volumes are unaffected.
+
 The existing lint job also checks the generated HTTP contract with `npm run api:check`. Its offline
 exporter uses locked backend dependencies without application startup; no extra CI job is needed.
 It runs the offline release/edge regression suite in `.github/scripts/tests`, actionlint
@@ -74,6 +80,24 @@ Every job sets `timeout-minutes`. GitHub otherwise lets a hung job run for six h
 feedback and occupying runner capacity.
 
 ## Edge images are built when needed
+
+The same workflow refreshes the PostgreSQL test mirror weekly, independently of edge
+publication. Skopeo copies the official Docker Hub images with all platforms and
+preserves their digests; the workflow checks AMD64/ARM64 availability and verifies the
+destination manifest digest. It does not rebuild or execute upstream images. GHCR writes
+are limited to that job and its temporary login is removed afterwards.
+
+Before the first CI use, bootstrap the mirror from the trusted implementation branch:
+
+```bash
+gh workflow run build-images.yml --ref <trusted-branch> -f test-images-only=true
+```
+
+This manual mode copies only test images and does not publish Capado images. Scheduled
+copies run from the default branch; a failed copy is reported as a workflow failure.
+On first publication, make the `ci-postgres` package public in GitHub's package settings
+so forks can read it too. Repository workflows still authenticate with `GITHUB_TOKEN`;
+no additional registry secret is required. Verify the bootstrap before changing CI consumers.
 
 `.github/workflows/build-images.yml` starts every night at 01:30 UTC. Its first job reads the
 Actions API with GitHub CLI pagination and evaluates publication receipts with `jq` directly in
@@ -161,8 +185,14 @@ and pre-commit. All minor/patch updates and existing hash refreshes share
 security fixes. Security updates retain Renovate's priority behavior and can ignore normal
 PR limits. Major updates are separated and stay manual; TypeScript major updates retain the
 existing exclusion until the lint tooling supports them. Docker tags retain their existing
-precision and are not converted into digest pins. Weekly lockfile maintenance refreshes
+precision and are not converted into digest pins. Daily lockfile maintenance refreshes
 indirect npm/Python dependencies in its own PR and can also auto-merge after checks pass.
+Maintenance is eligible at every existing daily bot run (`schedule: ["at any time"]`),
+so delayed Actions starts cannot miss a narrow weekly time window. Both lockfiles share
+the maintenance PR; it is created only when their contents change and remains separate
+from ordinary dependency PRs. CI continues to install the committed versions with
+`--frozen`, and security findings still block merging. If a fix is outside the allowed
+dependency constraints, the constraints need review rather than bypassing the audit.
 
 Python interpreter minor/major upgrades are an exception: Docker images and Actions Python
 versions share a separate `Python runtime` PR with auto-merge disabled. Keep the minimum

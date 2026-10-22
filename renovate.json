@@ -24,7 +24,11 @@
   "rebaseWhen": "behind-base-branch",
   "prConcurrentLimit": 2,
   "prHourlyLimit": 2,
-  "lockFileMaintenance": { "enabled": true, "automerge": true },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": ["at any time"]
+  },
   "vulnerabilityAlerts": {
     "groupName": "{{#if isMajor}}major security fixes{{else}}all non-major dependencies{{/if}}",
     "groupSlug": "all-minor-patch",

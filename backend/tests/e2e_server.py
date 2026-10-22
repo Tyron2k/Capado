@@ -183,7 +183,7 @@ async def _serve(api_log):
                 f"POSTGRES_DB={database}",
                 "-p",
                 "127.0.0.1::5432",
-                "public.ecr.aws/docker/library/postgres:18",
+                os.environ.get("CAPADO_E2E_POSTGRES_IMAGE", "postgres:18"),
             ],
             check=True,
             stdout=subprocess.DEVNULL,

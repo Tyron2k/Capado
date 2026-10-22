@@ -149,10 +149,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
     services:
       postgres:
-        # Docker's official mirror avoids shared-runner Docker Hub pull limits.
-        image: public.ecr.aws/docker/library/postgres:18
+        image: ghcr.io/tyron2k/capado/ci-postgres:18
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: test-only
@@ -213,6 +218,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
     defaults:
       run:
         working-directory: frontend
@@ -251,7 +259,13 @@ jobs:
         run: npx --no-install playwright install --with-deps chromium
 
       - name: Real browser workflows (PostgreSQL and FastAPI started automatically)
-        run: npm run test:e2e
+        env:
+          CAPADO_E2E_POSTGRES_IMAGE: ghcr.io/tyron2k/capado/ci-postgres:18
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+          npm run test:e2e
 
       - name: Browser failure diagnostics
         if: failure()
@@ -389,12 +403,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
     defaults:
       run:
         working-directory: backend
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:18-alpine
+        image: ghcr.io/tyron2k/capado/ci-postgres:18-alpine
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
         env:
           POSTGRES_USER: capado
           POSTGRES_PASSWORD: capado

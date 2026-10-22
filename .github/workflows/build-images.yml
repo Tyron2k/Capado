@@ -6,12 +6,17 @@ name: Build images
 on:
   schedule:
     - cron: "30 1 * * *" # 02:30 CET / 03:30 CEST
+    - cron: "45 0 * * 1" # Weekly refresh of the official PostgreSQL test images.
   workflow_dispatch:
     inputs:
       force:
         description: "Build even when the current edge images are still fresh"
         required: false
         default: true
+        type: boolean
+      test-images-only:
+        description: "Refresh only the PostgreSQL test mirrors (also usable before merging CI changes)"
+        default: false
         type: boolean
 
 concurrency:
@@ -26,7 +31,9 @@ permissions:
 
 jobs:
   decide:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' && !inputs.test-images-only &&
+      github.event.schedule != '45 0 * * 1'
     name: Decide whether edge needs rebuilding
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -80,3 +87,45 @@ jobs:
     with:
       channel: edge
       source-sha: ${{ github.sha }}
+
+  mirror-test-images:
+    name: Mirror official PostgreSQL test images
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '45 0 * * 1') ||
+      (github.event_name == 'workflow_dispatch' && inputs.test-images-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      packages: write
+    env:
+      REGISTRY_AUTH_FILE: ${{ github.workspace }}/.postgres-mirror-auth.json
+    steps:
+      # Skopeo is installed on ubuntu-24.04. It copies all platforms and their
+      # original digests without rebuilding or executing the upstream image.
+      - name: Authenticate to GHCR
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | skopeo login --username "$GHCR_USER" --password-stdin ghcr.io
+
+      - name: Copy and verify official images
+        run: |
+          set -euo pipefail
+          target="ghcr.io/${GITHUB_REPOSITORY,,}/ci-postgres"
+          for tag in 18 18-alpine; do
+            source="docker.io/library/postgres:${tag}"
+            skopeo inspect --raw "docker://${source}" > source.json
+            jq -e '[.manifests[].platform | select(.os == "linux") | .architecture] |
+              index("amd64") != null and index("arm64") != null' source.json
+            digest="sha256:$(sha256sum source.json | cut -d ' ' -f 1)"
+            skopeo copy --all --preserve-digests --retry-times 3 \
+              "docker://${source%:*}@${digest}" "docker://${target}:${tag}"
+            skopeo inspect --raw "docker://${target}:${tag}" > mirrored.json
+            test "$digest" = "sha256:$(sha256sum mirrored.json | cut -d ' ' -f 1)"
+            echo "${target}:${tag} verified against ${source}@${digest}" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Remove registry credentials
+        if: always()
+        run: rm -f "$REGISTRY_AUTH_FILE"

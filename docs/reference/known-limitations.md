@@ -156,8 +156,11 @@ The first Capado update group left the vulnerable Mako and smol-toml versions in
 lockfiles unchanged, despite existing GitHub alerts and read access for the bot.
 
 Dependabot **security updates** therefore remain enabled, alongside Dependabot alerts and
-the dependency graph. Renovate owns routine version updates and weekly lockfile maintenance;
-maintenance may refresh an affected indirect dependency, but is not a targeted security fix.
+the dependency graph. Renovate owns routine version updates and daily lockfile maintenance;
+maintenance now runs on every daily bot invocation and may refresh an affected indirect
+dependency, but is not a targeted security fix. GitHub alerts and `pip-audit` use different
+advisory sources; an audit finding need not have a corresponding Dependabot alert. The
+audit stays blocking even when no GitHub security update PR is available.
 Remove this fallback only after upgrading to a Renovate release supporting both lockfiles
 and verifying an actual transitive alert's fix. See [CI](ci.md) for the bot configuration.
 
