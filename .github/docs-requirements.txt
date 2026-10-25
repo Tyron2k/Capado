@@ -7,4 +7,4 @@
 # Pinned exactly, for the same reason ruff and mypy are: a theme that changes its rendering between
 # builds turns "the docs look different" into a question nobody can answer from the diff.
 mkdocs==1.6.1
-mkdocs-material==9.7.7
+mkdocs-material==9.8.0
