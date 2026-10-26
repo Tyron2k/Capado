@@ -1,0 +1,11 @@
+version: '3'
+
+tasks:
+  test:load:
+    desc: Local API load test (5 → 20 → 50 requests/s, disposable Compose stack)
+    cmds:
+      - bash tests/load/run.sh full
+  test:load:smoke:
+    desc: Short local API load check (5 requests/s, disposable Compose stack)
+    cmds:
+      - bash tests/load/run.sh smoke

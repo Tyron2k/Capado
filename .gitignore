@@ -119,3 +119,6 @@ code2prompt-*.md
 /frontend/.e2e-state.json
 /frontend/playwright-report/
 /frontend/test-results/
+
+# Disposable local load-test reports
+/tests/load/results/

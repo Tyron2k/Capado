@@ -11,6 +11,9 @@
 
 ## Quick start (Docker)
 
+For an isolated performance check, use the [local load-test task](load-testing.md).
+It starts and removes its own test stack and does not use your development database.
+
 ```bash
 git clone <repo-url> capado && cd capado
 cp .env.example .env
