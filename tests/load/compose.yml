@@ -1,0 +1,57 @@
+name: capado-load
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: load_test
+      POSTGRES_PASSWORD: disposable-load-test-only
+      POSTGRES_DB: capado_load_test
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U load_test -d capado_load_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    image: ${CAPADO_LOAD_RUN_ID:?Use tests/load/run.sh}-backend
+    build:
+      context: ../../backend
+      target: production
+    environment: &backend-environment
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://load_test:disposable-load-test-only@db:5432/capado_load_test
+      JWT_SECRET_KEY: disposable-local-load-test-signing-key-never-production
+      COOKIE_SECURE: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  seed:
+    image: ${CAPADO_LOAD_RUN_ID:?Use tests/load/run.sh}-backend
+    environment: *backend-environment
+    command: ["python", "-m", "tests.seed_load_test"]
+
+  load:
+    image: grafana/k6:2.3.0
+    environment:
+      LOAD_PROFILE: ${LOAD_PROFILE:-full}
+      LOAD_P95_MS: ${LOAD_P95_MS:-1000}
+      LOAD_P99_MS: ${LOAD_P99_MS:-2000}
+      K6_NO_USAGE_REPORT: "true"
+      K6_WEB_DASHBOARD: "false"
+      K6_SUMMARY_EXPORT: /results/summary.json
+    volumes:
+      - ./scenario.js:/load/scenario.js:ro
+      - ./results:/results
+    command: ["run", "/load/scenario.js"]
+
+networks:
+  default:
+    internal: true

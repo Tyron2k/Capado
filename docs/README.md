@@ -11,6 +11,7 @@ docs/
 ├── index.de.md                   Project site landing page (Deutsch)
 ├── how-to/          Practical step-by-step guides (goal-oriented)
 │   ├── local-setup.md
+│   ├── load-testing.md          Local Task/k6 performance checks in disposable Compose
 │   ├── adding-a-feature.md       Includes the two gates that fail a pull request
 │   ├── upgrading.md              Existing installations: back up, pre-check, deploy order
 │   └── publishing-a-release.md   Cutting a release, and the manual image-visibility step

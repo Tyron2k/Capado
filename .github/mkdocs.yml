@@ -85,6 +85,7 @@ nav:
   - Startseite (Deutsch): index.de.md
   - Getting started:
       - Local setup: how-to/local-setup.md
+      - Local load testing: how-to/load-testing.md
       - Upgrading: how-to/upgrading.md
       - Publishing a release: how-to/publishing-a-release.md
       - Adding a feature: how-to/adding-a-feature.md
