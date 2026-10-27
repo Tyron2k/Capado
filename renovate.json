@@ -14,7 +14,10 @@
     "pip_requirements",
     "pre-commit"
   ],
-  "pre-commit": { "enabled": true, "pinDigests": true },
+  "pre-commit": {
+    "enabled": true,
+    "pinDigests": true
+  },
   "pinDigests": false,
   "automerge": false,
   "automergeType": "pr",
@@ -22,12 +25,14 @@
   "platformAutomerge": true,
   "separateMajorMinor": true,
   "rebaseWhen": "behind-base-branch",
-  "prConcurrentLimit": 2,
-  "prHourlyLimit": 2,
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 1,
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true,
-    "schedule": ["at any time"]
+    "schedule": [
+      "at any time"
+    ]
   },
   "vulnerabilityAlerts": {
     "groupName": "{{#if isMajor}}major security fixes{{else}}all non-major dependencies{{/if}}",
@@ -37,34 +42,95 @@
   },
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
       "groupName": "all non-major dependencies",
       "groupSlug": "all-minor-patch",
       "groupSingleUpdates": true,
-      "automerge": true
+      "automerge": true,
+      "prPriority": 10,
+      "postUpgradeTasks": {
+        "commands": [
+          "uv lock --project backend --upgrade",
+          "npm --prefix frontend update --package-lock-only --ignore-scripts"
+        ],
+        "executionMode": "branch",
+        "fileFilters": [
+          "backend/uv.lock",
+          "frontend/package-lock.json"
+        ],
+        "installTools": {
+          "uv": {},
+          "npm": {}
+        }
+      }
     },
     {
-      "description": "Review Python runtime upgrades together after local multi-platform builds.",
-      "matchPackageNames": ["python", "actions/python-versions"],
-      "matchUpdateTypes": ["minor", "major"],
-      "groupName": "Python runtime",
-      "groupSlug": "python-runtime",
-      "groupSingleUpdates": true,
+      "description": "Keep lock-only refreshes as a lower-priority fallback.",
+      "matchUpdateTypes": [
+        "lockFileMaintenance"
+      ],
+      "prPriority": 5
+    },
+    {
+      "description": "Manual major reviews must not consume the automatic-update hourly budget.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "prHourlyLimit": 0,
+      "prConcurrentLimit": 2,
       "automerge": false
     },
     {
+      "description": "Review Python runtime upgrades together after local multi-platform builds.",
+      "matchPackageNames": [
+        "python",
+        "actions/python-versions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "major"
+      ],
+      "groupName": "Python runtime",
+      "groupSlug": "python-runtime",
+      "groupSingleUpdates": true,
+      "automerge": false,
+      "prHourlyLimit": 0,
+      "prConcurrentLimit": 2,
+      "postUpgradeTasks": {
+        "commands": []
+      },
+      "prPriority": 0
+    },
+    {
       "description": "Keep the minimum supported Python version in CI.",
-      "matchManagers": ["github-actions"],
-      "matchFileNames": [".github/workflows/ci.yml"],
-      "matchPackageNames": ["actions/python-versions"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchFileNames": [
+        ".github/workflows/ci.yml"
+      ],
+      "matchPackageNames": [
+        "actions/python-versions"
+      ],
       "matchCurrentValue": "3.12",
       "enabled": false
     },
     {
       "description": "Keep TypeScript major updates blocked until the lint tooling supports them.",
-      "matchPackageNames": ["typescript"],
-      "matchUpdateTypes": ["major"],
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "enabled": false
     }
-  ]
+  ],
+  "statusCheckWhen": {
+    "artifactError": "always"
+  }
 }

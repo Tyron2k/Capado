@@ -464,12 +464,27 @@ jobs:
       - postgres-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      statuses: read
     steps:
       # Skipped jobs can satisfy a required check on their own. This gate only
       # succeeds when every dependency, including tests and CodeQL, succeeded.
       - name: Require every CI job to succeed
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
+          CHECK_RENOVATE_ARTIFACTS: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.login == 'tyron2k-renovate[bot]' }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
+          set -euo pipefail
           printf '%s\n' "$JOB_RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
           printf '%s\n' "$JOB_RESULTS" | jq -e 'length > 0 and all(.[]; .result == "success")'
+          if [ "${CHECK_RENOVATE_ARTIFACTS:-false}" = true ]; then
+            # Native auto-merge must also wait for successful lockfile generation.
+            # Check the PR head, not Actions' temporary merge commit. Fail closed.
+            gh api "repos/$REPOSITORY/commits/$PR_HEAD/status" \
+              --jq '.statuses | map(select(.context == "renovate/artifacts")) | first.state' > artifact-state.txt
+            test "$(cat artifact-state.txt)" = success
+          fi
