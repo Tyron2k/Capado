@@ -172,7 +172,11 @@ paid Advanced Security license.
 
 `.github/workflows/renovate.yml` runs the open-source Renovate container on GitHub Actions at
 01:23 UTC every day (02:23 in Berlin in winter, 03:23 in summer). It also supports a manual
-run on `main`, with a read-only full dry run selected by default. It does not run on PR code.
+run on `main`, with a read-only full dry run selected by default. Pushes to `main` first
+check for an outdated, same-repository Renovate PR with auto-merge enabled. Only if one
+exists does the workflow mint the app token and run Renovate again. The check uses Git
+ancestry rather than GitHub's eventually computed mergeability status. PR code is never
+checked out or executed by this writing workflow.
 Both the action and the Renovate version are pinned; the GitHub Actions manager also tracks
 the `renovate-version` input, keeping the bot itself up to date.
 Release Drafter's writing job also requires `main`; PR note previews use a read-only token and
@@ -185,14 +189,38 @@ and pre-commit. All minor/patch updates and existing hash refreshes share
 security fixes. Security updates retain Renovate's priority behavior and can ignore normal
 PR limits. Major updates are separated and stay manual; TypeScript major updates retain the
 existing exclusion until the lint tooling supports them. Docker tags retain their existing
-precision and are not converted into digest pins. Daily lockfile maintenance refreshes
-indirect npm/Python dependencies in its own PR and can also auto-merge after checks pass.
-Maintenance is eligible at every existing daily bot run (`schedule: ["at any time"]`),
-so delayed Actions starts cannot miss a narrow weekly time window. Both lockfiles share
-the maintenance PR; it is created only when their contents change and remains separate
-from ordinary dependency PRs. CI continues to install the committed versions with
-`--frozen`, and security findings still block merging. If a fix is outside the allowed
-dependency constraints, the constraints need review rather than bypassing the audit.
+precision and are not converted into digest pins. The routine group also refreshes both
+lockfiles completely, within the dependency constraints, before its commit. Renovate's
+native `postUpgradeTasks` runs `uv lock --project backend --upgrade` and
+`npm --prefix frontend update --package-lock-only --ignore-scripts` once per branch.
+The self-hosted command allowlist accepts only these exact commands; file filters include
+only `backend/uv.lock` and `frontend/package-lock.json`. No npm lifecycle scripts, custom
+repository helper, or separate global JSON configuration are needed.
+
+Renovate cannot natively group its `lockFileMaintenance` update type with normal updates.
+Instead, priority and a one-new-PR-per-hour budget choose the routine group first and the
+native lock-only fallback second. Both remain eligible daily, without a narrow time window.
+An existing routine PR disables the parallel fallback for that run. An existing fallback
+is finished before another automatic branch is created. A day without direct updates can
+therefore still get a lock-only PR. Existing branches can be rebased regardless of the
+creation limit. No extra PR or CI run is created for an unchanged lockfile.
+
+Global concurrent creation is not capped, so open manual reviews do not block routine work.
+Manual major and Python-runtime updates use a concurrent cap of two (counting other
+regular Renovate PRs), with no hourly creation limit. Automatic updates are exempt from
+that concurrent cap. Manual updates are sorted after the automatic group and fallback.
+GitHub vulnerability alerts retain their separate budget and priority. These exceptions
+can create additional review/security PRs; this policy does not promise one PR of any kind.
+
+`statusCheckWhen.artifactError: always` makes Renovate publish `renovate/artifacts` on
+updated heads. The existing **CI passed** gate requires that status to be successful for
+Renovate-authored PRs, in addition to every existing CI job. A failed, pending, absent or
+unreadable artifact status blocks merging. This prevents platform-native auto-merge from
+accepting a partial lockfile refresh even if ordinary frozen installs happen to succeed.
+Other contributors do not need a Renovate status. Use Renovate's rebase checkbox and a
+manual non-dry run for a requested retry; editing/rebasing bot branches independently can
+leave them without fresh artifact proof. CI keeps installing with `--frozen`, and audits
+remain blocking. A fix outside allowed dependency constraints needs constraint review.
 
 Python interpreter minor/major upgrades are an exception: Docker images and Actions Python
 versions share a separate `Python runtime` PR with auto-merge disabled. Keep the minimum
@@ -215,9 +243,11 @@ and preserve the pins instead of treating hexadecimal hashes as version numbers.
 
 Renovate queues GitHub's squash auto-merge. The existing strict branch rules still require
 **CI passed**, an up-to-date branch and CodeQL. The app receives no administrator bypass.
-Renovate updates branches that fall behind on its next run; with the daily schedule this may
-take until the next night. Use a manual run if a merge should progress sooner. Ordinary
-contributor PRs still require the maintainer's review.
+A `main` push resumes Renovate only for stale auto-merge PRs, allowing a merge/rebase/CI
+sequence without waiting for the next nightly scan or running the full bot every hour.
+The existing concurrency group serializes these runs. Forks, other authors, drafts and
+manual-review PRs do not trigger a writing run. API errors fail the selector visibly.
+Use the manual workflow for recovery. Ordinary contributor PRs remain maintainer-reviewed.
 
 ### One-time bot setup
 

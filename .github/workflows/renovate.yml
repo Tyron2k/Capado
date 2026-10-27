@@ -1,6 +1,8 @@
 name: Renovate
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: "23 1 * * *" # Daily 01:23 UTC (02:23/03:23 in Berlin).
   workflow_dispatch:
@@ -23,8 +25,65 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      RENOVATE_PLATFORM: github
+      RENOVATE_AUTODISCOVER: "false"
+      RENOVATE_ONBOARDING: "false"
+      RENOVATE_REQUIRE_CONFIG: required
+      RENOVATE_PLATFORM_COMMIT: enabled
+      RENOVATE_BINARY_SOURCE: install
+      RENOVATE_REPOSITORIES: ${{ github.repository }}
+      RENOVATE_DRY_RUN: ${{ inputs.dry_run && 'full' || '' }}
+      # These exact native commands are the only allowed post-upgrade executions.
+      RENOVATE_ALLOWED_COMMANDS: '["^uv lock --project backend --upgrade$", "^npm --prefix frontend update --package-lock-only --ignore-scripts$"]'
     steps:
+      - name: Select pending update work
+        id: work
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          gh api --paginate --slurp \
+            "repos/$REPOSITORY/pulls?state=open&base=main&per_page=100" > pulls.json
+          jq --arg repo "$REPOSITORY" '
+            [.[][] | select(.head.repo.full_name == $repo and
+              .user.login == "tyron2k-renovate[bot]" and
+              (.head.ref | startswith("renovate/")))]' pulls.json > bot-pulls.json
+          run=true
+          if [ "$EVENT_NAME" = push ]; then
+            run=false
+            while IFS= read -r head; do
+              behind="$(gh api "repos/$REPOSITORY/compare/main...$head" --jq .behind_by)"
+              if ! [[ "$behind" =~ ^[0-9]+$ ]]; then
+                echo '::error::GitHub returned an invalid ancestry comparison.'
+                exit 1
+              fi
+              if [ "$behind" -gt 0 ]; then
+                run=true
+                break
+              fi
+            done < <(jq -r '.[] | select(.auto_merge != null and .draft == false) | .head.sha' bot-pulls.json)
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if jq -e 'any(.[]; .head.ref == "renovate/all-minor-patch")' bot-pulls.json >/dev/null; then
+            # The open group already refreshes both locks. Suppress a duplicate PR.
+            echo 'force={"lockFileMaintenance":{"enabled":false}}' >> "$GITHUB_OUTPUT"
+          elif jq -e 'any(.[]; .head.ref == "renovate/lock-file-maintenance")' bot-pulls.json >/dev/null; then
+            # Finish the active fallback before opening another automatic branch.
+            echo 'force={"prConcurrentLimit":1}' >> "$GITHUB_OUTPUT"
+          else
+            # Hourly limit + priority picks a new group before the lock-only fallback.
+            echo 'force={}' >> "$GITHUB_OUTPUT"
+          fi
+          echo "Run Renovate: $run" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check bot credentials
+        if: steps.work.outputs.run == 'true'
         env:
           APP_CLIENT_ID: ${{ secrets.RENOVATE_APP_CLIENT_ID }}
           APP_PRIVATE_KEY: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
@@ -35,11 +94,14 @@ jobs:
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.work.outputs.run == 'true'
         with:
+          ref: main
           persist-credentials: false
 
       - name: Create repository-scoped bot token
         id: bot-token
+        if: steps.work.outputs.run == 'true'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ secrets.RENOVATE_APP_CLIENT_ID }}
@@ -56,16 +118,10 @@ jobs:
           permission-vulnerability-alerts: read
 
       - name: Update dependencies
+        if: steps.work.outputs.run == 'true'
         uses: renovatebot/github-action@2804199d260ad00c1fae0e9e842888369391c776 # v46.3.10
         with:
           token: ${{ steps.bot-token.outputs.token }}
           renovate-version: 44.186.6
         env:
-          RENOVATE_PLATFORM: github
-          RENOVATE_AUTODISCOVER: "false"
-          RENOVATE_ONBOARDING: "false"
-          RENOVATE_REQUIRE_CONFIG: required
-          RENOVATE_PLATFORM_COMMIT: enabled
-          RENOVATE_BINARY_SOURCE: install
-          RENOVATE_REPOSITORIES: ${{ github.repository }}
-          RENOVATE_DRY_RUN: ${{ inputs.dry_run && 'full' || '' }}
+          RENOVATE_FORCE: ${{ steps.work.outputs.force }}
