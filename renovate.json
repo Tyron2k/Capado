@@ -63,7 +63,9 @@
           "frontend/package-lock.json"
         ],
         "installTools": {
+          "python": {},
           "uv": {},
+          "node": {},
           "npm": {}
         }
       }
