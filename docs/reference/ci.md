@@ -193,6 +193,9 @@ precision and are not converted into digest pins. The routine group also refresh
 lockfiles completely, within the dependency constraints, before its commit. Renovate's
 native `postUpgradeTasks` runs `uv lock --project backend --upgrade` and
 `npm --prefix frontend update --package-lock-only --ignore-scripts` once per branch.
+Install Python before uv and Node.js before npm: Containerbase requires these parent
+tools to exist, including for frontend-only update groups. Validate this path in the
+pinned Renovate container; preinstalled host tools do not exercise installation.
 The self-hosted command allowlist accepts only these exact commands; file filters include
 only `backend/uv.lock` and `frontend/package-lock.json`. No npm lifecycle scripts, custom
 repository helper, or separate global JSON configuration are needed.

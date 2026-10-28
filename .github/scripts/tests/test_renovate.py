@@ -1,4 +1,4 @@
-"""Exercise the real workflow's selection logic with isolated GitHub API fixtures."""
+"""Check Renovate's tool prerequisites and real workflow selection logic."""
 
 import json
 import os
@@ -9,6 +9,20 @@ import unittest
 from pathlib import Path
 
 WORKFLOW = Path(__file__).resolve().parents[2] / "workflows/renovate.yml"
+
+
+class RenovateToolchainTests(unittest.TestCase):
+    def test_containerbase_parent_tools_are_installed_before_child_tools(self):
+        config = json.loads((WORKFLOW.parents[2] / "renovate.json").read_text())
+        # Containerbase's pip/npm installers require an explicitly installed parent.
+        parents = {"uv": "python", "npm": "node"}
+        for rule in config["packageRules"]:
+            tools = list(rule.get("postUpgradeTasks", {}).get("installTools", {}))
+            for child, parent in parents.items():
+                if child in tools:
+                    with self.subTest(tool=child):
+                        self.assertIn(parent, tools)
+                        self.assertLess(tools.index(parent), tools.index(child))
 
 
 def pull(branch, *, author="tyron2k-renovate[bot]", repo="Tyron2k/Capado", auto=True):
