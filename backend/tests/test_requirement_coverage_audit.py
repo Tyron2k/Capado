@@ -80,13 +80,13 @@ async def _seed_case(
         await session.flush()
 
         if person.get("qualified", True):
-            held = dict(
-                resource_id=resource.id,
-                skill_attribute_id=attribute.id,
-                level=person.get("level", 4),
-                valid_from=person.get("valid_from"),
-                valid_until=person.get("valid_until"),
-            )
+            held = {
+                "resource_id": resource.id,
+                "skill_attribute_id": attribute.id,
+                "level": person.get("level", 4),
+                "valid_from": person.get("valid_from"),
+                "valid_until": person.get("valid_until"),
+            }
             if kind == ResourceType.personal:
                 session.add(PersonalResourceSkill(**held))
             else:
