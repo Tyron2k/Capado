@@ -106,12 +106,8 @@ async def _seed_case(
                 resource_type=kind,
                 resource_id=resource.id,
                 work_package_id=package.id,
-                start_at=person.get(
-                    "start_at", datetime(2099, 1, 5, 10, tzinfo=UTC)
-                ),
-                end_at=person.get(
-                    "end_at", datetime(2099, 1, 5, 12, tzinfo=UTC)
-                ),
+                start_at=person.get("start_at", datetime(2099, 1, 5, 10, tzinfo=UTC)),
+                end_at=person.get("end_at", datetime(2099, 1, 5, 12, tzinfo=UTC)),
             )
         session.add(booking)
         bookings.append(booking)
