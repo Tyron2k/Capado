@@ -2,7 +2,7 @@
 
 These tests compare persisted aggregate coverage with the qualification mismatch
 check for the *same* assignments. Confirmed safe behavior is asserted normally;
-suspected false positives are strict xfails until the domain contract is fixed.
+qualification and temporal false positives are ordinary regression checks.
 
 The SQLite-backed `db_session` uses the real mapped tables, but this is not a
 substitute for PostgreSQL-specific integration or concurrent-write testing.
@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models.assignment import Assignment
+from app.models.calendar import WorkWeekProfile
 from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
@@ -41,6 +42,11 @@ async def _seed_case(
     people=(),
 ):
     """Persist a small fictional requirement and the specified resource bookings."""
+    if (
+        await session.scalar(select(WorkWeekProfile).where(WorkWeekProfile.is_default))
+        is None
+    ):
+        session.add(WorkWeekProfile(name="Fixture standard", is_default=True))
     group = ResourceGroup(name="Fixture team", resource_type=kind)
     skill = Skill(name="Fixture qualification", resource_type=kind.value)
     project = Project(name="Fixture project", start_date=DAY, end_date=LAST_DAY)
@@ -271,14 +277,6 @@ async def test_staggered_people_are_not_mismatched(db_session, staggered_crew):
     assert await _mismatches(db_session, package, bookings) == set()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason=(
-        "Aggregate headcount treats non-overlapping personal bookings as "
-        "simultaneous work-package staffing (issue #137 / #139)."
-    ),
-)
 async def test_staggered_people_do_not_cover_two_person_crew(
     db_session, staggered_crew
 ):
