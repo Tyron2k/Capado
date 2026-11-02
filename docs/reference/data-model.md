@@ -155,9 +155,22 @@ Requirement coverage checks each assigned resource against the particular requir
 its qualification must meet `min_level` and be valid for the full assignment period,
 using the same rule as qualification mismatch detection. Date bounds are inclusive;
 an unknown level satisfies only requirements with no minimum. Suggested resources
-must qualify for the entire work-package date range. These checks establish
-qualification eligibility; temporal headcount/FTE coverage and simultaneous
-people/machine presence require separate checks (tracked in #139).
+must qualify for the entire work-package date range.
+
+Personal `assigned_quantity` is the **lowest daily coverage** across the work
+package's working days, as defined by the existing standard work-week profile.
+Each qualifying booking counts only on its inclusive date range. Headcount counts
+distinct people meeting the allocation threshold on that day; effort-FTE sums the
+allocations active on that day. Rotating staff may cover consecutive days, but
+disjoint bookings cannot be added as simultaneous staffing or FTE. Configured
+non-working days create no staffing demand; without a standard profile, personal
+coverage cannot be established and is reported as zero.
+
+These figures measure qualified booking commitments. Resource-specific calendars,
+part-time profiles, site holidays, absences and concurrent work are still evaluated
+by the existing capacity/conflict services. A covered requirement alone is not a
+feasibility verdict. Infrastructure retains its existing timestamp-booking coverage;
+minute-level shared presence of people and machines is not inferred.
 
 ---
 

@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assignment import Assignment
+from app.models.calendar import WorkWeekProfile
 from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
@@ -118,6 +119,61 @@ def compute_coverage(
     return float(len(counted))
 
 
+def _personal_workday_coverage(
+    mode: RequirementMode,
+    min_allocation_percent: float,
+    assignments: list[Assignment],
+    start: date,
+    end: date,
+    working_weekdays: set[int] | None,
+) -> float | None:
+    """Minimum daily booking coverage on standard-profile workdays.
+
+    None means the configured profile has no working day in this interval.
+    A missing profile cannot establish coverage and yields zero. The sweep
+    visits booking boundaries, rather than every day in a potentially long plan.
+    Capacity, absences and site calendars remain separate checks.
+    """
+    if working_weekdays is None:
+        return 0.0
+    begin, stop = start.toordinal(), end.toordinal() + 1
+    events: dict[int, list[tuple[UUID, tuple[UUID, float] | None]]] = {
+        begin: [],
+        stop: [],
+    }
+    for assignment in assignments:
+        if assignment.start_date is None or assignment.end_date is None:
+            continue
+        left = max(begin, assignment.start_date.toordinal())
+        right = min(stop, assignment.end_date.toordinal() + 1)
+        if left >= right:
+            continue
+        allocation = (assignment.resource_id, assignment.allocation_percent or 100.0)
+        events.setdefault(left, []).append((assignment.id, allocation))
+        events.setdefault(right, []).append((assignment.id, None))
+
+    active: dict[UUID, tuple[UUID, float]] = {}
+    minimum: float | None = None
+    boundaries = sorted(events)
+    for left, right in zip(boundaries, boundaries[1:], strict=False):
+        for assignment_id, event_allocation in events[left]:
+            if event_allocation is None:
+                active.pop(assignment_id, None)
+            else:
+                active[assignment_id] = event_allocation
+        # Ordinal 1 was Monday. At most one week is needed to find a workday.
+        if not any(
+            (left - 1 + offset) % 7 in working_weekdays
+            for offset in range(min(right - left, 7))
+        ):
+            continue
+        coverage = compute_coverage(mode, min_allocation_percent, list(active.values()))
+        minimum = coverage if minimum is None else min(minimum, coverage)
+        if minimum == 0:
+            return 0.0
+    return minimum
+
+
 async def get_unmet_requirements(
     session: AsyncSession,
     *,
@@ -138,6 +194,8 @@ async def get_unmet_requirements(
     In either case the qualification must meet the minimum level and cover the
     whole assignment, using the same rules as assignment mismatch detection.
     Suggested resources must qualify for the whole work-package date range.
+    Personal coverage is the lowest daily coverage on standard-profile workdays;
+    disjoint bookings never become simultaneous staffing or effort-FTE.
 
     Args:
         session: Async database session.
@@ -289,6 +347,23 @@ async def get_unmet_requirements(
                 valid_from=irs.valid_from, valid_until=irs.valid_until, level=irs.level
             )
 
+    # Requirements use the standard profile's workdays, not a resource's supply.
+    # Load once for the whole overview; no per-package calendar queries.
+    working_weekdays: set[int] | None = None
+    personal_skill_ids = {
+        skill.id for skill in skills if skill.resource_type == "personal"
+    }
+    if any(req.skill_id in personal_skill_ids for req in requirements):
+        default_profile = await session.scalar(
+            select(WorkWeekProfile).where(WorkWeekProfile.is_default.is_(True))
+        )
+        if default_profile is not None:
+            working_weekdays = {
+                weekday
+                for weekday in range(7)
+                if default_profile.minutes_for_weekday(weekday) > 0
+            }
+
     # 7. Compute coverage for each requirement and collect unmet ones
     unmet_entries: list[
         tuple[WorkPackageRequirement, WorkPackage, Project, set[UUID], set[UUID], float]
@@ -311,6 +386,7 @@ async def get_unmet_requirements(
         # Coverage depends on how the requirement is meant to be satisfied
         # (RequirementMode); see :func:`compute_coverage`.
         allocations: list[tuple[UUID, float]] = []
+        eligible_assignments: list[Assignment] = []
         assigned_resource_ids: set[UUID] = set()
         for a in wp_assignments.get(req.work_package_id, []):
             span = assignment_span(a)
@@ -323,12 +399,30 @@ async def get_unmet_requirements(
                 end,
             ):
                 continue
+            eligible_assignments.append(a)
             assigned_resource_ids.add(a.resource_id)
             allocations.append((a.resource_id, a.allocation_percent or 100.0))
 
-        assigned_coverage = compute_coverage(
-            req.requirement_mode, req.min_allocation_percent, allocations
-        )
+        requirement_skill = skill_map.get(req.skill_id)
+        if (
+            requirement_skill is not None
+            and requirement_skill.resource_type == "personal"
+        ):
+            daily_coverage = _personal_workday_coverage(
+                req.requirement_mode,
+                req.min_allocation_percent,
+                eligible_assignments,
+                wp.start_date,
+                wp.end_date,
+                working_weekdays,
+            )
+            if daily_coverage is None:
+                continue  # No staffing demand on configured non-working days.
+            assigned_coverage = daily_coverage
+        else:
+            assigned_coverage = compute_coverage(
+                req.requirement_mode, req.min_allocation_percent, allocations
+            )
 
         gap = req.quantity - assigned_coverage
         if gap > 0:
