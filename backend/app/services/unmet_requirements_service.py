@@ -30,6 +30,7 @@ from app.models.work_package_requirement import (
     WorkPackageRequirement,
 )
 from app.schemas.assignment import ResourceSuggestion, UnmetRequirementResponse
+from app.services.qualification import HeldQualification, satisfies
 from app.services.time_zone import (
     local_date,
     local_day_bounds,
@@ -58,6 +59,21 @@ def assignment_span(assignment: Assignment) -> tuple[date, date] | None:
             assignment.end_at, zone
         )
     return None
+
+
+def _qualifies_for_requirement(
+    qualifications: dict[UUID, HeldQualification],
+    matching_attr_ids: set[UUID],
+    min_level: int | None,
+    start: date | None,
+    end: date | None,
+) -> bool:
+    """Apply the shared qualification rule to this particular requirement."""
+    return any(
+        attribute_id in matching_attr_ids
+        and satisfies(qualification, min_level, start, end)
+        for attribute_id, qualification in qualifications.items()
+    )
 
 
 def compute_coverage(
@@ -119,6 +135,9 @@ async def get_unmet_requirements(
       exact attribute.
     - If skill_attribute_id is None: count assigned resources that have ANY
       attribute of the requirement's skill.
+    In either case the qualification must meet the minimum level and cover the
+    whole assignment, using the same rules as assignment mismatch detection.
+    Suggested resources must qualify for the whole work-package date range.
 
     Args:
         session: Async database session.
@@ -229,8 +248,8 @@ async def get_unmet_requirements(
         else:
             infra_resource_ids.add(a.resource_id)
 
-    # resource_id → set of skill_attribute_ids (for assigned resources only)
-    resource_skill_attrs: dict[UUID, set[UUID]] = {}
+    # Keep bounds and levels: matching an attribute alone does not qualify a booking.
+    resource_qualifications: dict[UUID, dict[UUID, HeldQualification]] = {}
 
     if personal_resource_ids:
         personal_skills = list(
@@ -245,8 +264,10 @@ async def get_unmet_requirements(
             .all()
         )
         for ps in personal_skills:
-            resource_skill_attrs.setdefault(ps.resource_id, set()).add(
+            resource_qualifications.setdefault(ps.resource_id, {})[
                 ps.skill_attribute_id
+            ] = HeldQualification(
+                valid_from=ps.valid_from, valid_until=ps.valid_until, level=ps.level
             )
 
     if infra_resource_ids:
@@ -262,8 +283,10 @@ async def get_unmet_requirements(
             .all()
         )
         for irs in infra_skills:
-            resource_skill_attrs.setdefault(irs.resource_id, set()).add(
+            resource_qualifications.setdefault(irs.resource_id, {})[
                 irs.skill_attribute_id
+            ] = HeldQualification(
+                valid_from=irs.valid_from, valid_until=irs.valid_until, level=irs.level
             )
 
     # 7. Compute coverage for each requirement and collect unmet ones
@@ -290,8 +313,15 @@ async def get_unmet_requirements(
         allocations: list[tuple[UUID, float]] = []
         assigned_resource_ids: set[UUID] = set()
         for a in wp_assignments.get(req.work_package_id, []):
-            res_attrs = resource_skill_attrs.get(a.resource_id, set())
-            if not (res_attrs & matching_attr_ids):
+            span = assignment_span(a)
+            start, end = span if span is not None else (None, None)
+            if not _qualifies_for_requirement(
+                resource_qualifications.get(a.resource_id, {}),
+                matching_attr_ids,
+                req.min_level,
+                start,
+                end,
+            ):
                 continue
             assigned_resource_ids.add(a.resource_id)
             allocations.append((a.resource_id, a.allocation_percent or 100.0))
@@ -347,7 +377,8 @@ async def get_unmet_requirements(
             assigned_resource_ids=assigned_resource_ids,
             wp_start=wp.start_date,
             wp_end=wp.end_date,
-            candidate_skill_attrs=suggestion_data.candidate_skill_attrs,
+            min_level=req.min_level,
+            candidate_qualifications=suggestion_data.candidate_qualifications,
             resource_map=suggestion_data.resource_map,
             group_map=suggestion_data.group_map,
             resource_assignments=suggestion_data.resource_assignments,
@@ -378,7 +409,7 @@ class _SuggestionData:
     """Container for lazily-loaded suggestion candidate data."""
 
     __slots__ = (
-        "candidate_skill_attrs",
+        "candidate_qualifications",
         "resource_map",
         "group_map",
         "resource_assignments",
@@ -386,12 +417,12 @@ class _SuggestionData:
 
     def __init__(
         self,
-        candidate_skill_attrs: dict[UUID, set[UUID]],
+        candidate_qualifications: dict[UUID, dict[UUID, HeldQualification]],
         resource_map: dict[UUID, tuple[str, str, UUID]],
         group_map: dict[UUID, str],
         resource_assignments: dict[UUID, list[tuple[date, date]]],
     ):
-        self.candidate_skill_attrs = candidate_skill_attrs
+        self.candidate_qualifications = candidate_qualifications
         self.resource_map = resource_map
         self.group_map = group_map
         self.resource_assignments = resource_assignments
@@ -445,19 +476,23 @@ async def _load_suggestion_data(
         .all()
     )
 
-    # Build candidate_skill_attrs: resource_id → set of attribute_ids
-    candidate_skill_attrs: dict[UUID, set[UUID]] = {}
+    # Retain the qualification, not just the presence of an attribute.
+    candidate_qualifications: dict[UUID, dict[UUID, HeldQualification]] = {}
     candidate_personal_ids: set[UUID] = set()
     candidate_infra_ids: set[UUID] = set()
 
     for ps in personal_skill_rows:
-        candidate_skill_attrs.setdefault(ps.resource_id, set()).add(
+        candidate_qualifications.setdefault(ps.resource_id, {})[
             ps.skill_attribute_id
+        ] = HeldQualification(
+            valid_from=ps.valid_from, valid_until=ps.valid_until, level=ps.level
         )
         candidate_personal_ids.add(ps.resource_id)
     for irs in infra_skill_rows:
-        candidate_skill_attrs.setdefault(irs.resource_id, set()).add(
+        candidate_qualifications.setdefault(irs.resource_id, {})[
             irs.skill_attribute_id
+        ] = HeldQualification(
+            valid_from=irs.valid_from, valid_until=irs.valid_until, level=irs.level
         )
         candidate_infra_ids.add(irs.resource_id)
 
@@ -503,10 +538,10 @@ async def _load_suggestion_data(
             )
             group_ids.add(infra_r.group_id)
 
-    # Remove inactive resources from candidate_skill_attrs
-    candidate_skill_attrs = {
+    # Remove inactive resources from candidate_qualifications
+    candidate_qualifications = {
         rid: attrs
-        for rid, attrs in candidate_skill_attrs.items()
+        for rid, attrs in candidate_qualifications.items()
         if rid in resource_map
     }
 
@@ -571,7 +606,7 @@ async def _load_suggestion_data(
                 resource_assignments.setdefault(a.resource_id, []).append(span)
 
     return _SuggestionData(
-        candidate_skill_attrs=candidate_skill_attrs,
+        candidate_qualifications=candidate_qualifications,
         resource_map=resource_map,
         group_map=group_map,
         resource_assignments=resource_assignments,
@@ -584,7 +619,8 @@ def _compute_suggestions(
     assigned_resource_ids: set[UUID],
     wp_start: date,
     wp_end: date,
-    candidate_skill_attrs: dict[UUID, set[UUID]],
+    min_level: int | None,
+    candidate_qualifications: dict[UUID, dict[UUID, HeldQualification]],
     resource_map: dict[UUID, tuple[str, str, UUID]],
     group_map: dict[UUID, str],
     resource_assignments: dict[UUID, list[tuple[date, date]]],
@@ -592,16 +628,17 @@ def _compute_suggestions(
 ) -> list[ResourceSuggestion]:
     """Find up to max_suggestions resources for an unmet requirement.
 
-    Candidates must have a matching skill attribute and not already be
-    assigned to the work package. They are ranked by fewest overlapping
-    assignments in the WP period (least busy first).
+    Candidates must hold a matching qualification at the required level for the
+    whole work-package period and not already be assigned to the work package.
+    They are ranked by fewest overlapping assignments in the WP period (least busy first).
 
     Args:
         matching_attr_ids: Skill attribute IDs that satisfy the requirement.
         assigned_resource_ids: Resource IDs already assigned to this WP.
         wp_start: Work package start date.
         wp_end: Work package end date.
-        candidate_skill_attrs: Pre-filtered resource skill attribute mappings.
+        min_level: Minimum assessed level required, if any.
+        candidate_qualifications: Pre-filtered qualifications with bounds and levels.
         resource_map: Resource ID to (name, resource_type, group_id) mapping.
         group_map: Group ID to group name mapping.
         resource_assignments: Resource ID to list of (start, end) assignment ranges.
@@ -613,8 +650,10 @@ def _compute_suggestions(
     """
     candidates: list[tuple[int, UUID]] = []
 
-    for resource_id, skill_attrs in candidate_skill_attrs.items():
-        if not (skill_attrs & matching_attr_ids):
+    for resource_id, qualifications in candidate_qualifications.items():
+        if not _qualifies_for_requirement(
+            qualifications, matching_attr_ids, min_level, wp_start, wp_end
+        ):
             continue
         if resource_id in assigned_resource_ids:
             continue

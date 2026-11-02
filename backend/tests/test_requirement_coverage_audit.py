@@ -11,6 +11,7 @@ substitute for PostgreSQL-specific integration or concurrent-write testing.
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 
 from app.models.assignment import Assignment
 from app.models.project import Project, WorkPackage
@@ -71,10 +72,16 @@ async def _seed_case(
     bookings = []
     for index, person in enumerate(people):
         if kind == ResourceType.personal:
-            resource = PersonalResource(name=f"Person {index}", group_id=group.id)
+            resource = PersonalResource(
+                name=f"Person {index}",
+                group_id=group.id,
+                is_active=person.get("active", True),
+            )
         else:
             resource = InfrastructureResource(
-                name=f"Machine {index}", group_id=group.id
+                name=f"Machine {index}",
+                group_id=group.id,
+                is_active=person.get("active", True),
             )
         session.add(resource)
         await session.flush()
@@ -154,6 +161,17 @@ async def test_missing_qualification_is_unmet_and_mismatched(db_session):
         (ResourceType.personal, {"level": 2}),
         (ResourceType.personal, {"level": None}),
         (ResourceType.personal, {"level": 4, "valid_from": DAY + timedelta(days=1)}),
+        (ResourceType.personal, {"valid_until": DAY + timedelta(days=1)}),
+        (ResourceType.infrastructure, {"level": 2}),
+        (ResourceType.infrastructure, {"level": None}),
+        (ResourceType.infrastructure, {"valid_from": DAY + timedelta(days=1)}),
+        (
+            ResourceType.infrastructure,
+            {
+                "valid_until": DAY + timedelta(days=1),
+                "end_at": datetime(2099, 1, 7, 12, tzinfo=UTC),
+            },
+        ),
         (
             ResourceType.infrastructure,
             {"level": 4, "valid_until": DAY - timedelta(days=1)},
@@ -164,6 +182,11 @@ async def test_missing_qualification_is_unmet_and_mismatched(db_session):
         "below-minimum-level",
         "unassessed-level",
         "not-yet-valid",
+        "mid-booking-expiry",
+        "machine-below-minimum-level",
+        "machine-unassessed-level",
+        "machine-not-yet-valid",
+        "machine-mid-booking-expiry",
         "expired-machine",
     ],
 )
@@ -182,14 +205,6 @@ async def test_unqualified_resource_is_mismatched(db_session, unqualified_case):
     assert await _mismatches(db_session, package, bookings) == {bookings[0].id}
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason=(
-        "Aggregate unmet coverage counts skill attributes but does not apply "
-        "qualification date bounds or minimum level (issue #137)."
-    ),
-)
 async def test_unqualified_resource_must_not_cover_requirement(
     db_session, unqualified_case
 ):
@@ -271,3 +286,79 @@ async def test_staggered_people_do_not_cover_two_person_crew(
     unmet = await get_unmet_requirements(db_session, resource_type="personal")
     assert len(unmet) == 1
     assert unmet[0].gap >= 1
+
+
+@pytest.mark.parametrize("kind", [ResourceType.personal, ResourceType.infrastructure])
+@pytest.mark.parametrize("level,minimum", [(3, 3), (None, None)])
+async def test_qualification_boundaries_are_inclusive(db_session, kind, level, minimum):
+    """Exact date/level boundaries and an unspecified minimum remain supported."""
+    package, bookings = await _seed_case(
+        db_session,
+        kind=kind,
+        minimum_level=minimum,
+        people=[
+            {
+                "level": level,
+                "valid_from": DAY,
+                "valid_until": LAST_DAY if kind == ResourceType.personal else DAY,
+            }
+        ],
+    )
+    assert await _mismatches(db_session, package, bookings) == set()
+    assert await get_unmet_requirements(db_session, resource_type=kind.value) == []
+
+
+async def test_coverage_checks_each_requirement_not_just_any_matching_one(db_session):
+    """A resource satisfying one requirement cannot fill a stricter second one."""
+    package, bookings = await _seed_case(
+        db_session, minimum_level=3, people=[{"level": 4}]
+    )
+    requirement = (
+        await db_session.execute(select(WorkPackageRequirement))
+    ).scalar_one()
+    db_session.add(
+        WorkPackageRequirement(
+            work_package_id=package.id,
+            skill_id=requirement.skill_id,
+            skill_attribute_id=None,
+            quantity=1,
+            min_level=5,
+        )
+    )
+    await db_session.commit()
+    assert await _mismatches(db_session, package, bookings) == set()
+    unmet = await get_unmet_requirements(db_session, resource_type="personal")
+    assert len(unmet) == 1
+    assert unmet[0].attribute_name is None
+    assert unmet[0].assigned_quantity == 0
+    assert unmet[0].gap == 1
+    assert unmet[0].suggestions == []
+
+
+@pytest.mark.parametrize("kind", [ResourceType.personal, ResourceType.infrastructure])
+async def test_suggestions_require_valid_qualified_active_candidates(db_session, kind):
+    """Candidates must qualify for the whole package, not merely hold an attribute."""
+    _, bookings = await _seed_case(
+        db_session,
+        kind=kind,
+        minimum_level=3,
+        people=[
+            {"level": 3, "valid_from": DAY, "valid_until": LAST_DAY},
+            {"valid_until": DAY - timedelta(days=1)},
+            {"valid_from": DAY + timedelta(days=1)},
+            {"level": 2},
+            {"level": None},
+            {"valid_until": DAY + timedelta(days=1)},
+            {"qualified": False},
+            {"active": False},
+        ],
+    )
+    expected = bookings[0].resource_id
+    for booking in bookings:
+        await db_session.delete(booking)
+    await db_session.commit()
+    unmet = await get_unmet_requirements(db_session, resource_type=kind.value)
+    assert len(unmet) == 1
+    assert unmet[0].assigned_quantity == 0
+    assert [s.resource_id for s in unmet[0].suggestions] == [expected]
+    assert unmet[0].suggestions[0].resource_type == kind.value

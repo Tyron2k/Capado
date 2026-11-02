@@ -151,6 +151,14 @@
 | `min_level` | INTEGER | NULLABLE | Minimum proficiency 1–5. `NULL` means the requirement does not grade — a resource whose level is unassessed still matches |
 | `created_at` | TIMESTAMPTZ | NOT NULL | Creation timestamp |
 
+Requirement coverage checks each assigned resource against the particular requirement:
+its qualification must meet `min_level` and be valid for the full assignment period,
+using the same rule as qualification mismatch detection. Date bounds are inclusive;
+an unknown level satisfies only requirements with no minimum. Suggested resources
+must qualify for the entire work-package date range. These checks establish
+qualification eligibility; temporal headcount/FTE coverage and simultaneous
+people/machine presence require separate checks (tracked in #139).
+
 ---
 
 ### `assignments`
