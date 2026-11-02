@@ -308,9 +308,9 @@ Conflicts that span a weekend with the same root cause are merged into a single 
 
 ### What is a skill mismatch?
 
-A skill mismatch is detected when an assigned resource does not hold any of the skills required by the work package.
+A skill mismatch is detected when an assigned resource meets none of the work package's qualification requirements. This includes the required minimum level and validity for the entire booking period.
 
-**Example**: A work package requires "Assembly" and "Welding". A resource with neither Assembly nor Welding skills is flagged as a skill mismatch. A resource with Assembly skills is correctly assigned — it does not need to have all skills.
+**Example**: A work package requires "Assembly" and "Welding". A resource without a matching qualification is flagged as a skill mismatch. A resource with a valid Assembly qualification at a sufficient level meets one requirement — it does not need to have all skills.
 
 ### How a requirement is covered
 
@@ -327,6 +327,8 @@ A requirement is counted in one of **two ways**, and the difference matters:
 - 2 electricians at 50% each → satisfied
 
 The trap is in headcount: spreading a task across many people in small slices covers nothing under that rule, even when the slices add up. If the task needs two people present at once, that is the point; if it is only about hours of work, choose effort.
+
+Personnel coverage is checked daily on working days of the standard work-week profile. People booked on separate days are not added as simultaneous staffing. Personnel bookings have no clock times, so a covered requirement does not prove shared presence during a particular machine shift. Check individual capacity and conflicts as well.
 
 ### Display on the Planning page
 

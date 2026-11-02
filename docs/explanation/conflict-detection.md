@@ -56,11 +56,11 @@ Capacity comes from `WorkingTimeService`; see
 
 ### Infrastructure Resources
 
-- Same boundary-sweep approach at the day level: for each span, count how many
-  bookings are active. Two or more covering the same span produce a conflict
-  (100% exclusive).
-- A sweep-line helper (`_infrastructure_overlaps`) groups overlapping
-  minute-precision intervals into conflict periods.
+- `_infrastructure_overlaps` sweeps the actual UTC timestamp boundaries.
+  Two or more bookings active over the same interval produce a conflict
+  (100% exclusive); an end at 02:00 permits a start at 02:00.
+- Stored conflict dates summarize those intervals in the local planning zone;
+  assignment timestamps retain their minute precision.
 - Each timestamp span with the same active overlap set is stored as a conflict
   period, so an unrelated booking never gets added to the conflict links.
 - Week profiles do not apply: infrastructure is exclusive rather than
@@ -166,3 +166,11 @@ Resource Gantt bars use the assignment's actual booking dates rather than the wo
 planned dates. Infrastructure overlap is checked with timestamp precision: a booking ending
 at 10:00 does not conflict with one starting at 10:00. A midnight end does not occupy the next
 calendar day. The chart itself still displays calendar days.
+
+## Combining the results
+
+A qualification mismatch and a missing requirement are separate from the three
+stored conflict causes. A covered requirement may still have a capacity conflict,
+and committed edits can temporarily precede conflict reconciliation. See the
+[combined guarantees and executable reference cases](combined-planning.md) for
+read-after-write behavior, freshness and limits on shared personnel/machine presence.

@@ -92,6 +92,7 @@ nav:
   - Understanding it:
       - Architecture: explanation/architecture.md
       - Capacity model: explanation/capacity-model.md
+      - Combined planning: explanation/combined-planning.md
       - Conflict detection: explanation/conflict-detection.md
   - Reference:
       - API: reference/api.md
