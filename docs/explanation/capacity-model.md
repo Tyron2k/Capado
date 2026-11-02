@@ -72,9 +72,12 @@ distinction carries the three cases the model must tell apart:
 | Part-time, booked full | 450 | 450 | 480 | **conflict** — does not fit |
 | Full-time, booked full | 480 | 480 | 480 | no conflict |
 
-The holiday row is the cost of this rule: work assigned across it delivers less
-time than the planner assumed. That is a *shortfall*, not an over-allocation,
-and belongs to the unmet-requirements surface rather than to conflict detection.
+A holiday can reduce delivered capacity without producing an over-allocation.
+Current requirement coverage measures qualified booking commitments on the
+standard profile's workdays; it does not subtract site-specific supply losses.
+Read available capacity alongside coverage and conflicts. The
+[combined planning reference cases](combined-planning.md) demonstrate this limit
+and define the scope of a combined verdict.
 
 ## Calendar exceptions
 

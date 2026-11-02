@@ -317,9 +317,9 @@ Konflikte, die über ein Wochenende hinweg dieselbe Ursache haben, werden zu ein
 
 ### Was ist eine Skill-Abweichung?
 
-Eine Skill-Abweichung wird erkannt, wenn eine zugewiesene Ressource keinen der vom Arbeitspaket geforderten Skills besitzt.
+Eine Skill-Abweichung wird erkannt, wenn eine zugewiesene Ressource keine der Qualifikationsanforderungen des Arbeitspakets erfüllt. Dabei zählen auch die geforderte Mindeststufe und die Gültigkeit für den gesamten Buchungszeitraum.
 
-**Beispiel**: Ein Arbeitspaket erfordert „Montage" und „Schweißen". Eine Ressource die weder Montage- noch Schweißkenntnisse hat wird als Skill-Abweichung markiert. Eine Ressource mit Montagekenntnissen ist dagegen korrekt zugeordnet — sie muss nicht alle Skills besitzen.
+**Beispiel**: Ein Arbeitspaket erfordert „Montage" und „Schweißen". Eine Ressource ohne passende Qualifikation wird als Skill-Abweichung markiert. Eine Ressource mit gültiger Montagequalifikation und ausreichender Stufe erfüllt dagegen eine der Anforderungen — sie muss nicht alle Skills besitzen.
 
 ### Wie eine Anforderung gedeckt wird
 
@@ -336,6 +336,8 @@ Eine Anforderung wird auf eine von **zwei Arten** gezählt, und der Unterschied 
 - 2 Elektriker zu je 50 % → gedeckt
 
 Die Stolperfalle steckt in der Kopfzahl: Wer eine Aufgabe auf viele Personen mit kleinen Anteilen verteilt, deckt sie nach dieser Zählweise nicht — auch wenn die Summe der Anteile ausreicht. Braucht die Aufgabe zwei Personen gleichzeitig vor Ort, ist das gewollt; geht es nur um Arbeitsstunden, wählen Sie Aufwand.
+
+Die Personaldeckung wird tageweise an den Arbeitstagen des Standard-Arbeitszeitprofils geprüft. Personen auf getrennten Tagen werden nicht zu einer gleichzeitigen Besetzung addiert. Da Personalbuchungen keine Uhrzeiten enthalten, beweist eine gedeckte Anforderung keine gemeinsame Anwesenheit während einer bestimmten Maschinenschicht. Prüfen Sie zusätzlich individuelle Kapazität und Konflikte.
 
 ### Darstellung auf der Planungsseite
 
