@@ -148,17 +148,8 @@ async def test_missing_qualification_is_unmet_and_mismatched(db_session):
     assert unmet[0].gap == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason=(
-        "Aggregate unmet coverage counts skill attributes but does not apply "
-        "qualification date bounds or minimum level (issue #137)."
-    ),
-)
-@pytest.mark.parametrize(
-    ("kind", "details"),
-    [
+@pytest.fixture(
+    params=[
         (ResourceType.personal, {"level": 4, "valid_until": DAY - timedelta(days=1)}),
         (ResourceType.personal, {"level": 2}),
         (ResourceType.personal, {"level": None}),
@@ -176,14 +167,34 @@ async def test_missing_qualification_is_unmet_and_mismatched(db_session):
         "expired-machine",
     ],
 )
-async def test_unqualified_resource_must_not_cover_requirement(
-    db_session, kind, details
-):
-    """The mismatch checker rejects these bookings; aggregate coverage should too."""
+async def unqualified_case(db_session, request):
+    """Persist the same unqualified-resource cases for both service checks."""
+    kind, details = request.param
     package, bookings = await _seed_case(
         db_session, kind=kind, minimum_level=3, people=[details]
     )
+    return kind, package, bookings
+
+
+async def test_unqualified_resource_is_mismatched(db_session, unqualified_case):
+    """Qualification mismatch detection must keep rejecting these bookings."""
+    _, package, bookings = unqualified_case
     assert await _mismatches(db_session, package, bookings) == {bookings[0].id}
+
+
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason=(
+        "Aggregate unmet coverage counts skill attributes but does not apply "
+        "qualification date bounds or minimum level (issue #137)."
+    ),
+)
+async def test_unqualified_resource_must_not_cover_requirement(
+    db_session, unqualified_case
+):
+    """Aggregate coverage should reject the same unqualified bookings."""
+    kind, _, _ = unqualified_case
     unmet = await get_unmet_requirements(db_session, resource_type=kind.value)
     assert len(unmet) == 1
     assert unmet[0].assigned_quantity == 0
@@ -226,6 +237,25 @@ async def test_effort_mode_sums_two_half_allocations(db_session):
     assert await get_unmet_requirements(db_session, resource_type="personal") == []
 
 
+@pytest.fixture
+async def staggered_crew(db_session):
+    """Persist qualified people whose bookings do not overlap."""
+    return await _seed_case(
+        db_session,
+        quantity=2,
+        people=[
+            {"start_date": DAY, "end_date": DAY},
+            {"start_date": DAY + timedelta(days=1), "end_date": LAST_DAY},
+        ],
+    )
+
+
+async def test_staggered_people_are_not_mismatched(db_session, staggered_crew):
+    """Disjoint booking dates do not make either person's qualification invalid."""
+    package, bookings = staggered_crew
+    assert await _mismatches(db_session, package, bookings) == set()
+
+
 @pytest.mark.xfail(
     strict=True,
     raises=AssertionError,
@@ -234,17 +264,10 @@ async def test_effort_mode_sums_two_half_allocations(db_session):
         "simultaneous work-package staffing (issue #137 / #139)."
     ),
 )
-async def test_staggered_people_do_not_cover_two_person_crew(db_session):
+async def test_staggered_people_do_not_cover_two_person_crew(
+    db_session, staggered_crew
+):
     """Two people on disjoint days cannot staff a two-person crew together."""
-    package, bookings = await _seed_case(
-        db_session,
-        quantity=2,
-        people=[
-            {"start_date": DAY, "end_date": DAY},
-            {"start_date": DAY + timedelta(days=1), "end_date": LAST_DAY},
-        ],
-    )
-    assert await _mismatches(db_session, package, bookings) == set()
     unmet = await get_unmet_requirements(db_session, resource_type="personal")
     assert len(unmet) == 1
     assert unmet[0].gap >= 1
