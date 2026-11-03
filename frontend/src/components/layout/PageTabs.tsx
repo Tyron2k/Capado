@@ -6,7 +6,7 @@
  * do not reset the active tab.
  */
 
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, type Ref } from 'react'
 import { Tabs } from '@mantine/core'
 import { PageLayout } from './PageLayout'
 import type { Icon } from '@tabler/icons-react'
@@ -20,6 +20,8 @@ export interface TabDefinition {
   icon: Icon
   /** Tab panel content. */
   content: ReactNode
+  /** Focus target for contextual navigation into this tab. */
+  buttonRef?: Ref<HTMLButtonElement>
 }
 
 interface PageTabsProps {
@@ -29,6 +31,9 @@ interface PageTabsProps {
   tabs: TabDefinition[]
   /** Which tab is active by default. Defaults to first tab. */
   defaultTab?: string
+  /** Optional controlled tab, for navigation from a contextual action. */
+  value?: string
+  onChange?: (value: string | null) => void
   /** Page-level actions shared by all tabs. */
   actions?: ReactNode
 }
@@ -38,15 +43,20 @@ interface PageTabsProps {
  * Prevents the active tab from resetting on parent re-renders or
  * notification-triggered context changes.
  */
-export function PageTabs({ title, tabs, defaultTab, actions }: PageTabsProps) {
+export function PageTabs({ title, tabs, defaultTab, actions, value, onChange }: PageTabsProps) {
   const [activeTab, setActiveTab] = useState<string | null>(defaultTab ?? tabs[0]?.value ?? null)
 
   return (
     <PageLayout title={title} headerActions={actions}>
-      <Tabs value={activeTab} onChange={setActiveTab}>
+      <Tabs value={value ?? activeTab} onChange={onChange ?? setActiveTab}>
         <Tabs.List className="capado-tabs-list">
           {tabs.map((tab) => (
-            <Tabs.Tab key={tab.value} value={tab.value} leftSection={<tab.icon size={16} />}>
+            <Tabs.Tab
+              ref={tab.buttonRef}
+              key={tab.value}
+              value={tab.value}
+              leftSection={<tab.icon size={16} />}
+            >
               {tab.label}
             </Tabs.Tab>
           ))}

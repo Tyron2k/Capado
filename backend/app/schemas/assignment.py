@@ -17,7 +17,6 @@ from pydantic import AwareDatetime, BaseModel, Field
 from app.models.conflict import ConflictCause
 from app.models.resource import ResourceType
 from app.schemas import ResponseModel
-from app.schemas.capacity import ConflictResponse
 
 
 class AssignmentCreate(BaseModel):
@@ -170,11 +169,3 @@ class UnmetRequirementResponse(ResponseModel):
     assigned_quantity: float
     gap: float
     suggestions: list[ResourceSuggestion] = []
-
-
-class PlanningOverviewResponse(ResponseModel):
-    """Typed combined planning data without duplicating the three domain contracts."""
-
-    unmet_requirements: list[UnmetRequirementResponse]
-    conflicts: list[ConflictResponse]
-    mismatched_assignments: list[AssignmentResponse]

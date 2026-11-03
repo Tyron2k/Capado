@@ -225,7 +225,7 @@ export interface paths {
          *     runs an additional pass for assignments not covered by conflicts.
          *
          *     Returns:
-         *         Dict with keys: unmet_requirements, conflicts, mismatched_assignments.
+         *         Dict with unmet requirements, conflicts, mismatches and active packages.
          */
         get: operations["get_planning_overview_api_assignments_planning_overview_get"];
         put?: never;
@@ -259,6 +259,26 @@ export interface paths {
          *         List of unmet requirement entries with gap information.
          */
         get: operations["list_unmet_requirements_api_assignments_planning_unmet_requirements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assignments/planning/work-packages/{work_package_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read current planning evidence for one active work package
+         * @description Preview the current checks without reserving capacity or saving conflicts.
+         */
+        get: operations["work_package_readiness_api_assignments_planning_work_packages__work_package_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5016,8 +5036,26 @@ export interface components {
             resource_id: string;
         };
         /**
+         * PersonnelSupplyGap
+         * @description First booked standard workday with zero individual calendar supply.
+         */
+        PersonnelSupplyGap: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Resource Id
+             * Format: uuid
+             */
+            resource_id: string;
+            /** Resource Name */
+            resource_name: string;
+        };
+        /**
          * PlanningOverviewResponse
-         * @description Typed combined planning data without duplicating the three domain contracts.
+         * @description Existing problem lists plus selectable active work packages.
          */
         PlanningOverviewResponse: {
             /** Conflicts */
@@ -5026,6 +5064,38 @@ export interface components {
             mismatched_assignments: components["schemas"]["AssignmentResponse"][];
             /** Unmet Requirements */
             unmet_requirements: components["schemas"]["UnmetRequirementResponse"][];
+            /** Work Packages */
+            work_packages: components["schemas"]["PlanningWorkPackage"][];
+        };
+        /**
+         * PlanningWorkPackage
+         * @description An active package selectable in the existing planning overview.
+         */
+        PlanningWorkPackage: {
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Project Id
+             * Format: uuid
+             */
+            project_id: string;
+            /** Project Name */
+            project_name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
         };
         /**
          * PreviewCapacityDay
@@ -5405,6 +5475,37 @@ export interface components {
             priority?: components["schemas"]["ProjectPriority"] | null;
             /** Start Date */
             start_date?: string | null;
+        };
+        /**
+         * ReadinessConflict
+         * @description A current, read-only conflict with its affected resource and bookings.
+         */
+        ReadinessConflict: {
+            /** Assignment Ids */
+            assignment_ids: string[];
+            /** Available Percent */
+            available_percent: number;
+            cause: components["schemas"]["ConflictCause"];
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Resource Id
+             * Format: uuid
+             */
+            resource_id: string;
+            /** Resource Name */
+            resource_name: string;
+            resource_type: components["schemas"]["ResourceType"];
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Total Assigned Percent */
+            total_assigned_percent: number;
         };
         /**
          * RefreshResponse
@@ -6592,6 +6693,52 @@ export interface components {
             lag_working_days: number;
         };
         /**
+         * WorkPackageReadiness
+         * @description Scoped evidence, known blockers and explicit limits of the checks.
+         */
+        WorkPackageReadiness: {
+            /** Assignments */
+            assignments: components["schemas"]["AssignmentResponse"][];
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Conflicts */
+            conflicts: components["schemas"]["ReadinessConflict"][];
+            /** Infrastructure Requirements */
+            infrastructure_requirements: number;
+            /**
+             * Infrastructure Status
+             * @enum {string}
+             */
+            infrastructure_status: "covered" | "missing_requirements" | "conflicting" | "not_fully_assessable";
+            /** Limits */
+            limits: ("no_personnel_requirements" | "no_infrastructure_requirements" | "no_standard_profile" | "missing_calendar" | "personnel_clock_times" | "infrastructure_continuity" | "capacity_window_limit")[];
+            /** Personnel Requirements */
+            personnel_requirements: number;
+            /**
+             * Personnel Status
+             * @enum {string}
+             */
+            personnel_status: "covered" | "missing_requirements" | "conflicting" | "not_fully_assessable";
+            /**
+             * Qualification Status
+             * @enum {string}
+             */
+            qualification_status: "covered" | "missing_requirements" | "conflicting" | "not_fully_assessable";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "covered" | "missing_requirements" | "conflicting" | "not_fully_assessable";
+            /** Supply Gaps */
+            supply_gaps: components["schemas"]["PersonnelSupplyGap"][];
+            /** Unmet Requirements */
+            unmet_requirements: components["schemas"]["UnmetRequirementResponse"][];
+            work_package: components["schemas"]["PlanningWorkPackage"];
+        };
+        /**
          * WorkPackageRequirementCreate
          * @description Request body for adding a requirement to a work package.
          */
@@ -7183,6 +7330,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UnmetRequirementResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    work_package_readiness_api_assignments_planning_work_packages__work_package_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_package_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkPackageReadiness"];
                 };
             };
             /** @description Validation Error */

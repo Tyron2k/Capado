@@ -132,8 +132,8 @@ describe('unmet requirement suggestions', () => {
       resource_id: 'r1',
       work_package_id: 'w1',
       resource_type: 'infrastructure',
-      start_at: '2026-09-01T08:00:00',
-      end_at: '2026-09-10T17:00:00',
+      start_at: '2026-09-01T06:00:00.000Z',
+      end_at: '2026-09-10T15:00:00.000Z',
     })
     expect(createAssignment).not.toHaveBeenCalled()
   })

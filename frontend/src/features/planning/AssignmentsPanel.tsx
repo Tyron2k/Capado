@@ -25,6 +25,7 @@ import {
   TextInput,
   Tooltip,
 } from '@mantine/core'
+import type { ConflictFocus } from './conflictFocus'
 import { DataTable, FilterBar } from '../../components/layout'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../utils/errorHandling'
@@ -63,7 +64,13 @@ function formatAssignmentEnd(assignment: Assignment, locale: Locale, timeZone: s
   return '—'
 }
 
-export function AssignmentsPanel() {
+export function AssignmentsPanel({
+  focus = null,
+  onClearFocus,
+}: {
+  focus?: ConflictFocus | null
+  onClearFocus?: () => void
+}) {
   const { t } = useTranslation()
   const { settings } = useSettings()
   const queryClient = useQueryClient()
@@ -198,6 +205,9 @@ export function AssignmentsPanel() {
   // Filter assignments based on search, type filter, and project filter
   const filteredAssignments = useMemo(() => {
     let result = assignments
+    if (focus?.workPackageId)
+      result = result.filter((a) => a.work_package_id === focus.workPackageId)
+    if (focus?.resourceId) result = result.filter((a) => a.resource_id === focus.resourceId)
     if (typeFilter) {
       result = result.filter((a) => a.resource_type === typeFilter)
     }
@@ -214,7 +224,7 @@ export function AssignmentsPanel() {
       )
     }
     return result
-  }, [assignments, typeFilter, projectFilter, search])
+  }, [assignments, typeFilter, projectFilter, search, focus])
 
   // Build project filter options from loaded assignments
   const projectOptions = useMemo(() => {
@@ -270,6 +280,14 @@ export function AssignmentsPanel() {
         </Button>
       </FilterBar>
 
+      {focus && (
+        <Group justify="space-between">
+          <Text size="sm">{t('readiness.bookingsFiltered')}</Text>
+          <Button variant="subtle" size="xs" onClick={onClearFocus}>
+            {t('readiness.showAllBookings')}
+          </Button>
+        </Group>
+      )}
       {loading ? (
         <DataTable
           loading={true}

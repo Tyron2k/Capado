@@ -83,7 +83,9 @@ async def get_conflict_check_status(
             minutes=CONFLICT_CHECK_INTERVAL_MINUTES * 2
         )
     return {
-        "last_checked_at": last_checked.isoformat() + "Z" if last_checked else None,
+        "last_checked_at": last_checked.isoformat().replace("+00:00", "Z")
+        if last_checked
+        else None,
         "status": latest.status if latest else "never",
         "stale": stale,
         "enabled": settings.scheduler_enabled if settings else True,

@@ -178,6 +178,7 @@ async def get_unmet_requirements(
     session: AsyncSession,
     *,
     resource_type: str | None = None,
+    work_package_id: UUID | None = None,
 ) -> list[UnmetRequirementResponse]:
     """Compute work package requirements that lack sufficient assigned resources.
 
@@ -199,6 +200,7 @@ async def get_unmet_requirements(
 
     Args:
         session: Async database session.
+        work_package_id: Limit coverage and suggestions to one package when supplied.
         resource_type: Optional filter — 'personal' or 'infrastructure'.
             When set, only requirements whose skill belongs to that resource
             type are returned.
@@ -208,9 +210,12 @@ async def get_unmet_requirements(
 
     """
     # 1. Load all requirements
-    requirements = list(
-        (await session.execute(select(WorkPackageRequirement))).scalars().all()
-    )
+    requirement_query = select(WorkPackageRequirement)
+    if work_package_id is not None:
+        requirement_query = requirement_query.where(
+            WorkPackageRequirement.work_package_id == work_package_id
+        )
+    requirements = list((await session.execute(requirement_query)).scalars().all())
     if not requirements:
         return []
 

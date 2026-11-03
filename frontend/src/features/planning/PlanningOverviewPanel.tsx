@@ -11,16 +11,24 @@ import { useCallback, useEffect, useMemo } from 'react'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { Loader, Stack } from '@mantine/core'
+import { Alert, Button, Loader, Stack } from '@mantine/core'
 import { useTranslation } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { getPlanningOverview } from '../../api/assignments'
 import { showErrorNotification } from '../../utils/errorHandling'
 import { UnmetRequirementsSection } from './UnmetRequirementsAlert'
 import { ConflictsSection } from './ConflictsSection'
+import { WorkPackageReadinessPanel } from './WorkPackageReadinessPanel'
+import type { ConflictFocus } from './conflictFocus'
 import { parseConflictFocus } from './conflictFocus'
 
-export function PlanningOverviewPanel() {
+export function PlanningOverviewPanel({
+  onAssignments,
+  active = true,
+}: {
+  onAssignments?: (focus: ConflictFocus) => void
+  active?: boolean
+}) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -39,6 +47,7 @@ export function PlanningOverviewPanel() {
   const overviewQuery = useQuery({
     queryKey: queryKeys.planning.overview(),
     refetchInterval: 60_000,
+    enabled: active,
     queryFn: ({ signal }) => getPlanningOverview(signal),
   })
   const data = overviewQuery.data ?? null
@@ -71,29 +80,60 @@ export function PlanningOverviewPanel() {
   )
 
   if (loading) return <Loader size="sm" />
+  if (error)
+    return (
+      <Alert color="red" title={t('readiness.unavailable')}>
+        <Button variant="subtle" onClick={reload}>
+          {t('readiness.retry')}
+        </Button>
+      </Alert>
+    )
+  const selected = searchParams.get('assess')
 
   return (
     <Stack gap="lg">
-      <ConflictCheckStatus />
-      <UnmetRequirementsSection
-        items={personalUnmet}
-        title={t('planning.unmetPersonal')}
-        error={error}
-        onAssigned={reload}
-      />
-      <UnmetRequirementsSection
-        items={infraUnmet}
-        title={t('planning.unmetInfrastructure')}
-        error={error}
-        onAssigned={reload}
-      />
-      <ConflictsSection
-        conflicts={data?.conflicts ?? []}
-        mismatches={data?.mismatched_assignments ?? []}
+      <WorkPackageReadinessPanel
+        active={active}
+        packages={data?.work_packages ?? []}
+        selected={selected}
+        onSelect={(id) =>
+          setSearchParams((previous) => {
+            const next = new URLSearchParams(previous)
+            if (id) next.set('assess', id)
+            else next.delete('assess')
+            next.delete('work_package')
+            next.delete('project')
+            next.delete('resource')
+            return next
+          })
+        }
+        onAssignments={onAssignments}
         onChanged={reload}
-        focus={conflictFocus}
-        onClearFocus={clearConflictFocus}
       />
+      {!selected && (
+        <>
+          <ConflictCheckStatus />
+          <UnmetRequirementsSection
+            items={personalUnmet}
+            title={t('planning.unmetPersonal')}
+            error={error}
+            onAssigned={reload}
+          />
+          <UnmetRequirementsSection
+            items={infraUnmet}
+            title={t('planning.unmetInfrastructure')}
+            error={error}
+            onAssigned={reload}
+          />
+          <ConflictsSection
+            conflicts={data?.conflicts ?? []}
+            mismatches={data?.mismatched_assignments ?? []}
+            onChanged={reload}
+            focus={conflictFocus}
+            onClearFocus={clearConflictFocus}
+          />
+        </>
+      )}
     </Stack>
   )
 }

@@ -36,10 +36,13 @@ from app.schemas.assignment import (
     AssignmentPreviewResponse,
     AssignmentResponse,
     AssignmentUpdate,
-    PlanningOverviewResponse,
     UnmetRequirementResponse,
 )
 from app.schemas.pagination import PaginatedResponse
+from app.schemas.planning_readiness import (
+    PlanningOverviewResponse,
+    WorkPackageReadiness,
+)
 from app.services.assignment_preview import AssignmentPreviewService
 from app.services.assignment_service import AssignmentService
 from app.services.freeze_enforcement import enforce_freeze, span_of
@@ -49,6 +52,10 @@ from app.services.permissions import (
     get_current_user,
 )
 from app.services.planning_freeze import Span
+from app.services.planning_readiness import (
+    get_work_package_readiness,
+    list_planning_work_packages,
+)
 from app.services.skill_mismatch import detect_mismatches
 from app.services.time_zone import local_date, planning_zone
 from app.services.unmet_requirements_service import get_unmet_requirements
@@ -493,12 +500,13 @@ async def get_planning_overview(
     runs an additional pass for assignments not covered by conflicts.
 
     Returns:
-        Dict with keys: unmet_requirements, conflicts, mismatched_assignments.
+        Dict with unmet requirements, conflicts, mismatches and active packages.
 
     """
     from app.models.conflict import Conflict
     from app.services.conflict_enrichment import enrich_conflicts_batch
 
+    work_packages = await list_planning_work_packages(session)
     # Load unmet requirements
     unmet = await get_unmet_requirements(session)
 
@@ -539,6 +547,7 @@ async def get_planning_overview(
     all_mismatch_ids = conflict_mismatch_ids | additional_mismatches
     if not all_mismatch_ids:
         return {
+            "work_packages": work_packages,
             "unmet_requirements": unmet,
             "conflicts": enriched_conflicts,
             "mismatched_assignments": [],
@@ -555,10 +564,25 @@ async def get_planning_overview(
     ]
 
     return {
+        "work_packages": work_packages,
         "unmet_requirements": unmet,
         "conflicts": enriched_conflicts,
         "mismatched_assignments": mismatched,
     }
+
+
+@router.get(
+    "/planning/work-packages/{work_package_id}",
+    response_model=WorkPackageReadiness,
+    summary="Read current planning evidence for one active work package",
+)
+async def work_package_readiness(
+    work_package_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(get_current_user),
+) -> WorkPackageReadiness:
+    """Preview the current checks without reserving capacity or saving conflicts."""
+    return await get_work_package_readiness(session, work_package_id)
 
 
 @router.get(

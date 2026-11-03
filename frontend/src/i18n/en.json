@@ -1230,5 +1230,52 @@
     "density": "Table density",
     "comfortable": "Comfortable",
     "compact": "Compact"
+  },
+  "readiness": {
+    "title": "Work package readiness",
+    "selectPackage": "Assess work package",
+    "choosePackage": "Choose a work package",
+    "noPackages": "No active work packages",
+    "introduction": "Select a work package to see its requirements, qualifications and current resource constraints together.",
+    "personnel": "Personnel coverage and capacity",
+    "infrastructure": "Equipment coverage and bookings",
+    "qualification": "Assignment qualifications",
+    "status": {
+      "covered": "Covered within scope",
+      "missing_requirements": "Missing requirements",
+      "conflicting": "Conflicting",
+      "not_fully_assessable": "Not fully assessable"
+    },
+    "unavailable": "Readiness could not be assessed",
+    "failedCheck": "The current check failed. Previous positive results do not confirm the current plan.",
+    "retry": "Try again",
+    "checking": "Checking current inputs…",
+    "refresh": "Check again",
+    "checkedAt": "Checked: {time}",
+    "snapshot": "The timestamp marks completion of these checks. Recheck after concurrent edits; resources are not reserved. The general conflict list is updated separately.",
+    "requirementCount": "Requirements: {count}",
+    "scope": "Scope of these checks",
+    "limits": {
+      "no_personnel_requirements": "No personnel requirements are defined; staffing demand cannot be confirmed.",
+      "no_infrastructure_requirements": "No equipment requirements are defined; equipment demand cannot be confirmed.",
+      "no_standard_profile": "No standard work-week profile is configured. Daily personnel requirement coverage cannot be established.",
+      "missing_calendar": "At least one personnel booking has no applicable work-week profile.",
+      "personnel_clock_times": "Personnel is booked by date and percentage. Shared presence during a particular machine shift cannot be established.",
+      "infrastructure_continuity": "Equipment coverage counts qualifying booked resources. It does not confirm continuous equipment coverage throughout the work package.",
+      "capacity_window_limit": "The current capacity check covers periods up to 366 days. This longer period has not been fully checked."
+    },
+    "noSupply": "No personal calendar capacity on at least {day}, despite a booking on a standard-profile workday. Commitment coverage alone does not establish available personnel.",
+    "inspectBookings": "Review package bookings",
+    "inspectResourceBookings": "Review all resource bookings",
+    "qualificationRule": "These bookings meet none of the package’s qualification requirements for the full booking period, including minimum level and validity. Open a card to review qualified alternatives.",
+    "currentConflicts": "Current booking constraints",
+    "causes": {
+      "over_allocation": "Assigned capacity exceeds available capacity",
+      "booking_overlap": "Exclusive equipment bookings overlap",
+      "outside_availability": "Booking extends outside operating windows"
+    },
+    "affectedBookings": "Affected bookings: {count}",
+    "bookingsFiltered": "Bookings filtered by the selected work package or resource.",
+    "showAllBookings": "Show all bookings"
   }
 }

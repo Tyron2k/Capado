@@ -312,6 +312,12 @@ A skill mismatch is detected when an assigned resource meets none of the work pa
 
 **Example**: A work package requires "Assembly" and "Welding". A resource without a matching qualification is flagged as a skill mismatch. A resource with a valid Assembly qualification at a sufficient level meets one requirement — it does not need to have all skills.
 
+### Work package readiness
+
+Select a work package in Planning → Overview. Personnel coverage and capacity, equipment bookings and qualifications are checked separately. “Covered within scope” confirms only the named check. Missing prerequisites, failed checks and precision limits remain visible. A covered personnel booking does not prove shared presence during a particular machine shift.
+
+“Review all resource bookings” opens the existing assignments, including competing work packages. Save corrections there explicitly. The direct check does not save bookings or reserve resources; its timestamp shows when it ran.
+
 ### How a requirement is covered
 
 A requirement is counted in one of **two ways**, and the difference matters:

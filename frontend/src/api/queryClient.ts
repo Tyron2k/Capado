@@ -116,6 +116,7 @@ export const queryKeys = {
   planning: {
     all: ['planning'] as const,
     overview: () => ['planning', 'overview'] as const,
+    readiness: (id: string) => ['planning', 'readiness', id] as const,
   },
   /**
    * Projects and their work packages.

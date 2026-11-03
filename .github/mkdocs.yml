@@ -86,6 +86,7 @@ nav:
   - Getting started:
       - Local setup: how-to/local-setup.md
       - Local load testing: how-to/load-testing.md
+      - Assessing work packages: how-to/assessing-work-packages.md
       - Upgrading: how-to/upgrading.md
       - Publishing a release: how-to/publishing-a-release.md
       - Adding a feature: how-to/adding-a-feature.md
@@ -93,6 +94,7 @@ nav:
       - Architecture: explanation/architecture.md
       - Capacity model: explanation/capacity-model.md
       - Combined planning: explanation/combined-planning.md
+      - Planning validation: explanation/planning-validation.md
       - Conflict detection: explanation/conflict-detection.md
   - Reference:
       - API: reference/api.md

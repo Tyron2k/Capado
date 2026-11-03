@@ -135,3 +135,9 @@ from PRs #157 and #158. Related regressions remain in
 `test_requirement_coverage_audit.py`, `test_temporal_requirement_coverage.py` and
 `test_requirement_coverage_postgres.py`; existing infrastructure window tests
 separately exercise daylight-saving boundaries.
+
+
+The [work-package assessment](../how-to/assessing-work-packages.md) presents these
+scoped checks in Planning Overview. The [validation baseline](planning-validation.md)
+records repeatable browser tasks and separates automated evidence from planner
+observations.

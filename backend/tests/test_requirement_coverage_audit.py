@@ -27,106 +27,10 @@ from app.models.skill import (
 from app.models.work_package_requirement import RequirementMode, WorkPackageRequirement
 from app.services.skill_mismatch import detect_mismatches
 from app.services.unmet_requirements_service import get_unmet_requirements
+from tests.planning_reference import _seed_case
 
 DAY = date(2099, 1, 5)
 LAST_DAY = DAY + timedelta(days=2)
-
-
-async def _seed_case(
-    session,
-    *,
-    kind=ResourceType.personal,
-    quantity=1,
-    mode=RequirementMode.headcount,
-    minimum_level=None,
-    people=(),
-):
-    """Persist a small fictional requirement and the specified resource bookings."""
-    if (
-        await session.scalar(select(WorkWeekProfile).where(WorkWeekProfile.is_default))
-        is None
-    ):
-        session.add(WorkWeekProfile(name="Fixture standard", is_default=True))
-    group = ResourceGroup(name="Fixture team", resource_type=kind)
-    skill = Skill(name="Fixture qualification", resource_type=kind.value)
-    project = Project(name="Fixture project", start_date=DAY, end_date=LAST_DAY)
-    session.add_all([group, skill, project])
-    await session.flush()
-
-    attribute = SkillAttribute(name="Fixture attribute", skill_id=skill.id)
-    package = WorkPackage(
-        name="Fixture package",
-        project_id=project.id,
-        start_date=DAY,
-        end_date=LAST_DAY,
-    )
-    session.add_all([attribute, package])
-    await session.flush()
-
-    session.add(
-        WorkPackageRequirement(
-            work_package_id=package.id,
-            skill_id=skill.id,
-            skill_attribute_id=attribute.id,
-            quantity=quantity,
-            requirement_mode=mode,
-            min_allocation_percent=100.0,
-            min_level=minimum_level,
-        )
-    )
-
-    bookings = []
-    for index, person in enumerate(people):
-        if kind == ResourceType.personal:
-            resource = PersonalResource(
-                name=f"Person {index}",
-                group_id=group.id,
-                is_active=person.get("active", True),
-            )
-        else:
-            resource = InfrastructureResource(
-                name=f"Machine {index}",
-                group_id=group.id,
-                is_active=person.get("active", True),
-            )
-        session.add(resource)
-        await session.flush()
-
-        if person.get("qualified", True):
-            held = {
-                "resource_id": resource.id,
-                "skill_attribute_id": attribute.id,
-                "level": person.get("level", 4),
-                "valid_from": person.get("valid_from"),
-                "valid_until": person.get("valid_until"),
-            }
-            if kind == ResourceType.personal:
-                session.add(PersonalResourceSkill(**held))
-            else:
-                session.add(InfrastructureResourceSkill(**held))
-
-        if kind == ResourceType.personal:
-            booking = Assignment(
-                resource_type=kind,
-                resource_id=resource.id,
-                work_package_id=package.id,
-                start_date=person.get("start_date", DAY),
-                end_date=person.get("end_date", LAST_DAY),
-                allocation_percent=person.get("allocation", 100.0),
-            )
-        else:
-            booking = Assignment(
-                resource_type=kind,
-                resource_id=resource.id,
-                work_package_id=package.id,
-                start_at=person.get("start_at", datetime(2099, 1, 5, 10, tzinfo=UTC)),
-                end_at=person.get("end_at", datetime(2099, 1, 5, 12, tzinfo=UTC)),
-            )
-        session.add(booking)
-        bookings.append(booking)
-
-    await session.commit()
-    return package, bookings
 
 
 async def _mismatches(session, package, bookings):
