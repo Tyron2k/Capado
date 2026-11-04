@@ -8,6 +8,9 @@ First run the [full candidate CI](../reference/ci.md#exact-release-candidate-val
 wait for **CI passed** to succeed. Record its `headSha` and create the release tag on that
 exact commit in `main` history. A green CodeQL-only push run or a PR check on a different SHA
 does not satisfy this release gate.
+The backend suite includes the [real PostgreSQL restore check](upgrading.md#1-back-up-without-exception),
+including current combined-planning data and a rejected truncated archive. Its failure
+fails the existing CI gate; there is no separate optional restore workflow to overlook.
 Use canonical SemVer: `vMAJOR.MINOR.PATCH`, optionally with a prerelease such as `-rc.1`.
 A bare version is normalized to the same container tag. Numeric identifiers cannot have leading
 zeroes. Build metadata remains supported: `+` is encoded as `_build_` in container tags, so

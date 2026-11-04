@@ -115,6 +115,20 @@ work packages, both resource types, bookings, calendars, permissions, audit,
 baselines, dependencies, conflicts, logos and token records must survive unchanged.
 It also verifies that restoring and starting the copy leaves the source untouched.
 
+The current-head backup additionally includes the shared combined-planning case:
+two qualified people, dated qualification validity, both requirement types, an
+overnight machine window and conflicting machine bookings. After restore, the
+authenticated work-package check must return the same qualification gap, conflicts,
+bookings and stated precision limits as before the backup (apart from its check
+timestamp). A deliberately truncated archive must fail without leaving partial
+application tables; the intact archive must then restore into that same empty target.
+
+This test is part of the existing backend test suite on both CI Python versions,
+using the existing PostgreSQL service. The release workflow requires successful
+full candidate CI on the exact release SHA, so its restore result is part of release
+readiness. No additional image build or CI job is needed. That synthetic check does
+not replace the isolated restore of an operator's own backup described above.
+
 Locally, run it against a disposable test server with CREATE DATABASE permission:
 
 ```bash
