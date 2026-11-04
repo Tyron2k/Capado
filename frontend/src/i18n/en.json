@@ -347,7 +347,10 @@
     "descShiftBackward": "Shift {days} days backward",
     "descShiftIntoWindow": "Move to {time} within operating hours",
     "descReduce": "Reduce to {percent}%",
-    "descSwap": "Swap to '{name}' (available)"
+    "descSwap": "Swap to '{name}' (available)",
+    "loadFailed": "Suggestions could not be loaded. Try again or review the booking manually.",
+    "noAlternatives": "No qualified replacement of the same resource type has capacity for this entire booking.",
+    "noneAvailable": "No automatic resolution found. Window shifts search free operating hours within the work package, up to 30 days either side. Review the bookings or availability manually."
   },
   "absences": {
     "title": "Absences",
@@ -500,7 +503,9 @@
     "assignmentRemoved": "Assignment was removed",
     "workPackage": "Work Package",
     "allocation": "Allocation",
-    "openInGantt": "Open in Gantt"
+    "openInGantt": "Open in Gantt",
+    "qualificationCheck": "Qualification check",
+    "qualificationRule": "A replacement must satisfy an applicable role for the entire booking, including minimum level and validity."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1241,7 +1246,7 @@
     "infrastructure": "Equipment coverage and bookings",
     "qualification": "Assignment qualifications",
     "status": {
-      "covered": "Covered within scope",
+      "covered": "No blockers within scope",
       "missing_requirements": "Missing requirements",
       "conflicting": "Conflicting",
       "not_fully_assessable": "Not fully assessable"
@@ -1276,6 +1281,7 @@
     },
     "affectedBookings": "Affected bookings: {count}",
     "bookingsFiltered": "Bookings filtered by the selected work package or resource.",
-    "showAllBookings": "Show all bookings"
+    "showAllBookings": "Show all bookings",
+    "undefinedRequirements": "No requirements defined"
   }
 }

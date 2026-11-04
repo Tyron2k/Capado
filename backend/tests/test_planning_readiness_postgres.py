@@ -56,7 +56,7 @@ async def test_direct_check_uses_committed_repair_despite_failed_saved_conflict_
         event.remove(engine.sync_engine, "before_cursor_execute", record)
     assert result.conflicts == []
     assert result.infrastructure_status == "covered"
-    assert result.status == "not_fully_assessable"
+    assert result.status == "covered"
     assert {"INSERT", "UPDATE", "DELETE"}.isdisjoint(statements)
     assert {c.id for c in (await session.scalars(select(Conflict))).all()} == old
     assert not session.new and not session.dirty

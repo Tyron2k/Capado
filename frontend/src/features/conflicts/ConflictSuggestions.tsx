@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core'
+import { Alert, Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../utils/errorHandling'
 import {
@@ -18,21 +18,28 @@ import {
 } from '@tabler/icons-react'
 import {
   getAssignment,
+  getAssignmentSuggestions,
   getConflictSuggestions,
   previewAssignment,
   updateAssignment,
   type ConflictSuggestion,
 } from '../../api/assignments'
 import type { AssignmentPreview, AssignmentUpdate } from '../../types/assignment'
-import { useTranslation } from '../../i18n'
+import { useTranslation, type Locale } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
 import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
 import { useSettings } from '../../context/SettingsContext'
 import { formatDateTime } from '../../utils/date'
 
-interface Props {
-  conflictId: string
+type Props = (
+  | { conflictId: string; assignmentId?: never; alternativesOnly?: never }
+  | {
+      assignmentId: string
+      alternativesOnly?: boolean
+      conflictId?: never
+    }
+) & {
   onApplied: () => void
 }
 
@@ -56,6 +63,7 @@ function buildDescription(
   s: ConflictSuggestion,
   t: (key: string, params?: Record<string, string | number>) => string,
   timeZone: string,
+  locale: Locale,
 ): string {
   switch (s.type) {
     case 'shift_forward':
@@ -64,7 +72,7 @@ function buildDescription(
       return t('suggestions.descShiftBackward', { days: Math.abs(s.shift_days ?? 0) })
     case 'shift_into_window':
       return t('suggestions.descShiftIntoWindow', {
-        time: s.new_start_at ? formatDateTime(s.new_start_at, 'de', timeZone).slice(-5) : '—',
+        time: s.new_start_at ? formatDateTime(s.new_start_at, locale, timeZone) : '—',
       })
     case 'reduce_allocation':
       return t('suggestions.descReduce', { percent: s.new_allocation_percent ?? 0 })
@@ -75,8 +83,13 @@ function buildDescription(
   }
 }
 
-export function ConflictSuggestions({ conflictId, onApplied }: Props) {
-  const { t } = useTranslation()
+export function ConflictSuggestions({
+  conflictId,
+  assignmentId,
+  alternativesOnly = false,
+  onApplied,
+}: Props) {
+  const { t, locale } = useTranslation()
   const { settings } = useSettings()
   const queryClient = useQueryClient()
   const [active, setActive] = useState<{
@@ -85,17 +98,16 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
     result: AssignmentPreview
   } | null>(null)
 
-  /**
-   * Suggestions fail SILENTLY, and that stays true.
-   *
-   * They are computed on request and they are optional: a conflict card is useful without them, and a
-   * notification saying the suggestions could not be loaded would be noise on a screen already
-   * reporting a problem. So the error is swallowed here, deliberately — the one place in this
-   * migration where not reporting is the right answer.
-   */
+  const suggestionsKey = assignmentId
+    ? queryKeys.conflicts.assignmentSuggestions(assignmentId, alternativesOnly)
+    : queryKeys.conflicts.suggestions(conflictId!)
   const suggestionsQuery = useQuery({
-    queryKey: queryKeys.conflicts.suggestions(conflictId),
-    queryFn: () => getConflictSuggestions(conflictId),
+    queryKey: suggestionsKey,
+    refetchOnMount: 'always',
+    queryFn: () =>
+      assignmentId
+        ? getAssignmentSuggestions(assignmentId, alternativesOnly)
+        : getConflictSuggestions(conflictId!),
   })
   const suggestions: ConflictSuggestion[] = suggestionsQuery.data ?? []
   const loading = suggestionsQuery.isPending
@@ -119,7 +131,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
     },
     onSuccess: setActive,
     onError: (error) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.suggestions(conflictId) })
+      void queryClient.invalidateQueries({ queryKey: suggestionsKey })
       showErrorNotification(error, t('common.error'), t('common.genericError'))
     },
   })
@@ -135,7 +147,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
     onSuccess: async (_result, { suggestion }) => {
       notifications.show({
         title: t('common.saved'),
-        message: buildDescription(suggestion, t, settings.timeZone),
+        message: buildDescription(suggestion, t, settings.timeZone, locale),
         color: 'green',
       })
       setActive(null)
@@ -155,7 +167,21 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
   })
 
   if (loading) return <Loader size="xs" />
-  if (suggestions.length === 0) return null
+  if (suggestionsQuery.isError)
+    return (
+      <Alert color="red" mt="sm">
+        <Text size="sm">{t('suggestions.loadFailed')}</Text>
+        <Button size="xs" variant="subtle" onClick={() => void suggestionsQuery.refetch()}>
+          {t('readiness.retry')}
+        </Button>
+      </Alert>
+    )
+  if (suggestions.length === 0)
+    return (
+      <Text size="sm" c="dimmed" mt="sm">
+        {t(alternativesOnly ? 'suggestions.noAlternatives' : 'suggestions.noneAvailable')}
+      </Text>
+    )
 
   return (
     <Stack gap="xs" mt="sm">
@@ -167,7 +193,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
         title={
           active
             ? t('suggestions.previewAction', {
-                action: buildDescription(active.suggestion, t, settings.timeZone),
+                action: buildDescription(active.suggestion, t, settings.timeZone, locale),
               })
             : ''
         }
@@ -181,6 +207,11 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
               preview={active.result}
               disclaimer={t('suggestions.previewDisclaimer')}
             />
+            {alternativesOnly && (
+              <Text size="xs" c="dimmed">
+                {t('suggestions.skillPreviewNote')}
+              </Text>
+            )}
             <Group justify="flex-end">
               <Button
                 variant="default"
@@ -212,7 +243,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
         const color = COLOR_MAP[s.type] ?? 'gray'
         const key = `${s.assignment_id}-${s.type}-${idx}`
         const label = t(`suggestions.type_${s.type}`)
-        const desc = buildDescription(s, t, settings.timeZone)
+        const desc = buildDescription(s, t, settings.timeZone, locale)
         return (
           <Group key={key} gap="xs" wrap="nowrap">
             <Badge size="xs" color={color} variant="light" leftSection={<Icon size={10} />}>

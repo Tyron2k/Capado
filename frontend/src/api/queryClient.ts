@@ -91,6 +91,8 @@ export const queryKeys = {
     }) => ['conflicts', 'resource-search', params] as const,
     /** Resolution suggestions for one conflict, computed on request from the current plan. */
     suggestions: (conflictId: string) => ['conflicts', 'suggestions', conflictId] as const,
+    assignmentSuggestions: (id: string, alternativesOnly: boolean) =>
+      ['conflicts', 'assignment-suggestions', id, alternativesOnly] as const,
     /**
      * Who could take over one assignment: requirements, then qualified resources, then availability.
      *

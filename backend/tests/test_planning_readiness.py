@@ -30,7 +30,7 @@ async def test_positive_checks_do_not_claim_machine_shift_personnel_presence(
         == result.qualification_status
         == "covered"
     )
-    assert result.status == "not_fully_assessable"
+    assert result.status == "covered"
     assert result.limits == ["personnel_clock_times", "infrastructure_continuity"]
     assert result.conflicts == result.supply_gaps == result.unmet_requirements == []
     assert result.personnel_requirements == result.infrastructure_requirements == 1
@@ -264,3 +264,37 @@ async def test_conflict_check_timestamp_is_a_valid_utc_instant(db_session):
     result = await get_conflict_check_status(session=db_session, _current_user=None)
     assert result["last_checked_at"] == "2026-11-03T12:00:00Z"
     assert datetime.fromisoformat(result["last_checked_at"]) == finished
+
+
+async def test_no_bookings_never_claim_checked_qualifications(db_session):
+    plan = await _seed_plan(db_session)
+    for booking in [*plan.crew_bookings, plan.machine_booking]:
+        await db_session.delete(booking)
+    await db_session.commit()
+    result = await get_work_package_readiness(db_session, plan.package.id)
+    assert result.qualification_status == "not_fully_assessable"
+    assert result.status == "missing_requirements"
+
+
+async def test_personnel_only_can_pass_defined_scope_without_inventing_equipment_demand(
+    db_session,
+):
+    from app.models.skill import Skill
+    from app.models.work_package_requirement import WorkPackageRequirement
+
+    plan = await _seed_plan(db_session)
+    requirement = await db_session.scalar(
+        select(WorkPackageRequirement)
+        .join(Skill)
+        .where(
+            WorkPackageRequirement.work_package_id == plan.package.id,
+            Skill.resource_type == "infrastructure",
+        )
+    )
+    await db_session.delete(requirement)
+    await db_session.delete(plan.machine_booking)
+    await db_session.commit()
+    result = await get_work_package_readiness(db_session, plan.package.id)
+    assert result.status == result.personnel_status == "covered"
+    assert result.infrastructure_status == "not_fully_assessable"
+    assert "no_infrastructure_requirements" in result.limits

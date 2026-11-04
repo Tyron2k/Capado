@@ -84,6 +84,16 @@ export async function deleteAssignment(id: string): Promise<void> {
 
 export type ConflictSuggestion = components['schemas']['ConflictSuggestionResponse']
 
+/** Resolve a current booking, including typed and qualified replacements. */
+export async function getAssignmentSuggestions(id: string, alternativesOnly = false) {
+  return (
+    await apiClient.get<ApiResponse<'/api/assignments/{assignment_id}/suggestions', 'get'>>(
+      `/api/assignments/${id}/suggestions`,
+      { params: { alternatives_only: alternativesOnly } },
+    )
+  ).data
+}
+
 /** Fetch resolution suggestions for a conflict. */
 export async function getConflictSuggestions(conflictId: string): Promise<ConflictSuggestion[]> {
   const response = await apiClient.get<

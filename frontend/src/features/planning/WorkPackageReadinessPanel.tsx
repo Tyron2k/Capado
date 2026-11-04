@@ -21,6 +21,7 @@ import { SectionHeader } from '../../components/layout'
 import type { ConflictFocus } from './conflictFocus'
 import { UnmetRequirementsSection } from './UnmetRequirementsAlert'
 import { ConflictsSection } from './ConflictsSection'
+import { ConflictSuggestions } from '../conflicts/ConflictSuggestions'
 
 type Package = components['schemas']['PlanningWorkPackage']
 type Status = components['schemas']['WorkPackageReadiness']['status']
@@ -120,7 +121,11 @@ export function WorkPackageReadinessPanel({
                   {t(`readiness.${dimension.key}`)}
                 </Text>
                 <Badge color={COLORS[dimension.status]} variant="light">
-                  {t(`readiness.status.${dimension.status}`)}
+                  {t(
+                    dimension.count === 0 && dimension.status === 'not_fully_assessable'
+                      ? 'readiness.undefinedRequirements'
+                      : `readiness.status.${dimension.status}`,
+                  )}
                 </Badge>
                 {dimension.count !== null && (
                   <Text size="xs" c="dimmed">
@@ -208,6 +213,19 @@ export function WorkPackageReadinessPanel({
                     </Button>
                   )}
                 </Group>
+                {data.conflicts.findIndex((c) => c.resource_id === conflict.resource_id) ===
+                  index &&
+                  data.assignments
+                    .filter(
+                      (a) =>
+                        a.resource_id === conflict.resource_id &&
+                        data.conflicts.some(
+                          (c) => c.resource_id === a.resource_id && c.assignment_ids.includes(a.id),
+                        ),
+                    )
+                    .map((a) => (
+                      <ConflictSuggestions key={a.id} assignmentId={a.id} onApplied={onChanged} />
+                    ))}
               </Paper>
             ))}
           </Stack>

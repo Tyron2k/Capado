@@ -19,11 +19,16 @@ reserve capacity or modify assignments.
 
 ## Read the result
 
-**Covered within scope** applies to the named check. **Missing requirements**
+**No blockers within scope** means the applicable, defined checks found no known
+blockers. It is reachable even when informational precision notes apply.
+**Missing requirements**
 means qualifying booking coverage is insufficient. **Conflicting** identifies a
 known capacity, booking or qualification blocker. **Not fully assessable** means
-necessary evidence is missing or the requested conclusion exceeds the available
-precision. Known blockers remain visible even when another check is incomplete.
+necessary evidence is missing or a check could not run. Qualification checks are
+incomplete when there are no bookings to examine. An unused resource domain without
+requirements is shown as undefined and does not prevent a successful result for
+the defined scope. Known blockers remain visible even when another check is
+incomplete.
 
 The scope notice explains the limits that apply to this package. In particular:
 
@@ -50,8 +55,17 @@ For a qualification blocker, expand the existing resource problem card to inspec
 the booking and qualified alternatives. The rule covers the whole booking period,
 not just the first day.
 
-For a capacity conflict, machine overlap or operating-window violation, choose
-**Review all resource bookings**. This opens the existing Assignments tab filtered
+For a capacity conflict, machine overlap or operating-window violation, preview
+one of the suggested changes directly in the assessment. Suggestions are computed
+from current bookings and do not depend on saved conflict records. Replacement
+resources keep the original resource type and must satisfy an applicable role,
+minimum level and validity for the full booking, with room for that interval.
+Operating-window moves search the nearest free continuous span within the package,
+up to 30 days either side of the original start; overnight spans are joined and
+competing bookings excluded. No fitting alternative produces an explanation; a
+failed request instead offers a retry.
+
+To edit manually, choose **Review all resource bookings**. This opens the existing Assignments tab filtered
 by resource, retaining competing bookings from other packages. Edit the relevant
 booking through the normal form. **Review package bookings** instead restricts the
 list to this package. **Show all bookings** clears the contextual filter.

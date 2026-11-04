@@ -107,7 +107,9 @@ describe('work package planning evidence', () => {
         screen.getByText(locale === 'en' ? 'Not fully assessable' : 'Nicht vollständig prüfbar'),
       ).toBeVisible()
       expect(
-        screen.getAllByText(locale === 'en' ? 'Covered within scope' : 'Im Prüfumfang gedeckt'),
+        screen.getAllByText(
+          locale === 'en' ? 'No blockers within scope' : 'Keine Blocker im Prüfumfang',
+        ),
       ).toHaveLength(3)
       expect(
         screen.getByText(
@@ -171,7 +173,7 @@ describe('work package planning evidence', () => {
     )
     setup({ client })
     expect(await screen.findByText('Checking current inputs…')).toBeVisible()
-    expect(screen.queryByText('Covered within scope')).not.toBeInTheDocument()
+    expect(screen.queryByText('No blockers within scope')).not.toBeInTheDocument()
     await act(async () => finish(evidence()))
     expect(await screen.findByTestId('work-package-readiness')).toBeVisible()
   })
@@ -234,4 +236,43 @@ describe('work package planning evidence', () => {
     expect(await screen.findByRole('button', { name: 'Show all conflicts' })).toBeVisible()
     expect(getWorkPackageReadiness).not.toHaveBeenCalled()
   })
+})
+
+it('polls the visible assessment without repeating the hidden global overview', async () => {
+  vi.useFakeTimers()
+  vi.mocked(getPlanningOverview).mockResolvedValue({
+    work_packages: [wp],
+    unmet_requirements: [],
+    conflicts: [],
+    mismatched_assignments: [],
+  })
+  vi.mocked(getWorkPackageReadiness).mockResolvedValue(evidence())
+  const client = createTestQueryClient()
+  const view = render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={['/planning?assess=wp']}>
+        <MantineProvider>
+          <I18nProvider locale="en">
+            <PlanningOverviewPanel />
+          </I18nProvider>
+        </MantineProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  try {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    expect(screen.getByTestId('work-package-readiness')).toBeVisible()
+    expect(getPlanningOverview).toHaveBeenCalledTimes(1)
+    expect(getWorkPackageReadiness).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000)
+    })
+    expect(getPlanningOverview).toHaveBeenCalledTimes(1)
+    expect(getWorkPackageReadiness).toHaveBeenCalledTimes(2)
+  } finally {
+    view.unmount()
+    vi.useRealTimers()
+  }
 })

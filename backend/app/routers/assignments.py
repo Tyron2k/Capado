@@ -38,6 +38,7 @@ from app.schemas.assignment import (
     AssignmentUpdate,
     UnmetRequirementResponse,
 )
+from app.schemas.conflict_suggestion import ConflictSuggestionResponse
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.planning_readiness import (
     PlanningOverviewResponse,
@@ -45,6 +46,7 @@ from app.schemas.planning_readiness import (
 )
 from app.services.assignment_preview import AssignmentPreviewService
 from app.services.assignment_service import AssignmentService
+from app.services.conflict_suggestion_service import ConflictSuggestionService
 from app.services.freeze_enforcement import enforce_freeze, span_of
 from app.services.permissions import (
     EntityType,
@@ -583,6 +585,22 @@ async def work_package_readiness(
 ) -> WorkPackageReadiness:
     """Preview the current checks without reserving capacity or saving conflicts."""
     return await get_work_package_readiness(session, work_package_id)
+
+
+@router.get(
+    "/{assignment_id}/suggestions", response_model=list[ConflictSuggestionResponse]
+)
+async def get_assignment_suggestions(
+    assignment_id: UUID,
+    alternatives_only: bool = Query(default=False),
+    session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(get_current_user),
+) -> list[ConflictSuggestionResponse]:
+    """Current, read-only booking resolutions; no persisted conflict ID required."""
+    suggestions = await ConflictSuggestionService(session).get_assignment_suggestions(
+        assignment_id, alternatives_only=alternatives_only
+    )
+    return [ConflictSuggestionResponse(**vars(s)) for s in suggestions]
 
 
 @router.get(

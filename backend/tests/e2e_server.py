@@ -310,6 +310,41 @@ async def seed_planning_reference(scenario):
                 end_at=_clock(MONDAY + timedelta(days=1), 1),
             )
             session.add(extra)
+        elif scenario == "overnight":
+            plan.machine_booking.start_at = _clock(MONDAY + timedelta(days=2), 21)
+            plan.machine_booking.end_at = _clock(MONDAY + timedelta(days=3), 1)
+        elif scenario == "replacement":
+            from app.models.resource import InfrastructureResource, PersonalResource
+            from app.models.skill import (
+                InfrastructureResourceSkill,
+                PersonalResourceSkill,
+            )
+
+            plan.machine_qualification.level = 1
+            machine = InfrastructureResource(
+                name="Replacement crane", group_id=plan.machine.group_id
+            )
+            person = PersonalResource(
+                name="Available person", group_id=plan.people[0].group_id
+            )
+            session.add_all([machine, person])
+            await session.flush()
+            session.add_all(
+                [
+                    InfrastructureResourceSkill(
+                        resource_id=machine.id,
+                        skill_attribute_id=plan.machine_qualification.skill_attribute_id,
+                        level=3,
+                    ),
+                    PersonalResourceSkill(
+                        resource_id=person.id,
+                        skill_attribute_id=plan.crew_qualifications[
+                            0
+                        ].skill_attribute_id,
+                        level=3,
+                    ),
+                ]
+            )
         else:
             raise ValueError("Unknown reference scenario")
         await session.commit()

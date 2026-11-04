@@ -323,7 +323,7 @@ Eine Skill-Abweichung wird erkannt, wenn eine zugewiesene Ressource keine der Qu
 
 ### Planbarkeit je Arbeitspaket
 
-Wählen Sie auf Planung → Übersicht ein Arbeitspaket aus. Personaldeckung und Kapazität, Infrastrukturbuchungen und Qualifikationen werden getrennt geprüft. „Im Prüfumfang gedeckt“ bestätigt nur die jeweilige Prüfung. Fehlende Voraussetzungen, fehlgeschlagene Prüfungen und Grenzen der Genauigkeit bleiben sichtbar. Eine gedeckte Personalbuchung beweist keine gemeinsame Anwesenheit während einer bestimmten Maschinenschicht.
+Wählen Sie auf Planung → Übersicht ein Arbeitspaket aus. Personaldeckung und Kapazität, Infrastrukturbuchungen und Qualifikationen werden getrennt geprüft. „Keine Blocker im Prüfumfang“ bestätigt die anwendbaren Prüfungen. Reine Genauigkeitshinweise verhindern dieses Ergebnis nicht. Ohne Buchungen bleiben Qualifikationen ungeprüft. Fehlende Voraussetzungen, fehlgeschlagene Prüfungen und Grenzen der Genauigkeit bleiben sichtbar. Eine gedeckte Personalbuchung beweist keine gemeinsame Anwesenheit während einer bestimmten Maschinenschicht.
 
 „Alle Buchungen der Ressource prüfen“ öffnet die bestehenden Zuordnungen einschließlich konkurrierender Arbeitspakete. Speichern Sie Korrekturen dort ausdrücklich. Die direkte Prüfung speichert selbst keine Buchungen und ersetzt keine Ressourcenreservierung. Der Zeitstempel zeigt, wann sie ausgeführt wurde.
 

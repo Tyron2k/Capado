@@ -345,9 +345,12 @@
     "type_swap_resource": "Tauschen",
     "descShiftForward": "{days} Tage nach vorne verschieben",
     "descShiftBackward": "{days} Tage nach hinten verschieben",
-    "descShiftIntoWindow": "Auf {time} Uhr innerhalb der Betriebszeit verschieben",
+    "descShiftIntoWindow": "Auf {time} innerhalb der Betriebszeit verschieben",
     "descReduce": "Auf {percent}% reduzieren",
-    "descSwap": "Zu '{name}' wechseln (verfügbar)"
+    "descSwap": "Zu '{name}' wechseln (verfügbar)",
+    "loadFailed": "Die Vorschläge konnten nicht geladen werden. Erneut versuchen oder die Buchung manuell prüfen.",
+    "noAlternatives": "Kein qualifizierter Ersatz desselben Ressourcentyps hat für diese gesamte Buchung freie Kapazität.",
+    "noneAvailable": "Keine automatische Lösung gefunden. Verschiebungen suchen freie Betriebsfenster innerhalb des Arbeitspakets, höchstens 30 Tage in beide Richtungen. Buchungen oder Verfügbarkeit manuell prüfen."
   },
   "absences": {
     "title": "Abwesenheiten",
@@ -500,7 +503,9 @@
     "assignmentRemoved": "Zuweisung wurde entfernt",
     "workPackage": "Arbeitspaket",
     "allocation": "Zuweisung",
-    "openInGantt": "Im Gantt öffnen"
+    "openInGantt": "Im Gantt öffnen",
+    "qualificationCheck": "Qualifikationsprüfung",
+    "qualificationRule": "Ein Ersatz muss eine passende Anforderung für den gesamten Buchungszeitraum erfüllen, einschließlich Mindeststufe und Gültigkeit."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1241,7 +1246,7 @@
     "infrastructure": "Infrastrukturdeckung und Buchungen",
     "qualification": "Qualifikationen der Zuordnungen",
     "status": {
-      "covered": "Im Prüfumfang gedeckt",
+      "covered": "Keine Blocker im Prüfumfang",
       "missing_requirements": "Anforderungen fehlen",
       "conflicting": "Konflikte vorhanden",
       "not_fully_assessable": "Nicht vollständig prüfbar"
@@ -1276,6 +1281,7 @@
     },
     "affectedBookings": "Betroffene Buchungen: {count}",
     "bookingsFiltered": "Buchungen nach dem gewählten Arbeitspaket oder der Ressource gefiltert.",
-    "showAllBookings": "Alle Buchungen anzeigen"
+    "showAllBookings": "Alle Buchungen anzeigen",
+    "undefinedRequirements": "Keine Anforderungen definiert"
   }
 }

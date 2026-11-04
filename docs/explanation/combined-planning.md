@@ -37,15 +37,14 @@ period; they do not promise freedom from every capacity or equipment constraint.
 
 ## Vocabulary for presenting combined results
 
-These terms describe evidence and its scope; they are not a new API status enum.
-The existing Planning Overview can use them when combining the current results.
+These terms describe evidence and its scope. The Planning Overview uses them when combining current results; its `covered` status is presented as “No blockers within scope”.
 
 | Term | Meaning | Presentation requirement |
 |---|---|---|
 | **Covered** | The particular requirement is met under its recorded mode, dates and qualification rules | State which requirement and precision were checked; do not turn this into an unconditional execution guarantee |
 | **Missing requirements** | Qualified booking coverage is below demand on a required day, or a requested infrastructure capability is not covered | Identify the deficient requirement and quantity; distinguish missing calendar configuration from a proven staffing deficit |
 | **Conflicting** | Applicable capacity, occupancy or operating-window checks report a violation | Show the cause, resource and involved bookings; distinguish current checks from last-known stored results |
-| **Not fully assessable** | A necessary result is absent, failed, stale, or cannot be derived at the requested precision | State the missing evidence, including minute-level personnel presence when only dates and percentages exist |
+| **Not fully assessable** | Necessary input is absent, a check failed, or the bounded check could not run | State the missing evidence. Informational precision limits remain visible even when all applicable checks pass |
 
 Known deficits and conflicts must remain visible even if other checks are
 incomplete. Coverage and a capacity conflict can both be true: the resources are

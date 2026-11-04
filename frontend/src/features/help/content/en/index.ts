@@ -314,7 +314,7 @@ A skill mismatch is detected when an assigned resource meets none of the work pa
 
 ### Work package readiness
 
-Select a work package in Planning → Overview. Personnel coverage and capacity, equipment bookings and qualifications are checked separately. “Covered within scope” confirms only the named check. Missing prerequisites, failed checks and precision limits remain visible. A covered personnel booking does not prove shared presence during a particular machine shift.
+Select a work package in Planning → Overview. Personnel coverage and capacity, equipment bookings and qualifications are checked separately. “No blockers within scope” confirms the applicable checks. Informational precision notes do not prevent this result. Without bookings, qualifications remain unchecked. Missing prerequisites, failed checks and precision limits remain visible. A covered personnel booking does not prove shared presence during a particular machine shift.
 
 “Review all resource bookings” opens the existing assignments, including competing work packages. Save corrections there explicitly. The direct check does not save bookings or reserve resources; its timestamp shows when it ran.
 

@@ -33,6 +33,7 @@ export function PlanningOverviewPanel({
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const conflictFocus = parseConflictFocus(searchParams)
+  const selected = searchParams.get('assess')
 
   const clearConflictFocus = useCallback(() => {
     setSearchParams((previous) => {
@@ -46,7 +47,8 @@ export function PlanningOverviewPanel({
 
   const overviewQuery = useQuery({
     queryKey: queryKeys.planning.overview(),
-    refetchInterval: 60_000,
+    refetchInterval: selected ? false : 60_000,
+    refetchOnWindowFocus: !selected,
     enabled: active,
     queryFn: ({ signal }) => getPlanningOverview(signal),
   })
@@ -88,7 +90,6 @@ export function PlanningOverviewPanel({
         </Button>
       </Alert>
     )
-  const selected = searchParams.get('assess')
 
   return (
     <Stack gap="lg">

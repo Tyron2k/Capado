@@ -8,6 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('../../api/assignments', () => ({
   getAssignment: vi.fn(),
+  getAssignmentSuggestions: vi.fn(),
   getConflictSuggestions: vi.fn(),
   previewAssignment: vi.fn(),
   updateAssignment: vi.fn(),
@@ -143,4 +144,15 @@ describe('conflict suggestions in the planning overview', () => {
     expect(updateAssignment).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Anwenden' })).not.toBeInTheDocument()
   })
+})
+
+it('distinguishes an empty result from a failed request and offers a retry', async () => {
+  vi.mocked(getConflictSuggestions)
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValue([])
+  renderSuggestions()
+  expect(await screen.findByText(/Die Vorschläge konnten nicht geladen werden/)).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
+  expect(await screen.findByText(/Keine automatische Lösung gefunden/)).toBeVisible()
+  expect(screen.queryByText(/Die Vorschläge konnten nicht geladen werden/)).not.toBeInTheDocument()
 })

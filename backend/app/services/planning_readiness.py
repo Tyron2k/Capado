@@ -26,6 +26,7 @@ from app.schemas.planning_readiness import (
     ReadinessStatus,
     WorkPackageReadiness,
 )
+from app.services.assignment_service import clip_assignment
 from app.services.conflict_service import ConflictService
 from app.services.skill_mismatch import detect_mismatches
 from app.services.time_zone import local_day_bounds, planning_today, planning_zone
@@ -75,40 +76,6 @@ def _status(
     if gaps:
         return "missing_requirements"
     return "not_fully_assessable" if unknown else "covered"
-
-
-def _clip(booking: Assignment, start: date, end: date) -> Assignment | None:
-    """Transient input to the existing engine; never mutate tracked bookings."""
-    if booking.resource_type == ResourceType.personal:
-        if booking.start_date is None or booking.end_date is None:
-            return None
-        lo, hi = max(start, booking.start_date), min(end, booking.end_date)
-        if lo > hi:
-            return None
-        return Assignment(
-            id=booking.id,
-            resource_id=booking.resource_id,
-            resource_type=booking.resource_type,
-            work_package_id=booking.work_package_id,
-            start_date=lo,
-            end_date=hi,
-            allocation_percent=booking.allocation_percent,
-        )
-    if booking.start_at is None or booking.end_at is None:
-        return None
-    lower = local_day_bounds(start, planning_zone())[0]
-    upper = local_day_bounds(end, planning_zone())[1]
-    lo_at, hi_at = max(lower, booking.start_at), min(upper, booking.end_at)
-    if lo_at >= hi_at:
-        return None
-    return Assignment(
-        id=booking.id,
-        resource_id=booking.resource_id,
-        resource_type=booking.resource_type,
-        work_package_id=booking.work_package_id,
-        start_at=lo_at,
-        end_at=hi_at,
-    )
 
 
 async def get_work_package_readiness(
@@ -216,7 +183,7 @@ async def get_work_package_readiness(
         )
         grouped: dict[UUID, list[Assignment]] = {rid: [] for rid in ids}
         for booking in competing:
-            clipped = _clip(booking, start, end)
+            clipped = clip_assignment(booking, start, end)
             if clipped:
                 grouped[booking.resource_id].append(clipped)
         working = WorkingTimeService(session)
@@ -300,12 +267,20 @@ async def get_work_package_readiness(
         gaps=any(u.resource_type == "infrastructure" for u in unmet),
         unknown=not infra_count or "capacity_window_limit" in limits,
     )
-    qualification_status = _status(conflicts=bool(mismatches), unknown=not requirements)
-    states = (personal_status, infra_status, qualification_status)
+    qualification_status = _status(
+        conflicts=bool(mismatches), unknown=not requirements or not own
+    )
+    # Precision notes describe the guarantee; they do not invalidate successful
+    # checks. An undefined, unused resource domain is outside that guarantee.
+    states = [qualification_status]
+    if personal_count or any(a.resource_type == ResourceType.personal for a in own):
+        states.append(personal_status)
+    if infra_count or any(a.resource_type == ResourceType.infrastructure for a in own):
+        states.append(infra_status)
     status = _status(
         conflicts="conflicting" in states,
         gaps="missing_requirements" in states,
-        unknown="not_fully_assessable" in states or bool(limits),
+        unknown="not_fully_assessable" in states,
     )
     return WorkPackageReadiness(
         work_package=_package(wp, project_name),
