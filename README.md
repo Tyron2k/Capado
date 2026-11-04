@@ -113,6 +113,9 @@ Das zieht die veröffentlichten Images, es wird nichts kompiliert. Öffne http:/
 Einrichtungsseite führt durch das Anlegen des ersten Administrators. Migrationen laufen beim Start
 automatisch.
 
+Für den ersten Plan gibt es eine [Schritt-für-Schritt-Anleitung mit fiktiven Beispieldaten](docs/how-to/first-combined-plan.md):
+Personal und Maschine zuweisen, Qualifikationen prüfen und einen Buchungskonflikt beheben.
+
 Nur Port 3000 muss erreichbar sein: das Frontend liefert die Anwendung aus und leitet `/api/` intern
 weiter. Postgres wird bewusst nicht auf den Host veröffentlicht.
 

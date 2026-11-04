@@ -80,6 +80,14 @@ presentation, and 390 × 844 layout without page-wide horizontal overflow.
 
 ## Planner observation protocol — not yet performed
 
+The [first combined plan walkthrough](../how-to/first-combined-plan.md) now provides
+a downloadable example ZIP from the same reference fixture. Its committed import
+regression checks the initial gap/conflicts and both documented repairs. An internal
+production-target Docker Compose check also exercised fresh setup, authenticated
+ZIP import, the two repairs, export and rejection of reimport into a populated target.
+That check used HTTP/API requests, not a new browser test or an independent operator.
+It establishes reproducibility of the data flow, not a measured usability improvement.
+
 For issue #135, invite two independent planners where possible. Obtain permission
 for the session; collect no personnel names, customer data, production plans or
 credentials. A person may stop at any time. Use only the fictional scenarios above.

@@ -9,9 +9,12 @@ from uuid import UUID
 
 import bcrypt
 import jwt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.exceptions import BusinessRuleError
+from app.models.user import RefreshToken
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +205,24 @@ def create_refresh_token() -> tuple[str, str, datetime]:
     token_hash = _hash_refresh_token(raw_token)
     expires_at = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     return raw_token, token_hash, expires_at
+
+
+async def revoke_user_refresh_tokens(session: AsyncSession, user_id: UUID) -> None:
+    """Invalidate every refresh branch, including recently rotated predecessors.
+
+    A rotated token remains usable in the concurrency grace window while it has
+    a successor marker. Explicit family revocation must remove that marker too.
+    Keep existing revocation timestamps for audit; the caller owns the transaction.
+    """
+    now = datetime.now(UTC)
+    result = await session.execute(
+        select(RefreshToken).where(RefreshToken.user_id == user_id)
+    )
+    for token in result.scalars().all():
+        if token.revoked_at is None:
+            token.revoked_at = now
+        token.replaced_by_id = None
+        session.add(token)
 
 
 def validate_refresh_token(

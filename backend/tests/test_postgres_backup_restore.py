@@ -6,7 +6,7 @@ import shutil
 import socket
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -19,6 +19,8 @@ from app import models as m
 from app.models.base import ORMModel
 from app.services.auth_service import hash_password
 from app.services.conflict_refresh import refresh_resources
+from app.services.planning_readiness import get_work_package_readiness
+from tests.planning_reference import MONDAY, _clock, _seed_plan
 from tests.test_csv_migration import source  # noqa: F401
 from tests.test_utc_migration_postgres import (  # noqa: F401
     BOOKING,
@@ -172,6 +174,15 @@ async def verify_running_application(url, refs, password, tmp_path):
                         f"/api/resources/personal/{refs['person']}", headers=headers
                     )
                 ).json()["id"] == str(refs["person"])
+                if "planning_expected" in refs:
+                    readiness = await client.get(
+                        f"/api/assignments/planning/work-packages/{refs['planning_package']}",
+                        headers=headers,
+                    )
+                    assert readiness.status_code == 200, readiness.text
+                    actual = readiness.json()
+                    actual.pop("checked_at")
+                    assert actual == refs["planning_expected"]
                 editor = await client.post(
                     "/api/auth/login",
                     json={"email": "editor@example.test", "password": password},
@@ -232,6 +243,32 @@ async def test_real_dump_restore_upgrade_and_authenticated_application(
         upgraded_source = await migrate(source_url, "head")
         assert upgraded_source.returncode == 0, upgraded_source.stderr
         assert await database_records(source_engine) == original_data
+        # Reuse the current combined reference case in addition to the legacy data.
+        # A restore must preserve blockers, not merely return successful API reads.
+        plan = await _seed_plan(db_session)
+        plan.crew_qualifications[0].valid_until = MONDAY
+        db_session.add(
+            m.Assignment(
+                resource_type=m.ResourceType.infrastructure,
+                resource_id=plan.machine.id,
+                work_package_id=plan.package.id,
+                start_at=_clock(MONDAY, 21),
+                end_at=_clock(MONDAY + timedelta(days=1), 1),
+            )
+        )
+        await db_session.commit()
+        await refresh_resources(db_session, plan.resource_ids)
+        readiness = await get_work_package_readiness(db_session, plan.package.id)
+        assert readiness.personnel_requirements == 1
+        assert readiness.infrastructure_requirements == 1
+        assert readiness.qualification_status == "conflicting"
+        assert len(readiness.conflicts) == 2
+        assert readiness.unmet_requirements
+        assert "personnel_clock_times" in readiness.limits
+        source["planning_package"] = plan.package.id
+        source["planning_expected"] = readiness.model_dump(
+            mode="json", exclude={"checked_at"}
+        )
     before = await database_records(source_engine)
     for name in (
         "projects",
@@ -249,6 +286,11 @@ async def test_real_dump_restore_upgrade_and_authenticated_application(
         "conflicts",
         "conflict_assignments",
         "refresh_tokens",
+        "skills",
+        "skill_attributes",
+        "personal_resource_skills",
+        "infrastructure_resource_skills",
+        "work_package_requirements",
     ):
         assert before[name], name
     async with source_engine.connect() as connection:
@@ -281,6 +323,34 @@ async def test_real_dump_restore_upgrade_and_authenticated_application(
     async with admin_engine.connect() as connection:
         await connection.execute(sa.text(f'CREATE DATABASE "{name}"'))
     try:
+        if backup_revision == "head":
+            # Keep the whole TOC readable and fail only while restoring data.
+            # Cutting halfway fails before SQL and cannot test atomic rollback.
+            damaged = dump[:-64]
+            assert (
+                await pg_tool("pg_restore", source_url, "--list", data=damaged)
+                == contents
+            )
+            with pytest.raises(AssertionError, match="pg_restore:"):
+                await pg_tool(
+                    "pg_restore",
+                    restored_url,
+                    f"--dbname={name}",
+                    "--no-owner",
+                    "--no-privileges",
+                    "--exit-on-error",
+                    "--single-transaction",
+                    data=damaged,
+                )
+            async with restored_engine.connect() as connection:
+                assert (
+                    await connection.scalar(
+                        sa.text(
+                            "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'"
+                        )
+                    )
+                    == 0
+                )
         await pg_tool(
             "pg_restore",
             restored_url,
