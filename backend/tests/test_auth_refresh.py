@@ -179,13 +179,15 @@ class TestRefreshFlow:
         family = [
             SimpleNamespace(revoked_at=None),
             SimpleNamespace(revoked_at=None),
+            stored,
         ]
+        original_revocation = stored.revoked_at
 
         session = AsyncMock()
         session.execute = AsyncMock(
             side_effect=[
                 _exec_result(scalar=stored),  # token lookup
-                _exec_result(scalars=family),  # _revoke_all_user_tokens select
+                _exec_result(scalars=family),  # explicit family revocation
             ]
         )
         session.add = MagicMock()
@@ -200,6 +202,8 @@ class TestRefreshFlow:
         assert exc.value.status_code == 401
         # The whole family was revoked.
         assert all(t.revoked_at is not None for t in family)
+        assert all(t.replaced_by_id is None for t in family)
+        assert stored.revoked_at == original_revocation
 
     async def test_logged_out_token_replay_revokes_family(self):
         """A revoked-but-never-rotated (logout) token replay revokes the family."""

@@ -10,6 +10,7 @@ from sqlalchemy import event, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_session
 from app.main import app
 from app.models.audit import AuditLog
@@ -42,11 +43,17 @@ async def account(combined_database):
     return user
 
 
+@pytest.mark.parametrize("rotations", [0, 2], ids=["active", "rotated-and-grace-fork"])
 async def test_recovery_revokes_refresh_and_preserves_normal_login_password_gate(
     combined_database,
     account,
+    rotations,
+    monkeypatch,
 ):
     session, _ = combined_database
+    # Keep the grace path open even on a slow runner: expiry must not hide a
+    # failed revocation and accidentally make this security regression pass.
+    monkeypatch.setattr(settings, "refresh_reuse_grace_seconds", 3600)
     other = User(
         email="viewer@example.test", name="Fictional viewer", password_hash="test-only"
     )
@@ -73,6 +80,27 @@ async def test_recovery_revokes_refresh_and_preserves_normal_login_password_gate
             )
             assert old_login.status_code == 200
             old_access = old_login.json()["access_token"]
+            old_cookies = [client.cookies.get(settings.refresh_cookie_name)]
+            for _ in range(rotations):
+                assert (await client.post("/api/auth/refresh")).status_code == 200
+                old_cookies.append(client.cookies.get(settings.refresh_cookie_name))
+            if rotations:
+                # Exercise the legitimate grace path before recovery, including
+                # its extra live session branch, without waiting for its expiry.
+                grace = await client.post(
+                    "/api/auth/refresh",
+                    headers={
+                        "Cookie": f"{settings.refresh_cookie_name}={old_cookies[0]}"
+                    },
+                )
+                assert grace.status_code == 200
+                old_cookies.append(client.cookies.get(settings.refresh_cookie_name))
+            previously_revoked = {
+                token.id: token.revoked_at
+                for token in (await session.scalars(select(RefreshToken))).all()
+                if token.user_id == account.id and token.revoked_at is not None
+            }
+            await session.commit()
             identity = (
                 account.id,
                 account.role,
@@ -91,6 +119,11 @@ async def test_recovery_revokes_refresh_and_preserves_normal_login_password_gate
             tokens = list(await session.scalars(select(RefreshToken)))
             own_tokens = [t for t in tokens if t.user_id == account.id]
             assert own_tokens and all(t.revoked_at for t in own_tokens)
+            assert all(
+                token.revoked_at == previously_revoked[token.id]
+                for token in own_tokens
+                if token.id in previously_revoked
+            )
             assert other_token.revoked_at is None
             entries = list(
                 await session.scalars(
@@ -108,7 +141,12 @@ async def test_recovery_revokes_refresh_and_preserves_normal_login_password_gate
             }
             assert OLD not in str([e.changes for e in entries])
             assert TEMPORARY not in str([e.changes for e in entries])
-            assert (await client.post("/api/auth/refresh")).status_code == 401
+            for cookie in old_cookies:
+                replay = await client.post(
+                    "/api/auth/refresh",
+                    headers={"Cookie": f"{settings.refresh_cookie_name}={cookie}"},
+                )
+                assert replay.status_code == 401
             assert (
                 await client.post(
                     "/api/auth/login", json={"email": EMAIL, "password": OLD}
@@ -137,6 +175,14 @@ async def test_recovery_revokes_refresh_and_preserves_normal_login_password_gate
             assert (
                 await client.get("/api/users/me", headers=headers)
             ).status_code == 200
+            # The password-change gate has now cleared: old refresh credentials
+            # must still be unusable, rather than regaining administrator access.
+            for cookie in old_cookies:
+                replay = await client.post(
+                    "/api/auth/refresh",
+                    headers={"Cookie": f"{settings.refresh_cookie_name}={cookie}"},
+                )
+                assert replay.status_code == 401
     finally:
         app.dependency_overrides.pop(get_session, None)
 
@@ -196,7 +242,15 @@ async def test_audit_failure_rolls_back_password_and_token_revocation(
         token_hash="test-only",
         expires_at=datetime.now(UTC) + timedelta(days=1),
     )
-    session.add(token)
+    predecessor = RefreshToken(
+        user_id=account.id,
+        token_hash="rotated-test-only",
+        expires_at=token.expires_at,
+        revoked_at=datetime.now(UTC),
+        replaced_by_id=token.id,
+    )
+    original_revocation = predecessor.revoked_at
+    session.add_all([token, predecessor])
     await session.commit()
     old_hash = account.password_hash
 
@@ -212,8 +266,11 @@ async def test_audit_failure_rolls_back_password_and_token_revocation(
         event.remove(engine.sync_engine, "before_cursor_execute", fail_audit)
     await session.refresh(account)
     await session.refresh(token)
+    await session.refresh(predecessor)
     assert account.password_hash == old_hash and not account.must_change_password
     assert token.revoked_at is None
+    assert predecessor.revoked_at == original_revocation
+    assert predecessor.replaced_by_id == token.id
 
 
 async def test_concurrent_account_write_prevents_recovery_without_overwrite(

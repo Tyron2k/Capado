@@ -14,9 +14,9 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import RefreshToken, User, UserRole
+from app.models.user import User, UserRole
 from app.services.audit import register_audit_listener, set_actor, set_reason
-from app.services.auth_service import hash_password
+from app.services.auth_service import hash_password, revoke_user_refresh_tokens
 
 
 async def recover_admin(
@@ -50,21 +50,13 @@ async def recover_admin(
                 "Use normal account management when another administrator is available."
             )
         user = admins[0]
-        tokens = list(
-            await session.scalars(
-                select(RefreshToken).where(
-                    RefreshToken.user_id == user.id, RefreshToken.revoked_at.is_(None)
-                )
-            )
-        )
         now = datetime.now(UTC)
         set_actor(session, None)
         set_reason(session, "Local operator: last-administrator credential recovery")
+        await revoke_user_refresh_tokens(session, user.id)
         user.password_hash = password_hash
         user.must_change_password = True
         user.updated_at = now
-        for token in tokens:
-            token.revoked_at = now
 
 
 async def _run(email: str, password: str) -> None:

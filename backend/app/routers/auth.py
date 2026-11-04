@@ -5,7 +5,6 @@ import hashlib
 import logging
 import secrets
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, func, select, text
@@ -28,6 +27,7 @@ from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
     hash_password,
+    revoke_user_refresh_tokens,
     validate_refresh_token,
     verify_password,
 )
@@ -46,25 +46,6 @@ _DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
 
 # CAPA: a dedicated namespace, separate from graph, scheduler and resource locks.
 _SETUP_LOCK_NAMESPACE = 0x43_41_50_41
-
-
-async def _revoke_all_user_tokens(session: AsyncSession, user_id: UUID) -> None:
-    """Revoke every active refresh token for a user (family revocation).
-
-    Args:
-        session: Database session (not committed here).
-        user_id: The user whose tokens should be revoked.
-
-    """
-    now = datetime.now(UTC)
-    statement = select(RefreshToken).where(
-        RefreshToken.user_id == user_id,
-        RefreshToken.revoked_at.is_(None),
-    )
-    result = await session.execute(statement)
-    for token in result.scalars().all():
-        token.revoked_at = now
-        session.add(token)
 
 
 async def _delete_expired_tokens(session: AsyncSession) -> None:
@@ -247,7 +228,7 @@ async def refresh(
                 "Refresh token reuse detected for user %s; revoking all tokens.",
                 stored_token.user_id,
             )
-            await _revoke_all_user_tokens(session, stored_token.user_id)
+            await revoke_user_refresh_tokens(session, stored_token.user_id)
             await session.commit()
             clear_refresh_cookie(response)
             raise HTTPException(

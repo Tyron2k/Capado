@@ -66,7 +66,8 @@ upgrade procedure, not by deleting users or altering roles directly.
 
 ## Session limits
 
-The command revokes all stored refresh tokens for the recovered account. Existing short-lived
+The command revokes all stored refresh tokens for the recovered account, including
+recently rotated predecessors and concurrent-refresh branches. Existing short-lived
 access JWTs retain their normal expiry: they are blocked by the password-change gate until
 the temporary password is changed, but are not individually revoked. This procedure is for
 forgotten credentials. For suspected account/token compromise, also rotate the deployment's
