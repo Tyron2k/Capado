@@ -88,6 +88,7 @@ nav:
       - Local load testing: how-to/load-testing.md
       - Assessing work packages: how-to/assessing-work-packages.md
       - Upgrading: how-to/upgrading.md
+      - Recovering administrator access: how-to/recovering-administrator-access.md
       - Publishing a release: how-to/publishing-a-release.md
       - Adding a feature: how-to/adding-a-feature.md
   - Understanding it:

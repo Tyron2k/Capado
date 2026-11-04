@@ -277,10 +277,18 @@ gets back in through SSO, as an administrator, provided all of:
 means the setup admin's password is typically used once at install and never again. That is precisely
 the password that is forgotten a year later.
 
-### Where it still ends in the database
+### Local operator recovery
+
+If no administrator can sign in, the trusted operator can recover the **sole active
+administrator** through the [interactive local command](../how-to/recovering-administrator-access.md).
+It preserves the account and OIDC link, requires a password change, revokes refresh
+tokens and records the intervention with redacted audit values. It is not a public
+password-reset API and does not create, promote or reactivate accounts.
+
+OIDC cannot provide recovery when:
 
 - **No OIDC configured.** A single-admin deployment that loses that password has no way in but
-  writing a bcrypt hash into the `users` table by hand.
+  using the local operator procedure above.
 - **Email mismatch.** No link happens. If auto-creation is enabled the SSO login instead produces a
   **viewer** (`role=UserRole.viewer`), which cannot repair anything.
 - **Provider unreachable.** Only the local password remains, and it is the forgotten one.
