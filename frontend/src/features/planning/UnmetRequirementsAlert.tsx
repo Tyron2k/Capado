@@ -38,6 +38,7 @@ import type {
   UnmetRequirement,
 } from '../../types/assignment'
 import { AssignmentPreviewSummary } from './AssignmentPreviewSummary'
+import { AssignmentChangeSummary } from './AssignmentChangeSummary'
 
 /** A group of unmet requirements belonging to the same work package. */
 interface WpBucket {
@@ -237,17 +238,12 @@ function UnmetRequirementCard({
       >
         {activePreview && (
           <Stack gap="md">
-            <Text size="sm">
-              {activePreview.payload.resource_type === 'personal'
-                ? t('planning.unmetPreviewPersonal', {
-                    start: formatDate(bucket.start_date),
-                    end: formatDate(bucket.end_date),
-                  })
-                : t('planning.unmetPreviewInfrastructure', {
-                    start: formatDate(bucket.start_date),
-                    end: formatDate(bucket.end_date),
-                  })}
-            </Text>
+            <AssignmentChangeSummary
+              after={activePreview.payload}
+              preview={activePreview.result}
+              workPackageName={bucket.work_package_name}
+              projectName={bucket.project_name}
+            />
             <AssignmentPreviewSummary
               preview={activePreview.result}
               disclaimer={t('planning.unmetPreviewDisclaimer')}

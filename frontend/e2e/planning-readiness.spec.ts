@@ -77,6 +77,10 @@ test('combined planning: fill missing staffing while retaining the precision lim
   await measure.step(() => verdict.getByRole('button', { name: 'Preview', exact: true }).click())
   const dialog = page.getByRole('dialog', { name: /Preview.*Person 1/ })
   await expect(dialog).toBeVisible()
+  const proposal = dialog.getByRole('table', { name: 'Proposed change' })
+  await expect(dialog.getByText('New booking', { exact: true })).toBeVisible()
+  await expect(proposal.getByRole('row', { name: /Allocation/ })).toContainText('100 %')
+  await expect(proposal.getByRole('row', { name: /Start Date/ })).toContainText('2099-01-05')
   await measure.step(() => dialog.getByRole('button', { name: 'Assign', exact: true }).click())
   await expect(dialog).toBeHidden()
   await expect(verdict.getByText('No blockers within scope', { exact: true })).toHaveCount(4)
@@ -196,6 +200,7 @@ test('combined planning: an overnight booking gets a current free-window suggest
   page,
 }, info) => {
   await start(page, 'overnight')
+  await page.setViewportSize({ width: 1440, height: 1000 })
   await selectPackage(page, measurement().step)
   const verdict = page.getByTestId('work-package-readiness')
   await expect(
@@ -204,11 +209,40 @@ test('combined planning: an overnight booking gets a current free-window suggest
   await verdict.getByRole('button', { name: 'Preview', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: /Preview: Move to/ })
   await expect(dialog.getByText('Conflicts: 1 → 0', { exact: true })).toBeVisible()
+  const proposal = dialog.getByRole('table', { name: 'Proposed change' })
+  const fromRow = proposal.getByRole('row', { name: /Occupied From/ })
+  const untilRow = proposal.getByRole('row', { name: /Occupied Until/ })
+  await expect(fromRow).toContainText('2099-01-07 21:00:00 (UTC+01:00)')
+  await expect(fromRow).toContainText('2099-01-06 02:00:00 (UTC+01:00)')
+  await expect(untilRow).toContainText('2099-01-08 01:00:00 (UTC+01:00)')
+  await expect(untilRow).toContainText('2099-01-06 06:00:00 (UTC+01:00)')
+  await expect(proposal.getByRole('row', { name: /Duration/ })).toContainText('Unchanged')
   await page.screenshot({
     path: info.outputPath('readiness-overnight-preview.png'),
-    fullPage: true,
+    fullPage: false,
   })
+  await page.setViewportSize({ width: 390, height: 844 })
+  const mobileProposal = dialog.getByRole('list', { name: 'Proposed change' })
+  await expect(mobileProposal).toBeVisible()
+  await expect(proposal).toBeHidden()
+  await expect(
+    mobileProposal.getByRole('listitem').filter({ hasText: 'Occupied From' }),
+  ).toContainText('2099-01-06 02:00:00 (UTC+01:00)')
+  await expect
+    .poll(() => dialog.evaluate((node) => node.scrollWidth <= node.clientWidth))
+    .toBe(true)
+  await page.screenshot({
+    path: info.outputPath('readiness-overnight-preview-mobile.png'),
+    fullPage: false,
+  })
+  const updated = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/assignments/') && response.request().method() === 'PUT',
+  )
   await dialog.getByRole('button', { name: 'Apply', exact: true }).click()
+  const saved = (await (await updated).json()).assignment
+  expect(saved.start_at).toBe('2099-01-06T01:00:00Z')
+  expect(saved.end_at).toBe('2099-01-06T05:00:00Z')
   await expect(dialog).toBeHidden()
   await expect(verdict.getByText('No blockers within scope', { exact: true })).toHaveCount(4)
 })
@@ -227,6 +261,11 @@ test('combined planning: equipment alternatives never offer a person and apply w
   await verdict.getByRole('button', { name: 'Preview', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: /Preview: Swap to 'Replacement crane'/ })
   await expect(dialog.getByText('Conflicts: 0 → 0', { exact: true })).toHaveCount(2)
+  const proposal = dialog.getByRole('table', { name: 'Proposed change' })
+  const resource = proposal.getByRole('row', { name: /Resource/ })
+  await expect(resource.getByText('Fictional crane', { exact: true })).toBeVisible()
+  await expect(resource.getByText('Replacement crane', { exact: true })).toBeVisible()
+  await expect(proposal.getByRole('row', { name: /Occupied From/ })).toContainText('Unchanged')
   await page.screenshot({
     path: info.outputPath('readiness-equipment-swap-preview.png'),
     fullPage: true,

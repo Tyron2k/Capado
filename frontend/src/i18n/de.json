@@ -1283,5 +1283,17 @@
     "bookingsFiltered": "Buchungen nach dem gewählten Arbeitspaket oder der Ressource gefiltert.",
     "showAllBookings": "Alle Buchungen anzeigen",
     "undefinedRequirements": "Keine Anforderungen definiert"
+  },
+  "assignmentChange": {
+    "title": "Geplante Änderung",
+    "createTitle": "Neue Buchung",
+    "field": "Angabe",
+    "before": "Vorher",
+    "after": "Nachher",
+    "new": "Neu",
+    "changed": "Geändert",
+    "unchanged": "Unverändert",
+    "duration": "Dauer",
+    "timeZone": "Zeitzone: {zone}"
   }
 }

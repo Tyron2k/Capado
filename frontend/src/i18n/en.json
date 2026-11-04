@@ -1283,5 +1283,17 @@
     "bookingsFiltered": "Bookings filtered by the selected work package or resource.",
     "showAllBookings": "Show all bookings",
     "undefinedRequirements": "No requirements defined"
+  },
+  "assignmentChange": {
+    "title": "Proposed change",
+    "createTitle": "New booking",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "new": "New",
+    "changed": "Changed",
+    "unchanged": "Unchanged",
+    "duration": "Duration",
+    "timeZone": "Time zone: {zone}"
   }
 }

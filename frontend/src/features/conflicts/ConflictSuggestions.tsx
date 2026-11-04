@@ -24,10 +24,16 @@ import {
   updateAssignment,
   type ConflictSuggestion,
 } from '../../api/assignments'
-import type { AssignmentPreview, AssignmentUpdate } from '../../types/assignment'
+import type {
+  Assignment,
+  AssignmentCreate,
+  AssignmentPreview,
+  AssignmentUpdate,
+} from '../../types/assignment'
 import { useTranslation, type Locale } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
+import { AssignmentChangeSummary } from '../planning/AssignmentChangeSummary'
 import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
 import { useSettings } from '../../context/SettingsContext'
 import { formatDateTime } from '../../utils/date'
@@ -95,6 +101,8 @@ export function ConflictSuggestions({
   const [active, setActive] = useState<{
     suggestion: ConflictSuggestion
     patch: AssignmentUpdate
+    before: Assignment
+    after: AssignmentCreate
     result: AssignmentPreview
   } | null>(null)
 
@@ -126,8 +134,9 @@ export function ConflictSuggestions({
     mutationFn: async (suggestion: ConflictSuggestion) => {
       const assignment = await getAssignment(suggestion.assignment_id)
       const patch = patchForSuggestion(suggestion, assignment)
-      const result = await previewAssignment(previewPayloadForPatch(assignment, patch))
-      return { suggestion, patch, result }
+      const after = previewPayloadForPatch(assignment, patch)
+      const result = await previewAssignment(after)
+      return { suggestion, patch, before: assignment, after, result }
     },
     onSuccess: setActive,
     onError: (error) => {
@@ -203,6 +212,11 @@ export function ConflictSuggestions({
       >
         {active && (
           <Stack gap="md">
+            <AssignmentChangeSummary
+              before={active.before}
+              after={active.after}
+              preview={active.result}
+            />
             <AssignmentPreviewSummary
               preview={active.result}
               disclaimer={t('suggestions.previewDisclaimer')}

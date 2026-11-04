@@ -51,6 +51,13 @@ For a missing requirement, expand its existing requirement card and preview a
 qualified resource suggestion. Confirming the preview saves the assignment;
 opening or cancelling it does not. The preview is an estimate, not a reservation.
 
+Before confirming a suggestion, review the **Proposed change** comparison. It shows
+resource, start/end and personnel allocation before and after, and marks unchanged
+values. Equipment bookings include exact clock times, UTC offsets, the display time
+zone and elapsed duration. A new booking is identified explicitly with its complete
+proposed period and allocation. The conflict impact is shown separately below. The
+comparison uses the same proposal sent for preview and saved on confirmation.
+
 For a qualification blocker, expand the existing resource problem card to inspect
 the booking and qualified alternatives. The rule covers the whole booking period,
 not just the first day.

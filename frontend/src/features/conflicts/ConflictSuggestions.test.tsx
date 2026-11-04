@@ -2,7 +2,7 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
 import { QueryClientProvider } from '@tanstack/react-query'
 
@@ -116,6 +116,14 @@ describe('conflict suggestions in the planning overview', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Vorschau' }))
 
     expect(await screen.findByText('Konflikte: 0 → 0')).toBeInTheDocument()
+    const change = screen.getByRole('table', { name: 'Geplante Änderung' })
+    const start = within(change).getByRole('row', { name: /Startdatum/ })
+    expect(within(start).getByText('01.09.2026')).toBeVisible()
+    expect(within(start).getByText('03.09.2026')).toBeVisible()
+    expect(within(start).getByText('Geändert')).toBeVisible()
+    const allocation = within(change).getByRole('row', { name: /Auslastung/ })
+    expect(within(allocation).getAllByText('80 %')).toHaveLength(2)
+    expect(within(allocation).getByText('Unverändert')).toBeVisible()
     expect(getAssignment).toHaveBeenCalledWith('a1')
     expect(previewAssignment).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,4 +163,33 @@ it('distinguishes an empty result from a failed request and offers a retry', asy
   fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
   expect(await screen.findByText(/Keine automatische Lösung gefunden/)).toBeVisible()
   expect(screen.queryByText(/Die Vorschläge konnten nicht geladen werden/)).not.toBeInTheDocument()
+})
+
+it('shows the exact allocation reduction before saving the same value', async () => {
+  vi.mocked(getConflictSuggestions).mockResolvedValue([
+    {
+      type: 'reduce_allocation',
+      assignment_id: 'a1',
+      description: 'reduce',
+      new_allocation_percent: 37.5,
+      new_end_at: null,
+      new_start_at: null,
+      target_resource_id: null,
+      target_resource_name: null,
+      shift_days: null,
+    },
+  ])
+  renderSuggestions()
+  fireEvent.click(await screen.findByRole('button', { name: 'Vorschau' }))
+  const table = await screen.findByRole('table', { name: 'Geplante Änderung' })
+  const allocation = within(table).getByRole('row', { name: /Auslastung/ })
+  expect(within(allocation).getByText('80 %')).toBeVisible()
+  expect(within(allocation).getByText('37,5 %')).toBeVisible()
+  expect(within(allocation).getByText('Geändert')).toBeVisible()
+  expect(within(table).getByRole('row', { name: /Startdatum/ })).toHaveTextContent('Unverändert')
+  expect(updateAssignment).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Anwenden' }))
+  await waitFor(() =>
+    expect(updateAssignment).toHaveBeenCalledWith('a1', { allocation_percent: 37.5 }),
+  )
 })
