@@ -164,6 +164,28 @@ audit stays blocking even when no GitHub security update PR is available.
 Remove this fallback only after upgrading to a Renovate release supporting both lockfiles
 and verifying an actual transitive alert's fix. See [CI](ci.md) for the bot configuration.
 
+## Legacy minimatch advisory in API tooling
+
+As verified on 4 November 2026, the scoped `minimatch@^10` override upgrades ESLint,
+its configuration matcher and the TypeScript parser to patched minimatch 11.0.4.
+These are development dependencies. Runtime dependencies have no corresponding finding.
+
+`openapi-typescript` 7.13.0 still depends on Redocly 1.34.23 and its callable
+minimatch 5.1.9 API. npm applies GHSA-g3hv-75wg-m249 to every version `<11.0.1`,
+so it continues reporting this legacy chain. The
+[maintainer's advisory](https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249)
+describes amplification in `firstPhasePreProcess()` with `optimizationLevel >= 2`.
+The inspected [5.1.9 source](https://github.com/isaacs/minimatch/blob/v5.1.9/minimatch.js)
+contains neither that method nor the optimization-level mechanism. This is a
+source-based applicability assessment of this specific advisory; the npm finding
+remains visible and has not been suppressed or dismissed.
+
+Forcing minimatch 11 into Redocly's legacy dependency breaks its callable API.
+Forcing current Redocly 2 into the generator also fails: the generator imports
+`@redocly/openapi-core/lib/ref-utils.js`, which the newer package does not export.
+Retire this legacy chain when the generator supports the updated Redocly API,
+then validate the generated contract before removing the compatibility note.
+
 ## Free-text fields defeat the enum work
 
 `Absence.note` (500 chars) and `AuditLog.reason` accept anything. Historical migration 013

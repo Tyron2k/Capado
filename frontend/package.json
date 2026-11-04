@@ -62,12 +62,14 @@
   "//dependencies-notes": {
     "postcss": "Loaded indirectly by Vite via postcss.config.cjs \u2014 required as the PostCSS engine",
     "postcss-preset-mantine": "Loaded as a plugin via postcss.config.cjs \u2014 provides Mantine CSS transformations",
-    "openapi-typescript": "Its peer metadata still names TypeScript 5. Scope the override to this generator; validate emitted types against TypeScript 5 and the application TypeScript 6 build."
+    "openapi-typescript": "Its peer metadata still names TypeScript 5. Scope the override to this generator; validate emitted types against TypeScript 5 and the application TypeScript 6 build.",
+    "minimatch": "Upgrade only minimatch 10 consumers to the patched named-export API. Redocly 1.x requires the callable minimatch 5 API; upgrading that chain needs upstream openapi-typescript support. GHSA-g3hv-75wg-m249 concerns optimizationLevel >= 2, absent from minimatch 5."
   },
   "overrides": {
     "openapi-typescript": {
       "typescript": "$typescript"
-    }
+    },
+    "minimatch@^10": "^11.0.4"
   },
   "knip": {
     "ignore": [
