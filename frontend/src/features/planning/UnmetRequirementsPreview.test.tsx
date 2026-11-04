@@ -2,7 +2,7 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
 import { QueryClientProvider } from '@tanstack/react-query'
 
@@ -114,6 +114,10 @@ describe('unmet requirement suggestions', () => {
       end_date: '2026-09-10',
       allocation_percent: 100,
     })
+    expect(screen.getByText('Neue Buchung')).toBeVisible()
+    const change = screen.getByRole('table', { name: 'Geplante Änderung' })
+    expect(within(change).getByRole('row', { name: /Auslastung/ })).toHaveTextContent('100 %')
+    expect(within(change).getByRole('row', { name: /Startdatum/ })).toHaveTextContent('01.09.2026')
     expect(createAssignment).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Zuweisen' }))
@@ -132,9 +136,16 @@ describe('unmet requirement suggestions', () => {
       resource_id: 'r1',
       work_package_id: 'w1',
       resource_type: 'infrastructure',
-      start_at: '2026-09-01T08:00:00',
-      end_at: '2026-09-10T17:00:00',
+      start_at: '2026-09-01T06:00:00.000Z',
+      end_at: '2026-09-10T15:00:00.000Z',
     })
+    const change = screen.getByRole('table', { name: 'Geplante Änderung' })
+    expect(within(change).getByRole('row', { name: /Belegt von/ })).toHaveTextContent(
+      '01.09.2026 08:00:00 (UTC+02:00)',
+    )
+    expect(within(change).getByRole('row', { name: /Belegt bis/ })).toHaveTextContent(
+      '10.09.2026 17:00:00 (UTC+02:00)',
+    )
     expect(createAssignment).not.toHaveBeenCalled()
   })
 

@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core'
+import { Alert, Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
 import { showErrorNotification } from '../../utils/errorHandling'
 import {
@@ -18,21 +18,41 @@ import {
 } from '@tabler/icons-react'
 import {
   getAssignment,
+  getAssignmentSuggestions,
   getConflictSuggestions,
   previewAssignment,
   updateAssignment,
   type ConflictSuggestion,
 } from '../../api/assignments'
-import type { AssignmentPreview, AssignmentUpdate } from '../../types/assignment'
-import { useTranslation } from '../../i18n'
+import type {
+  Assignment,
+  AssignmentCreate,
+  AssignmentPreview,
+  AssignmentUpdate,
+} from '../../types/assignment'
+import { useTranslation, type Locale } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
+import { AssignmentChangeSummary } from '../planning/AssignmentChangeSummary'
 import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
 import { useSettings } from '../../context/SettingsContext'
 import { formatDateTime } from '../../utils/date'
 
-interface Props {
-  conflictId: string
+type Props = (
+  | { conflictId: string; assignmentId?: never; assignmentIds?: never; alternativesOnly?: never }
+  | {
+      assignmentId: string
+      assignmentIds?: never
+      alternativesOnly?: boolean
+      conflictId?: never
+    }
+  | {
+      assignmentIds: string[]
+      assignmentId?: never
+      conflictId?: never
+      alternativesOnly?: boolean
+    }
+) & {
   onApplied: () => void
 }
 
@@ -56,6 +76,7 @@ function buildDescription(
   s: ConflictSuggestion,
   t: (key: string, params?: Record<string, string | number>) => string,
   timeZone: string,
+  locale: Locale,
 ): string {
   switch (s.type) {
     case 'shift_forward':
@@ -64,7 +85,7 @@ function buildDescription(
       return t('suggestions.descShiftBackward', { days: Math.abs(s.shift_days ?? 0) })
     case 'shift_into_window':
       return t('suggestions.descShiftIntoWindow', {
-        time: s.new_start_at ? formatDateTime(s.new_start_at, 'de', timeZone).slice(-5) : '—',
+        time: s.new_start_at ? formatDateTime(s.new_start_at, locale, timeZone) : '—',
       })
     case 'reduce_allocation':
       return t('suggestions.descReduce', { percent: s.new_allocation_percent ?? 0 })
@@ -75,29 +96,45 @@ function buildDescription(
   }
 }
 
-export function ConflictSuggestions({ conflictId, onApplied }: Props) {
-  const { t } = useTranslation()
+export function ConflictSuggestions({
+  conflictId,
+  assignmentId,
+  assignmentIds,
+  alternativesOnly = false,
+  onApplied,
+}: Props) {
+  const { t, locale } = useTranslation()
   const { settings } = useSettings()
   const queryClient = useQueryClient()
   const [active, setActive] = useState<{
     suggestion: ConflictSuggestion
     patch: AssignmentUpdate
+    before: Assignment
+    after: AssignmentCreate
     result: AssignmentPreview
   } | null>(null)
 
-  /**
-   * Suggestions fail SILENTLY, and that stays true.
-   *
-   * They are computed on request and they are optional: a conflict card is useful without them, and a
-   * notification saying the suggestions could not be loaded would be noise on a screen already
-   * reporting a problem. So the error is swallowed here, deliberately — the one place in this
-   * migration where not reporting is the right answer.
-   */
+  const ids = [...new Set(assignmentIds ?? (assignmentId ? [assignmentId] : []))].sort()
+  const suggestionsKey = conflictId
+    ? queryKeys.conflicts.suggestions(conflictId)
+    : queryKeys.conflicts.assignmentSuggestions(ids.join(','), alternativesOnly)
   const suggestionsQuery = useQuery({
-    queryKey: queryKeys.conflicts.suggestions(conflictId),
-    queryFn: () => getConflictSuggestions(conflictId),
+    queryKey: suggestionsKey,
+    refetchOnMount: 'always',
+    queryFn: async () =>
+      conflictId
+        ? getConflictSuggestions(conflictId)
+        : (
+            await Promise.all(ids.map((id) => getAssignmentSuggestions(id, alternativesOnly)))
+          ).flat(),
   })
-  const suggestions: ConflictSuggestion[] = suggestionsQuery.data ?? []
+  // Merge all involved bookings before ranking: the complete fix may belong to
+  // the second booking rather than the first card's original suggestion order.
+  const suggestions: ConflictSuggestion[] = [...(suggestionsQuery.data ?? [])].sort(
+    (a, b) =>
+      (a.conflicts_after ?? Number.MAX_SAFE_INTEGER) -
+      (b.conflicts_after ?? Number.MAX_SAFE_INTEGER),
+  )
   const loading = suggestionsQuery.isPending
 
   /**
@@ -114,12 +151,13 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
     mutationFn: async (suggestion: ConflictSuggestion) => {
       const assignment = await getAssignment(suggestion.assignment_id)
       const patch = patchForSuggestion(suggestion, assignment)
-      const result = await previewAssignment(previewPayloadForPatch(assignment, patch))
-      return { suggestion, patch, result }
+      const after = previewPayloadForPatch(assignment, patch)
+      const result = await previewAssignment(after)
+      return { suggestion, patch, before: assignment, after, result }
     },
     onSuccess: setActive,
     onError: (error) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.suggestions(conflictId) })
+      void queryClient.invalidateQueries({ queryKey: suggestionsKey })
       showErrorNotification(error, t('common.error'), t('common.genericError'))
     },
   })
@@ -135,7 +173,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
     onSuccess: async (_result, { suggestion }) => {
       notifications.show({
         title: t('common.saved'),
-        message: buildDescription(suggestion, t, settings.timeZone),
+        message: buildDescription(suggestion, t, settings.timeZone, locale),
         color: 'green',
       })
       setActive(null)
@@ -155,7 +193,21 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
   })
 
   if (loading) return <Loader size="xs" />
-  if (suggestions.length === 0) return null
+  if (suggestionsQuery.isError)
+    return (
+      <Alert color="red" mt="sm">
+        <Text size="sm">{t('suggestions.loadFailed')}</Text>
+        <Button size="xs" variant="subtle" onClick={() => void suggestionsQuery.refetch()}>
+          {t('readiness.retry')}
+        </Button>
+      </Alert>
+    )
+  if (suggestions.length === 0)
+    return (
+      <Text size="sm" c="dimmed" mt="sm">
+        {t(alternativesOnly ? 'suggestions.noAlternatives' : 'suggestions.noneAvailable')}
+      </Text>
+    )
 
   return (
     <Stack gap="xs" mt="sm">
@@ -167,7 +219,7 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
         title={
           active
             ? t('suggestions.previewAction', {
-                action: buildDescription(active.suggestion, t, settings.timeZone),
+                action: buildDescription(active.suggestion, t, settings.timeZone, locale),
               })
             : ''
         }
@@ -177,10 +229,20 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
       >
         {active && (
           <Stack gap="md">
+            <AssignmentChangeSummary
+              before={active.before}
+              after={active.after}
+              preview={active.result}
+            />
             <AssignmentPreviewSummary
               preview={active.result}
               disclaimer={t('suggestions.previewDisclaimer')}
             />
+            {alternativesOnly && (
+              <Text size="xs" c="dimmed">
+                {t('suggestions.skillPreviewNote')}
+              </Text>
+            )}
             <Group justify="flex-end">
               <Button
                 variant="default"
@@ -207,36 +269,75 @@ export function ConflictSuggestions({ conflictId, onApplied }: Props) {
           {t('suggestions.title')}
         </Text>
       </Group>
-      {suggestions.map((s, idx) => {
-        const Icon = ICON_MAP[s.type] ?? IconBulb
-        const color = COLOR_MAP[s.type] ?? 'gray'
-        const key = `${s.assignment_id}-${s.type}-${idx}`
-        const label = t(`suggestions.type_${s.type}`)
-        const desc = buildDescription(s, t, settings.timeZone)
-        return (
-          <Group key={key} gap="xs" wrap="nowrap">
-            <Badge size="xs" color={color} variant="light" leftSection={<Icon size={10} />}>
-              {label}
-            </Badge>
-            <Text size="xs" style={{ flex: 1 }}>
-              {desc}
-            </Text>
-            <Button
-              size="compact-xs"
-              variant="light"
-              color={color}
-              loading={previewMutation.isPending && previewMutation.variables === s}
-              disabled={previewMutation.isPending || applyMutation.isPending}
-              onClick={() => {
-                setActive(null)
-                previewMutation.mutate(s)
-              }}
-            >
-              {t('assignmentForm.preview')}
-            </Button>
-          </Group>
-        )
-      })}
+      <Text size="xs" c="dimmed">
+        {t('suggestions.rankingScope')}
+      </Text>
+      <Stack
+        component="ol"
+        aria-label={t('suggestions.title')}
+        gap="xs"
+        m={0}
+        p={0}
+        style={{ listStyle: 'none' }}
+      >
+        {suggestions.map((s, idx) => {
+          const Icon = ICON_MAP[s.type] ?? IconBulb
+          const color = COLOR_MAP[s.type] ?? 'gray'
+          const key = `${s.assignment_id}-${s.type}-${idx}`
+          const label = t(`suggestions.type_${s.type}`)
+          const desc = buildDescription(s, t, settings.timeZone, locale)
+          return (
+            <Group component="li" key={key} gap="xs" wrap="nowrap">
+              <Badge size="xs" color={color} variant="light" leftSection={<Icon size={10} />}>
+                {label}
+              </Badge>
+              <Stack gap={3} style={{ flex: 1, minWidth: 0 }}>
+                {s.work_package_name && (
+                  <Text size="xs" fw={600}>
+                    {s.work_package_name}
+                  </Text>
+                )}
+                <Text size="xs">{desc}</Text>
+                <Group gap={6}>
+                  <Badge
+                    size="xs"
+                    variant="light"
+                    color={
+                      s.conflicts_after == null
+                        ? 'gray'
+                        : s.conflicts_after === 0
+                          ? 'green'
+                          : 'orange'
+                    }
+                  >
+                    {s.conflicts_after == null
+                      ? t('suggestions.impactUnavailable')
+                      : t('suggestions.remainingConflicts', { count: s.conflicts_after })}
+                  </Badge>
+                  {s.conflicts_before != null && (
+                    <Text size="xs" c="dimmed">
+                      {t('suggestions.previousConflicts', { count: s.conflicts_before })}
+                    </Text>
+                  )}
+                </Group>
+              </Stack>
+              <Button
+                size="compact-xs"
+                variant="light"
+                color={color}
+                loading={previewMutation.isPending && previewMutation.variables === s}
+                disabled={previewMutation.isPending || applyMutation.isPending}
+                onClick={() => {
+                  setActive(null)
+                  previewMutation.mutate(s)
+                }}
+              >
+                {t('assignmentForm.preview')}
+              </Button>
+            </Group>
+          )
+        })}
+      </Stack>
     </Stack>
   )
 }

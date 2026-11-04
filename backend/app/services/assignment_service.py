@@ -54,6 +54,40 @@ def duplicate_booking_query(booking: Assignment, exclude_id: UUID | None = None)
     return statement
 
 
+def clip_assignment(booking: Assignment, start: date, end: date) -> Assignment | None:
+    """Transient input to the existing engine; never mutate tracked bookings."""
+    if booking.resource_type == ResourceType.personal:
+        if booking.start_date is None or booking.end_date is None:
+            return None
+        lo, hi = max(start, booking.start_date), min(end, booking.end_date)
+        if lo > hi:
+            return None
+        return Assignment(
+            id=booking.id,
+            resource_id=booking.resource_id,
+            resource_type=booking.resource_type,
+            work_package_id=booking.work_package_id,
+            start_date=lo,
+            end_date=hi,
+            allocation_percent=booking.allocation_percent,
+        )
+    if booking.start_at is None or booking.end_at is None:
+        return None
+    lower = local_day_bounds(start, planning_zone())[0]
+    upper = local_day_bounds(end, planning_zone())[1]
+    lo_at, hi_at = max(lower, booking.start_at), min(upper, booking.end_at)
+    if lo_at >= hi_at:
+        return None
+    return Assignment(
+        id=booking.id,
+        resource_id=booking.resource_id,
+        resource_type=booking.resource_type,
+        work_package_id=booking.work_package_id,
+        start_at=lo_at,
+        end_at=hi_at,
+    )
+
+
 def is_identical_booking_violation(error: IntegrityError) -> bool:
     """Recognize only the booking guards, not unrelated integrity failures."""
     name = getattr(getattr(error.orig, "__cause__", None), "constraint_name", None)

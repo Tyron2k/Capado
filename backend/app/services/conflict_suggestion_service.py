@@ -15,16 +15,23 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment, ConflictCause
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.schemas.assignment import AssignmentPreviewRequest
 from app.schemas.conflict_suggestion import SuggestionType
+from app.services.assignment_preview import AssignmentPreviewService
+from app.services.assignment_service import AssignmentService, clip_assignment
+from app.services.conflict_service import ConflictService
+from app.services.qualification import HeldQualification, satisfies
 from app.services.time_zone import (
     local_date,
     local_time,
     local_wall_time_to_utc,
     planning_zone,
 )
+from app.services.unmet_requirements_service import assignment_span
 from app.services.working_time_service import (
     WorkingTimeService,
     minutes_to_percent,
@@ -50,6 +57,9 @@ class ResolutionSuggestion:
     new_start_at: datetime | None = None
     new_end_at: datetime | None = None
     """Every infrastructure time shift carries the exact UTC interval to apply."""
+    work_package_name: str | None = None
+    conflicts_before: int | None = None
+    conflicts_after: int | None = None
 
 
 def _shift_booking(
@@ -355,6 +365,314 @@ class ConflictSuggestionService:
                     )
                 )
 
+        return (
+            suggestions
+            if self._preloaded
+            else await self._assess_suggestions(
+                suggestions, {a.id: a for a in assignments}
+            )
+        )
+
+    async def get_assignment_suggestions(
+        self, assignment_id: UUID, *, alternatives_only: bool = False
+    ) -> list[ResolutionSuggestion]:
+        """Use current bookings, without requiring a saved conflict record."""
+        assignment = await AssignmentService(self.session).get_by_id(assignment_id)
+        span = assignment_span(assignment)
+        if span is None or span[1] == date.max or (span[1] - span[0]).days > 365:
+            raise BusinessRuleError(
+                "Suggestions are limited to booking periods of 366 days."
+            )
+        suggestions = await self._qualified_alternatives(assignment)
+        if not alternatives_only:
+            bookings = list(
+                (
+                    await self.session.scalars(
+                        select(Assignment).where(
+                            Assignment.resource_id == assignment.resource_id
+                        )
+                    )
+                ).all()
+            )
+            bounded = [
+                clipped
+                for a in bookings
+                if (clipped := clip_assignment(a, *span)) is not None
+            ]
+            for period in await ConflictService(self.session).calculate_periods(
+                assignment.resource_id, bounded
+            ):
+                if assignment.id not in period.assignment_ids:
+                    continue
+                conflict = Conflict(
+                    resource_id=assignment.resource_id,
+                    resource_type=assignment.resource_type,
+                    cause=period.cause,
+                    start_date=period.start_date,
+                    end_date=period.end_date,
+                    total_assigned_percent=period.total_assigned_percent,
+                    available_percent=period.available_percent,
+                )
+                involved = [a for a in bookings if a.id in period.assignment_ids]
+                method = (
+                    self._suggest_for_personal
+                    if assignment.resource_type == ResourceType.personal
+                    else self._suggest_for_infrastructure
+                )
+                suggestions.extend(
+                    s
+                    for s in await method(
+                        assignment, conflict, involved, include_swap=False
+                    )
+                    if s.type != "swap_resource"
+                )
+        # One booking can participate in several conflict phases.
+        unique = list({tuple(vars(s).values()): s for s in suggestions}.values())
+        return await self._assess_suggestions(unique, {assignment.id: assignment})
+
+    async def _assess_suggestions(
+        self,
+        suggestions: list[ResolutionSuggestion],
+        assignments: dict[UUID, Assignment],
+    ) -> list[ResolutionSuggestion]:
+        """Use the ordinary read-only preview; an unassessable effect is never zero."""
+        preview = AssignmentPreviewService(self.session)
+        for suggestion in suggestions:
+            suggestion.conflicts_before = suggestion.conflicts_after = None
+            booking = assignments[suggestion.assignment_id]
+            suggestion.work_package_name = await self._get_work_package_name(
+                booking.work_package_id
+            )
+            try:
+                data = AssignmentPreviewRequest(
+                    assignment_id=booking.id,
+                    resource_id=suggestion.target_resource_id or booking.resource_id,
+                    resource_type=booking.resource_type,
+                    work_package_id=booking.work_package_id,
+                    start_date=booking.start_date,
+                    end_date=booking.end_date,
+                    allocation_percent=booking.allocation_percent,
+                    start_at=booking.start_at,
+                    end_at=booking.end_at,
+                )
+                if suggestion.type == "reduce_allocation":
+                    data.allocation_percent = suggestion.new_allocation_percent
+                elif suggestion.type in {
+                    "shift_forward",
+                    "shift_backward",
+                    "shift_into_window",
+                }:
+                    if booking.resource_type == ResourceType.personal:
+                        if (
+                            data.start_date is None
+                            or data.end_date is None
+                            or suggestion.shift_days is None
+                        ):
+                            raise ValueError("Incomplete suggested period")
+                        offset = timedelta(days=suggestion.shift_days)
+                        data.start_date += offset
+                        data.end_date += offset
+                    else:
+                        data.start_at, data.end_at = (
+                            suggestion.new_start_at,
+                            suggestion.new_end_at,
+                        )
+                impact = await preview.preview(data)
+            except (
+                BusinessRuleError,
+                ConflictError,
+                NotFoundError,
+                ValueError,
+                OverflowError,
+            ):
+                continue
+            suggestion.conflicts_before = sum(
+                len(r.conflicts_before) for r in impact.resources
+            )
+            suggestion.conflicts_after = sum(
+                len(r.conflicts_after) for r in impact.resources
+            )
+        return sorted(
+            suggestions,
+            key=lambda s: (
+                s.conflicts_after if s.conflicts_after is not None else float("inf")
+            ),
+        )
+
+    async def _qualified_alternatives(
+        self, assignment: Assignment
+    ) -> list[ResolutionSuggestion]:
+        """Same resource type, valid qualification and room for the whole booking.
+
+        A replacement needs one applicable role, matching mismatch detection;
+        a person is not expected to hold the package's machine qualifications.
+        """
+        from app.models.skill import (
+            InfrastructureResourceSkill,
+            PersonalResourceSkill,
+            Skill,
+            SkillAttribute,
+        )
+        from app.models.work_package_requirement import WorkPackageRequirement
+
+        span = assignment_span(assignment)
+        assert span is not None
+        start, end = span
+        model: type[PersonalResource] | type[InfrastructureResource] = (
+            PersonalResource
+            if assignment.resource_type == ResourceType.personal
+            else InfrastructureResource
+        )
+        qualification_model: (
+            type[PersonalResourceSkill] | type[InfrastructureResourceSkill]
+        ) = (
+            PersonalResourceSkill
+            if assignment.resource_type == ResourceType.personal
+            else InfrastructureResourceSkill
+        )
+        requirements = list(
+            (
+                await self.session.scalars(
+                    select(WorkPackageRequirement)
+                    .join(Skill, WorkPackageRequirement.skill_id == Skill.id)
+                    .where(
+                        WorkPackageRequirement.work_package_id
+                        == assignment.work_package_id,
+                        Skill.resource_type == assignment.resource_type.value,
+                    )
+                )
+            ).all()
+        )
+        if not requirements:
+            return []
+        rows = cast(
+            "Sequence[tuple[PersonalResource | InfrastructureResource, PersonalResourceSkill | InfrastructureResourceSkill, UUID]]",
+            (
+                await self.session.execute(
+                    select(model, qualification_model, SkillAttribute.skill_id)
+                    .join(
+                        qualification_model, qualification_model.resource_id == model.id
+                    )
+                    .join(
+                        SkillAttribute,
+                        SkillAttribute.id == qualification_model.skill_attribute_id,
+                    )
+                    .where(
+                        model.is_active.is_(True),
+                        model.id != assignment.resource_id,
+                        SkillAttribute.skill_id.in_({r.skill_id for r in requirements}),
+                    )
+                    .order_by(model.name, model.id)
+                )
+            ).all(),
+        )
+        candidates: dict[UUID, PersonalResource | InfrastructureResource] = {}
+        for resource, qualification, skill_id in rows:
+            if any(
+                req.skill_id == skill_id
+                and (
+                    req.skill_attribute_id is None
+                    or req.skill_attribute_id == qualification.skill_attribute_id
+                )
+                and satisfies(
+                    HeldQualification(
+                        valid_from=qualification.valid_from,
+                        valid_until=qualification.valid_until,
+                        level=qualification.level,
+                    ),
+                    req.min_level,
+                    start,
+                    end,
+                )
+                for req in requirements
+            ):
+                candidates[resource.id] = resource
+        if not candidates:
+            return []
+        bookings = list(
+            (
+                await self.session.scalars(
+                    select(Assignment).where(Assignment.resource_id.in_(candidates))
+                )
+            ).all()
+        )
+        working = WorkingTimeService(self.session)
+        await working.prepare(list(candidates), start, end)
+        from app.models.calendar import WorkWeekProfile
+
+        standard = (
+            await self.session.scalar(
+                select(WorkWeekProfile).where(WorkWeekProfile.is_default)
+            )
+            if assignment.resource_type == ResourceType.personal
+            else None
+        )
+        suggestions = []
+        for rid, resource in candidates.items():
+            own = [a for a in bookings if a.resource_id == rid]
+            # Preserve distinct booking intervals, but never offer an exact duplicate.
+            if any(
+                a.work_package_id == assignment.work_package_id
+                and a.start_date == assignment.start_date
+                and a.end_date == assignment.end_date
+                and a.allocation_percent == assignment.allocation_percent
+                and a.start_at == assignment.start_at
+                and a.end_at == assignment.end_at
+                for a in own
+            ):
+                continue
+            if assignment.resource_type == ResourceType.personal:
+                day = start
+                no_supply = standard is None
+                while day <= end and not no_supply:
+                    no_supply = (
+                        standard is not None
+                        and standard.minutes_for_weekday(day.weekday()) > 0
+                        and working.calendar_minutes(rid, day) == 0
+                    )
+                    day += timedelta(days=1)
+                if no_supply:
+                    continue
+                if _min_headroom_percent(working, rid, own, start, end) < (
+                    assignment.allocation_percent or 100
+                ):
+                    continue
+            else:
+                proposed = Assignment(
+                    resource_id=rid,
+                    resource_type=assignment.resource_type,
+                    work_package_id=assignment.work_package_id,
+                    start_at=assignment.start_at,
+                    end_at=assignment.end_at,
+                )
+                engine = ConflictService.from_data(
+                    session=self.session,
+                    working_time=working,
+                    resources={rid: resource},
+                    assignments={
+                        rid: [
+                            clipped
+                            for a in [*own, proposed]
+                            if (clipped := clip_assignment(a, start, end)) is not None
+                        ]
+                    },
+                )
+                if any(
+                    proposed.id in p.assignment_ids
+                    for p in await engine.calculate_periods(rid)
+                ):
+                    continue
+            suggestions.append(
+                ResolutionSuggestion(
+                    type="swap_resource",
+                    assignment_id=assignment.id,
+                    description=f"Swap to '{resource.name}'",
+                    target_resource_id=rid,
+                    target_resource_name=resource.name,
+                )
+            )
+            if len(suggestions) == 5:
+                break
         return suggestions
 
     async def _batch_load_work_package_names(
@@ -380,6 +698,8 @@ class ConflictSuggestionService:
         assignment: Assignment,
         conflict: Conflict,
         all_assignments: list[Assignment],
+        *,
+        include_swap: bool = True,
     ) -> list[ResolutionSuggestion]:
         """Generate suggestions for a personal resource conflict."""
         suggestions: list[ResolutionSuggestion] = []
@@ -441,14 +761,14 @@ class ConflictSuggestionService:
                     )
                 )
 
-        # 4. Swap to available resource (skill-matched)
-        required_skills = await self._get_required_skills_for_assignment(assignment)
-        swap = await self._find_available_personal_resource(
-            assignment, conflict, required_skills
-        )
-        if swap:
-            suggestions.append(swap)
-
+        if include_swap:
+            # 4. Swap to available resource (skill-matched)
+            required_skills = await self._get_required_skills_for_assignment(assignment)
+            swap = await self._find_available_personal_resource(
+                assignment, conflict, required_skills
+            )
+            if swap:
+                suggestions.append(swap)
         return suggestions
 
     async def _suggest_for_infrastructure(
@@ -456,17 +776,17 @@ class ConflictSuggestionService:
         assignment: Assignment,
         conflict: Conflict,
         all_assignments: list[Assignment],
+        *,
+        include_swap: bool = True,
     ) -> list[ResolutionSuggestion]:
         """Generate suggestions for an infrastructure resource conflict.
 
         Branches on the CAUSE, because the two infrastructure causes need different
         actions and offering the wrong one is worse than offering none.
 
-        For a booking outside the operating hours, a whole-day shift cannot help:
-        the clock time is unchanged, so a booking at 03:00 is still at 03:00 three
-        days later. Those suggestions are derived from an overlap that does not
-        exist for this cause, so they are not offered — only a shift into an actual
-        window is (ADR-005).
+        A window violation needs a free operating span, including overnight
+        spans. Blind whole-day shifts derived from an overlap do not establish
+        availability, so search actual windows within the package instead.
         """
         if conflict.cause == ConflictCause.outside_availability:
             return await self._suggest_shift_into_window(assignment)
@@ -515,63 +835,112 @@ class ConflictSuggestionService:
                     )
                 )
 
-        # 3. Swap to available infra resource (skill-matched)
-        required_skills = await self._get_required_skills_for_assignment(assignment)
-        swap = await self._find_available_infra_resource(
-            assignment, conflict, required_skills
-        )
-        if swap:
-            suggestions.append(swap)
-
+        if include_swap:
+            # 3. Swap to available infra resource (skill-matched)
+            required_skills = await self._get_required_skills_for_assignment(assignment)
+            swap = await self._find_available_infra_resource(
+                assignment, conflict, required_skills
+            )
+            if swap:
+                suggestions.append(swap)
         return suggestions
 
     async def _suggest_shift_into_window(
         self, assignment: Assignment
     ) -> list[ResolutionSuggestion]:
-        """Propose moving a booking into one of the resource's operating spans.
+        """Find the nearest free span inside the package, preserving elapsed duration.
 
-        Returns an empty list when no single span can hold the booking — a night
-        shift's worth of work will not fit into a two-hour window, and inventing a
-        suggestion that does not resolve the violation is worse than reporting the
-        conflict without one.
+        Join touching daily spans before fitting overnight bookings. Ambiguous or
+        missing local boundaries are skipped rather than guessed.
         """
+        from app.models.project import WorkPackage
+
         if assignment.start_at is None or assignment.end_at is None:
             return []
-
         zone = planning_zone()
-        local_start = local_time(assignment.start_at, zone)
-        local_end = local_time(assignment.end_at, zone)
-        # Across a DST offset change, a wall-clock shift can change elapsed
-        # duration. Do not offer a misleading one-span suggestion.
-        if local_start.utcoffset() != local_end.utcoffset():
-            return []
-        working_time = await self._prepared_working_time(
-            [assignment.resource_id],
-            local_start.date(),
-            local_end.date(),
+        day = local_date(assignment.start_at, zone)
+        start = max(
+            date.min + timedelta(days=1),
+            day - timedelta(days=min(30, (day - date.min).days)),
         )
-        spans = working_time.covered_spans(assignment.resource_id, local_start.date())
-        new_local_start = shift_into_span(
-            local_start.replace(tzinfo=None), local_end.replace(tzinfo=None), spans
+        end = min(
+            date.max - timedelta(days=1),
+            day + timedelta(days=min(30, (date.max - day).days)),
         )
-        if new_local_start is None:
+        if not self._preloaded:
+            package = await self.session.get(WorkPackage, assignment.work_package_id)
+            if package is None:
+                return []
+            start, end = max(start, package.start_date), min(end, package.end_date)
+        if end < start:
             return []
-        try:
-            new_start = local_wall_time_to_utc(new_local_start, zone)
-        except ValueError:
+        working = await self._prepared_working_time(
+            [assignment.resource_id], start, end
+        )
+        spans: list[tuple[datetime, datetime]] = []
+        current = start
+        while current <= end:
+            midnight = datetime.combine(current, time())
+            for lo, hi in working.covered_spans(assignment.resource_id, current):
+                try:
+                    lower = local_wall_time_to_utc(
+                        midnight + timedelta(minutes=lo), zone
+                    )
+                    upper = local_wall_time_to_utc(
+                        midnight + timedelta(minutes=hi), zone
+                    )
+                except ValueError:
+                    continue
+                if spans and lower <= spans[-1][1]:
+                    spans[-1] = (spans[-1][0], max(upper, spans[-1][1]))
+                else:
+                    spans.append((lower, upper))
+            current += timedelta(days=1)
+        if self._preloaded_candidate_assignments is not None:
+            bookings = self._preloaded_candidate_assignments
+        else:
+            bookings = list(
+                (
+                    await self.session.scalars(
+                        select(Assignment).where(
+                            Assignment.resource_id == assignment.resource_id,
+                            Assignment.id != assignment.id,
+                            Assignment.start_at.is_not(None),
+                        )
+                    )
+                ).all()
+            )
+        # Subtract occupied intervals, including competing packages.
+        for booking in bookings:
+            if (
+                booking.id == assignment.id
+                or booking.resource_id != assignment.resource_id
+                or booking.start_at is None
+                or booking.end_at is None
+            ):
+                continue
+            free = []
+            for lower, upper in spans:
+                if booking.end_at <= lower or booking.start_at >= upper:
+                    free.append((lower, upper))
+                else:
+                    if lower < booking.start_at:
+                        free.append((lower, booking.start_at))
+                    if booking.end_at < upper:
+                        free.append((booking.end_at, upper))
+            spans = free
+        duration = assignment.end_at - assignment.start_at
+        new_start = shift_into_span(assignment.start_at, assignment.end_at, spans)
+        if new_start is None:
             return []
-
         wp_name = await self._get_work_package_name(assignment.work_package_id)
         return [
             ResolutionSuggestion(
                 type="shift_into_window",
                 assignment_id=assignment.id,
-                description=(
-                    f"Move '{wp_name}' to {new_local_start.strftime('%H:%M')}, "
-                    "inside the operating hours"
-                ),
+                description=f"Move '{wp_name}' inside free operating hours",
                 new_start_at=new_start,
-                new_end_at=new_start + (assignment.end_at - assignment.start_at),
+                new_end_at=new_start + duration,
             )
         ]
 
@@ -787,59 +1156,26 @@ class ConflictSuggestionService:
 
 
 def shift_into_span(
-    start_at: datetime, end_at: datetime, spans: list[tuple[int, int]]
+    start_at: datetime, end_at: datetime, spans: list[tuple[datetime, datetime]]
 ) -> datetime | None:
-    """A new start timestamp that puts the whole booking inside one operating span.
+    """Nearest placement of the complete booking in a free continuous span.
 
-    Args:
-        start_at: Current booking start.
-        end_at: Current booking end.
-        spans: Bookable ``[start_minute, end_minute)`` pairs for the booking's day,
-            as :meth:`WorkingTimeService.covered_spans` returns them — already
-            merged and sorted.
-
-    Returns:
-        The proposed new start, or None when no single span can hold the booking.
-
-    Chooses the span whose start is **nearest** to the current start, because the
-    point of the suggestion is the smallest change that fixes the problem, not the
-    earliest possible slot. A booking wrongly placed at 03:00 against a two-shift
-    resource should be offered 06:00 rather than being pushed to whichever shift
-    happens to come first in the list.
-
-    Returns None when the booking already fits: there is then nothing to suggest,
-    and emitting a "shift" of zero would look like a fix for a conflict raised by
-    something else.
-
-    Returns None for a booking that crosses midnight. Spans belong to the day a
-    shift STARTS on (ADR-005), so relocating such a booking would have to re-derive
-    its tail against the next day's spans — a different calculation, and guessing at
-    it would produce a suggestion that does not actually resolve the violation.
+    Spans have resolved timestamps, so overnight and DST intervals preserve the
+    actual elapsed duration. A zero move or an interval that cannot fit has no fix.
     """
-    if end_at <= start_at:
+    duration = end_at - start_at
+    if duration <= timedelta() or any(
+        lo <= start_at and end_at <= hi for lo, hi in spans
+    ):
         return None
-    if end_at.date() != start_at.date():
-        return None
-
-    duration = int((end_at - start_at).total_seconds() // 60)
-    if duration <= 0:
-        return None
-
-    start_minute = start_at.hour * 60 + start_at.minute
-    end_minute = start_minute + duration
-
-    # Already inside one span: nothing to propose.
-    if any(s <= start_minute and end_minute <= e for s, e in spans):
-        return None
-
-    candidates = [(s, e) for s, e in spans if e - s >= duration]
-    if not candidates:
-        return None
-
-    best_start = min(candidates, key=lambda span: abs(span[0] - start_minute))[0]
-    if best_start == start_minute:
-        return None
-    return datetime.combine(start_at.date(), time()) + timedelta(minutes=best_start)
+    candidates = [
+        max(lo, min(start_at, hi - duration)) for lo, hi in spans if hi - lo >= duration
+    ]
+    return (
+        min(candidates, key=lambda instant: (abs(instant - start_at), instant))
+        if candidates
+        else None
+    )
 
 
 def _min_headroom_percent(

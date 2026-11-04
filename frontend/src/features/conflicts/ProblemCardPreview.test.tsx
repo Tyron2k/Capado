@@ -2,26 +2,26 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom/vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
 import { QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('../../api/assignments', () => ({
   getAssignment: vi.fn(),
+  getAssignmentSuggestions: vi.fn(),
   previewAssignment: vi.fn(),
   updateAssignment: vi.fn(),
 }))
-vi.mock('../../api/suggestions', () => ({ getSuggestions: vi.fn() }))
-vi.mock('../../api/workPackages', () => ({ getWorkPackageRequirements: vi.fn() }))
-vi.mock('../../api/skills', () => ({ searchByQualification: vi.fn() }))
 vi.mock('./ConflictAssignmentList', () => ({ ConflictAssignmentList: () => <div /> }))
 vi.mock('@mantine/notifications', () => ({ notifications: { show: vi.fn() } }))
 vi.mock('../../utils/errorHandling', () => ({ showErrorNotification: vi.fn() }))
 
-import { getAssignment, previewAssignment, updateAssignment } from '../../api/assignments'
-import { getSuggestions } from '../../api/suggestions'
-import { getWorkPackageRequirements } from '../../api/workPackages'
-import { searchByQualification } from '../../api/skills'
+import {
+  getAssignment,
+  getAssignmentSuggestions,
+  previewAssignment,
+  updateAssignment,
+} from '../../api/assignments'
 import { I18nProvider } from '../../i18n'
 import { createTestQueryClient } from '../../testUtils/queryClient'
 import { ProblemCard, type ProblemBucket } from './ProblemCard'
@@ -90,30 +90,22 @@ const bucket: ProblemBucket = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.mocked(getWorkPackageRequirements).mockResolvedValue([
+  vi.mocked(getAssignmentSuggestions).mockResolvedValue([
     {
-      id: 'req1',
-      skill_id: 'skill1',
-      skill_name: 'Skill One',
-      skill_attribute_id: null,
-      skill_attribute_name: null,
-      quantity: 1,
-      requirement_mode: 'headcount',
-      min_allocation_percent: 100,
+      type: 'swap_resource',
+      assignment_id: 'a1',
+      description: 'Swap',
+      target_resource_id: 'r2',
+      target_resource_name: 'Replacement Resource',
+      shift_days: null,
+      conflicts_before: null,
+      conflicts_after: null,
+      work_package_name: null,
+      new_allocation_percent: null,
+      new_start_at: null,
+      new_end_at: null,
     },
   ])
-  vi.mocked(getSuggestions).mockResolvedValue([
-    {
-      resource_id: 'r2',
-      resource_name: 'Replacement Resource',
-      qualification_summary: 'Skill One',
-      department: 'Test',
-      availability_status: 'available',
-      average_free_capacity: 100,
-      reason: '',
-    },
-  ])
-  vi.mocked(searchByQualification).mockResolvedValue([{ id: 'r2' } as never])
   vi.mocked(getAssignment).mockResolvedValue(assignment)
   vi.mocked(previewAssignment).mockResolvedValue({
     resources: [
@@ -145,15 +137,21 @@ describe('skill-conflict resource swap', () => {
 
     fireEvent.click(screen.getByText('Original Resource'))
     const previewButton = await screen.findByRole('button', {
-      name: 'Vorschau — Ressource tauschen',
+      name: 'Vorschau',
     })
-    expect(getSuggestions).toHaveBeenCalledWith(expect.objectContaining({ work_package_id: 'w1' }))
+    expect(getAssignmentSuggestions).toHaveBeenCalledWith('a1', true)
     expect(previewButton.textContent).toBe('Vorschau')
     fireEvent.click(previewButton)
     expect(await screen.findByText('Konflikte: 0 → 0')).toBeInTheDocument()
     expect(previewAssignment).toHaveBeenCalledWith(
       expect.objectContaining({ assignment_id: 'a1', resource_id: 'r2' }),
     )
+    const change = screen.getByRole('table', { name: 'Geplante Änderung' })
+    const resource = within(change).getByRole('row', { name: /Ressource/ })
+    expect(within(resource).getByText('Original Resource')).toBeVisible()
+    expect(within(resource).getByText('Replacement Resource')).toBeVisible()
+    expect(within(resource).getByText('Geändert')).toBeVisible()
+    expect(within(change).getByRole('row', { name: /Startdatum/ })).toHaveTextContent('Unverändert')
     expect(updateAssignment).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Anwenden' }))

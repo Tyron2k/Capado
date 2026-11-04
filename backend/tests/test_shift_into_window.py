@@ -15,19 +15,15 @@ from datetime import datetime
 
 from app.services.conflict_suggestion_service import shift_into_span
 
-# A two-shift resource, 06:00–14:00 and 14:00–22:00, as covered_spans actually returns
-# it: touching spans are MERGED there (start <= previous end), so the two shifts arrive
-# as one continuous 06:00–22:00 span. Writing them as two tuples here would test a shape
-# the service never produces.
-TWO_SHIFT = [(360, 1320)]
-# A resource with a gap between shifts stays two spans: 06:00–13:00 and 14:00–22:00.
-SPLIT_SHIFT = [(360, 780), (840, 1320)]
-DAY_SHIFT = [(360, 840)]
-NIGHT_ONLY = [(1320, 1440)]
-
 
 def _at(hour: int, minute: int = 0) -> datetime:
     return datetime(2026, 6, 1, hour, minute)
+
+
+TWO_SHIFT = [(_at(6), _at(22))]
+SPLIT_SHIFT = [(_at(6), _at(13)), (_at(14), _at(22))]
+DAY_SHIFT = [(_at(6), _at(14))]
+NIGHT_ONLY = [(_at(22), datetime(2026, 6, 2, 6))]
 
 
 class TestShiftIntoSpan:
@@ -40,7 +36,7 @@ class TestShiftIntoSpan:
 
     def test_a_booking_after_closing_moves_back_into_the_window(self):
         result = shift_into_span(_at(20), _at(22), DAY_SHIFT)
-        assert result == _at(6)
+        assert result == _at(12)
 
     def test_a_booking_already_inside_gets_no_suggestion(self):
         """Zero-shift suggestions would look like a fix for a different conflict."""
@@ -50,11 +46,7 @@ class TestShiftIntoSpan:
         assert shift_into_span(_at(6), _at(14), DAY_SHIFT) is None
 
     def test_the_nearest_span_wins_not_the_earliest(self):
-        """Smallest change that fixes the problem.
-
-        A booking at 13:00 that does not fit before 14:00 belongs in the afternoon
-        shift, not pushed back to 06:00 just because that span comes first.
-        """
+        """The nearest placement wins, including the end of an earlier span."""
         result = shift_into_span(_at(13), _at(19), SPLIT_SHIFT)
         assert result == _at(14)
 
@@ -65,17 +57,9 @@ class TestShiftIntoSpan:
     def test_no_windows_means_no_suggestion(self):
         assert shift_into_span(_at(3), _at(5), []) is None
 
-    def test_a_booking_crossing_midnight_is_left_alone(self):
-        """Spans belong to the day a shift STARTS on.
-
-        Relocating a wrapping booking would have to re-derive its tail against the
-        next day's spans, which is a different calculation — guessing would produce a
-        suggestion that does not actually fix anything.
-        """
-        result = shift_into_span(
-            datetime(2026, 6, 1, 23, 0), datetime(2026, 6, 2, 2, 0), NIGHT_ONLY
-        )
-        assert result is None
+    def test_a_booking_crossing_midnight_can_be_moved_into_a_night_window(self):
+        result = shift_into_span(_at(20), datetime(2026, 6, 2, 0), NIGHT_ONLY)
+        assert result == _at(22)
 
     def test_an_inverted_range_is_refused(self):
         assert shift_into_span(_at(10), _at(8), DAY_SHIFT) is None
@@ -98,5 +82,5 @@ class TestShiftIntoSpan:
 
     def test_minutes_are_preserved_not_rounded(self):
         """Shift edges are not always on the hour, and 07:30 is a real opening."""
-        result = shift_into_span(_at(3), _at(4), [(450, 900)])
+        result = shift_into_span(_at(3), _at(4), [(_at(7, 30), _at(15))])
         assert result == _at(7, 30)

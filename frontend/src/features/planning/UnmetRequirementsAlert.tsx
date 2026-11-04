@@ -28,7 +28,8 @@ import { useTranslation } from '../../i18n'
 import { createAssignment, previewAssignment } from '../../api/assignments'
 import { queryKeys } from '../../api/queryClient'
 import { showErrorNotification } from '../../utils/errorHandling'
-import { formatDate } from '../../utils/date'
+import { useSettings } from '../../context/SettingsContext'
+import { formatDate, localDateTimeToUtc } from '../../utils/date'
 import { SectionHeader } from '../../components/layout'
 import type {
   AssignmentCreate,
@@ -37,6 +38,7 @@ import type {
   UnmetRequirement,
 } from '../../types/assignment'
 import { AssignmentPreviewSummary } from './AssignmentPreviewSummary'
+import { AssignmentChangeSummary } from './AssignmentChangeSummary'
 
 /** A group of unmet requirements belonging to the same work package. */
 interface WpBucket {
@@ -77,6 +79,7 @@ function buildWpBuckets(items: UnmetRequirement[]): WpBucket[] {
 function proposedAssignment(
   bucket: WpBucket,
   suggestion: UnmetRequirementSuggestion,
+  timeZone: string,
 ): AssignmentCreate {
   const common = {
     resource_id: suggestion.resource_id,
@@ -92,11 +95,14 @@ function proposedAssignment(
     }
   }
   if (suggestion.resource_type === 'infrastructure') {
+    const startAt = localDateTimeToUtc(`${bucket.start_date}T08:00:00`, timeZone)
+    const endAt = localDateTimeToUtc(`${bucket.end_date}T17:00:00`, timeZone)
+    if (!startAt || !endAt) throw new Error('The proposed local booking time does not exist.')
     return {
       ...common,
       resource_type: 'infrastructure',
-      start_at: `${bucket.start_date}T08:00:00`,
-      end_at: `${bucket.end_date}T17:00:00`,
+      start_at: startAt,
+      end_at: endAt,
     }
   }
   throw new Error('Unsupported resource type')
@@ -162,6 +168,7 @@ function UnmetRequirementCard({
   onAssigned: () => void
 }) {
   const { t } = useTranslation()
+  const { settings } = useSettings()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [activePreview, setActivePreview] = useState<{
@@ -174,7 +181,7 @@ function UnmetRequirementCard({
 
   const previewMutation = useMutation({
     mutationFn: async (suggestion: UnmetRequirementSuggestion) => {
-      const payload = proposedAssignment(bucket, suggestion)
+      const payload = proposedAssignment(bucket, suggestion, settings.timeZone)
       const result = await previewAssignment(payload)
       return { suggestion, payload, result }
     },
@@ -231,17 +238,12 @@ function UnmetRequirementCard({
       >
         {activePreview && (
           <Stack gap="md">
-            <Text size="sm">
-              {activePreview.payload.resource_type === 'personal'
-                ? t('planning.unmetPreviewPersonal', {
-                    start: formatDate(bucket.start_date),
-                    end: formatDate(bucket.end_date),
-                  })
-                : t('planning.unmetPreviewInfrastructure', {
-                    start: formatDate(bucket.start_date),
-                    end: formatDate(bucket.end_date),
-                  })}
-            </Text>
+            <AssignmentChangeSummary
+              after={activePreview.payload}
+              preview={activePreview.result}
+              workPackageName={bucket.work_package_name}
+              projectName={bucket.project_name}
+            />
             <AssignmentPreviewSummary
               preview={activePreview.result}
               disclaimer={t('planning.unmetPreviewDisclaimer')}

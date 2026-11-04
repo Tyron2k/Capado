@@ -20,6 +20,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 
 import { createTestQueryClient } from '../../testUtils/queryClient'
 import { I18nProvider } from '../../i18n'
+import type { ConflictFocus } from './conflictFocus'
 import { AssignmentsPanel } from './AssignmentsPanel'
 import type { Assignment, AssignmentWithWarnings } from '../../types/assignment'
 import { getAssignments, createAssignment, updateAssignment } from '../../api/assignments'
@@ -188,12 +189,12 @@ beforeAll(() => {
   } as unknown as typeof ResizeObserver
 })
 
-function renderPanel() {
+function renderPanel(focus?: ConflictFocus) {
   return render(
     <QueryClientProvider client={createTestQueryClient()}>
       <MantineProvider>
         <I18nProvider locale="en">
-          <AssignmentsPanel />
+          <AssignmentsPanel focus={focus} onClearFocus={vi.fn()} />
         </I18nProvider>
       </MantineProvider>
     </QueryClientProvider>,
@@ -462,5 +463,21 @@ describe('AssignmentsPanel', () => {
         ).toBeInTheDocument()
       })
     })
+  })
+  it('resource context retains competing bookings on other work packages', async () => {
+    mockedGetAssignments.mockResolvedValue([
+      ...fakeAssignments,
+      {
+        ...fakeAssignments[0],
+        id: 'other',
+        work_package_id: 'other-wp',
+        work_package_name: 'Competing package',
+      },
+    ])
+    renderPanel({ resourceId: fakeAssignments[0].resource_id })
+    expect(await screen.findByText('Competing package')).toBeVisible()
+    expect(screen.getByText(fakeAssignments[0].work_package_name!)).toBeVisible()
+    expect(screen.queryByText(fakeAssignments[1].resource_name!)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show all bookings' })).toBeVisible()
   })
 })

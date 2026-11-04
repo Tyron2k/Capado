@@ -40,7 +40,7 @@ from app.services.conflict_service import ConflictService
 from app.services.skill_mismatch import detect_mismatches
 from app.services.time_zone import local_wall_time_to_utc, planning_zone
 from app.services.unmet_requirements_service import get_unmet_requirements
-from tests.test_requirement_coverage_audit import _seed_case
+from tests.planning_reference import _seed_plan
 from tests.test_utc_migration_postgres import legacy_database, migrate  # noqa: F401
 
 MONDAY = date(2099, 1, 5)
@@ -58,112 +58,6 @@ async def combined_database(legacy_database):
     assert migration.returncode == 0, migration.stderr
     async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session, engine
-
-
-async def _seed_plan(session, *, windows=True):
-    # Extend the existing personnel fixture rather than maintain a parallel seed.
-    package, crew_bookings = await _seed_case(
-        session,
-        quantity=2,
-        minimum_level=3,
-        people=[{"level": 3, "valid_from": MONDAY, "valid_until": WEDNESDAY}] * 2,
-    )
-    assert (package.start_date, package.end_date) == (MONDAY, WEDNESDAY)
-    people_by_id = {
-        p.id: p
-        for p in (
-            await session.scalars(
-                select(PersonalResource).where(
-                    PersonalResource.id.in_([b.resource_id for b in crew_bookings])
-                )
-            )
-        ).all()
-    }
-    people = [people_by_id[b.resource_id] for b in crew_bookings]
-    qualifications = {
-        q.resource_id: q
-        for q in (
-            await session.scalars(
-                select(PersonalResourceSkill).where(
-                    PersonalResourceSkill.resource_id.in_(people_by_id)
-                )
-            )
-        ).all()
-    }
-    crew_qualifications = [qualifications[p.id] for p in people]
-    crew_requirement = (
-        await session.scalars(
-            select(WorkPackageRequirement).where(
-                WorkPackageRequirement.work_package_id == package.id
-            )
-        )
-    ).one()
-    profile = await session.scalar(
-        select(WorkWeekProfile).where(WorkWeekProfile.is_default)
-    )
-    for weekday in ("monday", "tuesday", "wednesday", "thursday", "friday"):
-        setattr(profile, weekday + "_minutes", 480)
-    profile.saturday_minutes = profile.sunday_minutes = 0
-    site = Site(name="Fictional workshop")
-    machine_group = ResourceGroup(
-        name="Fictional machines", resource_type=ResourceType.infrastructure
-    )
-    machine_skill = Skill(
-        name="Fictional lifting capability", resource_type="infrastructure"
-    )
-    session.add_all([site, machine_group, machine_skill])
-    await session.flush()
-    for person in people:
-        person.site_id = site.id
-    machine = InfrastructureResource(
-        name="Fictional crane", group_id=machine_group.id, site_id=site.id
-    )
-    machine_attribute = SkillAttribute(
-        name="Fictional assessed lifting", skill_id=machine_skill.id
-    )
-    session.add_all([machine, machine_attribute])
-    await session.flush()
-    machine_qualification = InfrastructureResourceSkill(
-        resource_id=machine.id,
-        skill_attribute_id=machine_attribute.id,
-        level=3,
-        valid_from=MONDAY,
-        valid_until=WEDNESDAY,
-    )
-    machine_requirement = WorkPackageRequirement(
-        work_package_id=package.id,
-        skill_id=machine_skill.id,
-        skill_attribute_id=machine_attribute.id,
-        quantity=1,
-        min_level=2,
-    )
-    machine_booking = Assignment(
-        resource_type=ResourceType.infrastructure,
-        resource_id=machine.id,
-        work_package_id=package.id,
-        start_at=_clock(MONDAY, 22),
-        end_at=_clock(MONDAY + timedelta(days=1), 2),
-    )
-    session.add_all([machine_qualification, machine_requirement, machine_booking])
-    if windows:
-        session.add(
-            InfrastructureAvailabilityWindow(
-                resource_id=machine.id, weekday=0, start_time=time(22), end_time=time(6)
-            )
-        )
-    await session.commit()
-    return SimpleNamespace(
-        package=package,
-        people=people,
-        machine=machine,
-        site=site,
-        crew_qualifications=crew_qualifications,
-        machine_qualification=machine_qualification,
-        crew_requirement=crew_requirement,
-        crew_bookings=crew_bookings,
-        machine_booking=machine_booking,
-        resource_ids={person.id for person in people} | {machine.id},
-    )
 
 
 async def _unmet(session, plan):

@@ -19,6 +19,7 @@ from app.schemas.assignment import (
 from app.services.assignment_service import (
     AssignmentService,
     _validate_assignment_fields,
+    clip_assignment,
     duplicate_booking_query,
 )
 from app.services.capacity_service import CapacityService
@@ -51,6 +52,31 @@ def _serialize_conflicts(
         for period in periods
         if _in_windows(period, windows)
     ]
+
+
+async def _bounded_periods(
+    service: ConflictService,
+    resource_id: UUID,
+    bookings: list[Assignment],
+    windows: list[Span],
+) -> list[ConflictPeriod]:
+    """Inspect only the old/new windows, never unrelated booking history."""
+    merged: list[tuple[date, date]] = []
+    for window in sorted(windows, key=lambda w: w.start or date.min):
+        assert window.start is not None and window.end is not None
+        if merged and window.start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], window.end))
+        else:
+            merged.append((window.start, window.end))
+    periods = []
+    for start, end in merged:
+        bounded = [
+            clipped
+            for a in bookings
+            if (clipped := clip_assignment(a, start, end)) is not None
+        ]
+        periods.extend(await service.calculate_periods(resource_id, bounded))
+    return periods
 
 
 class AssignmentPreviewService:
@@ -146,11 +172,11 @@ class AssignmentPreviewService:
             if resource_id == proposed.resource_id:
                 after.append(proposed)
 
-            before_conflicts = await conflict_service.calculate_periods(
-                resource_id, before
+            before_conflicts = await _bounded_periods(
+                conflict_service, resource_id, before, windows
             )
-            after_conflicts = await conflict_service.calculate_periods(
-                resource_id, after
+            after_conflicts = await _bounded_periods(
+                conflict_service, resource_id, after, windows
             )
             capacity_days: list[PreviewCapacityDay] = []
             if resource_type == ResourceType.personal:

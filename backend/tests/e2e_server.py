@@ -284,6 +284,82 @@ async def seed_legacy_logo():
     await engine.dispose()
 
 
+async def seed_planning_reference(scenario):
+    """Reset only the owned browser DB to one shared, fictional planning task."""
+    value = json.loads(STATE.read_text())["url"]
+    await seed(value)
+    from app.database import async_session_factory, engine
+    from app.models.assignment import Assignment
+    from app.models.resource import ResourceType
+    from app.services.conflict_refresh import refresh_resources
+    from tests.planning_reference import MONDAY, _clock, _seed_plan
+
+    async with async_session_factory() as session:
+        plan = await _seed_plan(session)
+        extra = None
+        if scenario == "staffing":
+            await session.delete(plan.crew_bookings[1])
+        elif scenario == "qualification":
+            plan.crew_qualifications[0].level = 2
+        elif scenario == "machine":
+            extra = Assignment(
+                resource_id=plan.machine.id,
+                resource_type=ResourceType.infrastructure,
+                work_package_id=plan.package.id,
+                start_at=_clock(MONDAY, 21),
+                end_at=_clock(MONDAY + timedelta(days=1), 1),
+            )
+            session.add(extra)
+        elif scenario == "overnight":
+            plan.machine_booking.start_at = _clock(MONDAY + timedelta(days=2), 21)
+            plan.machine_booking.end_at = _clock(MONDAY + timedelta(days=3), 1)
+        elif scenario == "replacement":
+            from app.models.resource import InfrastructureResource, PersonalResource
+            from app.models.skill import (
+                InfrastructureResourceSkill,
+                PersonalResourceSkill,
+            )
+
+            plan.machine_qualification.level = 1
+            machine = InfrastructureResource(
+                name="Replacement crane", group_id=plan.machine.group_id
+            )
+            person = PersonalResource(
+                name="Available person", group_id=plan.people[0].group_id
+            )
+            session.add_all([machine, person])
+            await session.flush()
+            session.add_all(
+                [
+                    InfrastructureResourceSkill(
+                        resource_id=machine.id,
+                        skill_attribute_id=plan.machine_qualification.skill_attribute_id,
+                        level=3,
+                    ),
+                    PersonalResourceSkill(
+                        resource_id=person.id,
+                        skill_attribute_id=plan.crew_qualifications[
+                            0
+                        ].skill_attribute_id,
+                        level=3,
+                    ),
+                ]
+            )
+        else:
+            raise ValueError("Unknown reference scenario")
+        await session.commit()
+        await refresh_resources(session, plan.resource_ids)
+        data = json.loads(STATE.read_text())
+        data.update(
+            planning_package=str(plan.package.id),
+            planning_project=str(plan.package.project_id),
+            planning_machine=str(plan.machine.id),
+            planning_extra=str(extra.id) if extra else None,
+        )
+        STATE.write_text(json.dumps(data))
+    await engine.dispose()
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["serve"]:
         asyncio.run(serve())
@@ -291,5 +367,7 @@ if __name__ == "__main__":
         asyncio.run(seed(json.loads(STATE.read_text())["url"]))
     elif sys.argv[1:] == ["legacy-logo"]:
         asyncio.run(seed_legacy_logo())
+    elif len(sys.argv) == 3 and sys.argv[1] == "planning-reference":
+        asyncio.run(seed_planning_reference(sys.argv[2]))
     else:
         raise SystemExit("Usage: python -m tests.e2e_server {serve|reset|legacy-logo}")

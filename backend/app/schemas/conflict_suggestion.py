@@ -27,3 +27,6 @@ class ConflictSuggestionResponse(ResponseModel):
     target_resource_name: str | None = None
     new_start_at: datetime | None = None
     new_end_at: datetime | None = None
+    work_package_name: str | None = None
+    conflicts_before: int | None = None
+    conflicts_after: int | None = None

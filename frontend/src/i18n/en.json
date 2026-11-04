@@ -347,7 +347,14 @@
     "descShiftBackward": "Shift {days} days backward",
     "descShiftIntoWindow": "Move to {time} within operating hours",
     "descReduce": "Reduce to {percent}%",
-    "descSwap": "Swap to '{name}' (available)"
+    "descSwap": "Swap to '{name}' (available)",
+    "loadFailed": "Suggestions could not be loaded. Try again or review the booking manually.",
+    "noAlternatives": "No qualified replacement of the same resource type has capacity for this entire booking.",
+    "noneAvailable": "No automatic resolution found. Window shifts search free operating hours within the work package, up to 30 days either side. Review the bookings or availability manually.",
+    "rankingScope": "Fewest remaining capacity and booking conflicts first. Counts cover the affected resources and periods; preview checks again before applying.",
+    "impactUnavailable": "Impact not assessable",
+    "remainingConflicts": "{count} remaining",
+    "previousConflicts": "previously {count}"
   },
   "absences": {
     "title": "Absences",
@@ -500,7 +507,9 @@
     "assignmentRemoved": "Assignment was removed",
     "workPackage": "Work Package",
     "allocation": "Allocation",
-    "openInGantt": "Open in Gantt"
+    "openInGantt": "Open in Gantt",
+    "qualificationCheck": "Qualification check",
+    "qualificationRule": "A replacement must satisfy an applicable role for the entire booking, including minimum level and validity."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1230,5 +1239,65 @@
     "density": "Table density",
     "comfortable": "Comfortable",
     "compact": "Compact"
+  },
+  "readiness": {
+    "title": "Work package readiness",
+    "selectPackage": "Assess work package",
+    "choosePackage": "Choose a work package",
+    "noPackages": "No active work packages",
+    "introduction": "Select a work package to see its requirements, qualifications and current resource constraints together.",
+    "personnel": "Personnel coverage and capacity",
+    "infrastructure": "Equipment coverage and bookings",
+    "qualification": "Assignment qualifications",
+    "status": {
+      "covered": "No blockers within scope",
+      "missing_requirements": "Missing requirements",
+      "conflicting": "Conflicting",
+      "not_fully_assessable": "Not fully assessable"
+    },
+    "unavailable": "Readiness could not be assessed",
+    "failedCheck": "The current check failed. Previous positive results do not confirm the current plan.",
+    "retry": "Try again",
+    "checking": "Checking current inputs…",
+    "refresh": "Check again",
+    "checkedAt": "Checked: {time}",
+    "snapshot": "The timestamp marks completion of these checks. Recheck after concurrent edits; resources are not reserved. The general conflict list is updated separately.",
+    "requirementCount": "Requirements: {count}",
+    "scope": "Scope of these checks",
+    "limits": {
+      "no_personnel_requirements": "No personnel requirements are defined; staffing demand cannot be confirmed.",
+      "no_infrastructure_requirements": "No equipment requirements are defined; equipment demand cannot be confirmed.",
+      "no_standard_profile": "No standard work-week profile is configured. Daily personnel requirement coverage cannot be established.",
+      "missing_calendar": "At least one personnel booking has no applicable work-week profile.",
+      "personnel_clock_times": "Personnel is booked by date and percentage. Shared presence during a particular machine shift cannot be established.",
+      "infrastructure_continuity": "Equipment coverage counts qualifying booked resources. It does not confirm continuous equipment coverage throughout the work package.",
+      "capacity_window_limit": "The current capacity check covers periods up to 366 days. This longer period has not been fully checked."
+    },
+    "noSupply": "No personal calendar capacity on at least {day}, despite a booking on a standard-profile workday. Commitment coverage alone does not establish available personnel.",
+    "inspectBookings": "Review package bookings",
+    "inspectResourceBookings": "Review all resource bookings",
+    "qualificationRule": "These bookings meet none of the package’s qualification requirements for the full booking period, including minimum level and validity. Open a card to review qualified alternatives.",
+    "currentConflicts": "Current booking constraints",
+    "causes": {
+      "over_allocation": "Assigned capacity exceeds available capacity",
+      "booking_overlap": "Exclusive equipment bookings overlap",
+      "outside_availability": "Booking extends outside operating windows"
+    },
+    "affectedBookings": "Affected bookings: {count}",
+    "bookingsFiltered": "Bookings filtered by the selected work package or resource.",
+    "showAllBookings": "Show all bookings",
+    "undefinedRequirements": "No requirements defined"
+  },
+  "assignmentChange": {
+    "title": "Proposed change",
+    "createTitle": "New booking",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "new": "New",
+    "changed": "Changed",
+    "unchanged": "Unchanged",
+    "duration": "Duration",
+    "timeZone": "Time zone: {zone}"
   }
 }

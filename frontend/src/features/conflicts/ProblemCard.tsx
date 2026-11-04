@@ -6,52 +6,30 @@
 
 import React, { useMemo, useState } from 'react'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
   Badge,
   Box,
-  Button,
   Collapse,
   Group,
-  Loader,
-  Modal,
   Stack,
   Table,
   Text,
   UnstyledButton,
 } from '@mantine/core'
-import {
-  IconChevronDown,
-  IconChevronRight,
-  IconRepeat,
-  IconSwitchHorizontal,
-} from '@tabler/icons-react'
-import { notifications } from '@mantine/notifications'
-import { DataTable } from '../../components/layout'
+import { IconChevronDown, IconChevronRight, IconRepeat } from '@tabler/icons-react'
 import type {
   Assignment,
   Conflict,
   ConflictAssignmentInfo,
-  AssignmentPreview,
   ResourceType,
 } from '../../types/assignment'
-import type { WorkPackageRequirement } from '../../types/workPackage'
-import type { ResourceSuggestion } from '../../types/suggestion'
 import { differenceInDays, formatDate, startOfDayUtc } from '../../utils/date'
-import { showErrorNotification } from '../../utils/errorHandling'
-import { getSuggestions } from '../../api/suggestions'
-import { getWorkPackageRequirements } from '../../api/workPackages'
-import { getAssignment, previewAssignment, updateAssignment } from '../../api/assignments'
-import { searchByQualification } from '../../api/skills'
 import { useTranslation } from '../../i18n'
-import { queryKeys } from '../../api/queryClient'
 import { ConflictSeverityBadge } from './ConflictSeverityBadge'
 import { ConflictAssignmentList } from './ConflictAssignmentList'
 import { ConflictSuggestions } from './ConflictSuggestions'
 import { resourceTypeLabel } from './bucketing'
-import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
-import { previewPayloadForPatch } from './suggestionChange'
 
 // --- Types ---
 
@@ -103,15 +81,7 @@ export const ProblemCard = React.memo(function ProblemCard({
   focusedWorkPackageId,
 }: Props) {
   const { t } = useTranslation()
-  const queryClient = useQueryClient()
   const [open, setOpen] = useState(initiallyOpen)
-  const [swapPreview, setSwapPreview] = useState<{
-    assignmentId: string
-    targetResourceId: string
-    targetResourceName: string
-    result: AssignmentPreview
-  } | null>(null)
-
   // Skill mismatch state
 
   const isCapacity = bucket.type === 'capacity'
@@ -138,131 +108,6 @@ export const ProblemCard = React.memo(function ProblemCard({
     const ratios = conflicts.map((c) => c.overload_ratio).filter((r) => r !== null) as number[]
     return ratios.length > 0 ? Math.max(...ratios) : null
   }, [conflicts])
-
-  // Skill mismatch: load WP requirements + suggestions when expanded
-  const firstRawAssignment = bucket.rawAssignments?.[0]
-  const firstRawAssignmentId = firstRawAssignment?.id
-
-  /**
-   * ONE QUERY FOR THREE REQUESTS, because it is one answer.
-   *
-   * A swap candidate must satisfy all three parts at once: the work package's requirements, a
-   * qualification matching each of them, and availability in the window. Caching the parts separately
-   * would let a stale qualification survive a changed requirement and produce a candidate who cannot
-   * do the work — so they share a key and go stale together.
-   *
-   * `enabled` carries what the old effect's early returns did: not a capacity conflict, card open, an
-   * assignment present, and dates on it. Expressed as a condition rather than as returns inside an
-   * effect, which also means reopening the card reuses the answer instead of recomputing it.
-   */
-  const startDate = firstRawAssignment?.start_date ?? firstRawAssignment?.start_at?.slice(0, 10)
-  const endDate = firstRawAssignment?.end_date ?? firstRawAssignment?.end_at?.slice(0, 10)
-
-  const candidatesQuery = useQuery({
-    queryKey: queryKeys.conflicts.swapCandidates(
-      firstRawAssignmentId ?? 'none',
-      bucket.resource_id,
-    ),
-    queryFn: async () => {
-      const assignment = firstRawAssignment!
-      const [requirements, availData] = await Promise.all([
-        getWorkPackageRequirements(assignment.work_package_id),
-        getSuggestions({
-          start_date: startDate!,
-          end_date: endDate!,
-          allocation_percent: assignment.allocation_percent ?? 100,
-          work_package_id: assignment.work_package_id,
-        }),
-      ])
-
-      const qualificationResults = await Promise.all(
-        requirements.map((req) =>
-          searchByQualification({
-            skill_id: req.skill_id,
-            skill_attribute_id: req.skill_attribute_id ?? undefined,
-          }),
-        ),
-      )
-      const qualifiedIds = new Set<string>()
-      for (const qualified of qualificationResults) {
-        for (const r of qualified) qualifiedIds.add(r.id)
-      }
-
-      return {
-        missingSkills: requirements,
-        suggestions: availData.filter(
-          (s) => s.resource_id !== bucket.resource_id && qualifiedIds.has(s.resource_id),
-        ),
-      }
-    },
-    enabled: !isCapacity && open && Boolean(firstRawAssignmentId) && Boolean(startDate && endDate),
-  })
-
-  const missingSkills: WorkPackageRequirement[] = candidatesQuery.data?.missingSkills ?? []
-  const suggestions: ResourceSuggestion[] = candidatesQuery.data?.suggestions ?? []
-  const loadingSuggestions = candidatesQuery.isPending && candidatesQuery.fetchStatus === 'fetching'
-
-  /**
-   * A SWAP WRITES AN ASSIGNMENT: it moves the work to somebody else.
-   *
-   * Same five keys as the assignments panel, for the same reasons. `onChanged()` is still called
-   * because the parent uses it to collapse the card — presentation, not data. Previously it was the
-   * ONLY thing that happened, so what got refreshed depended on which screen this card was inside.
-   */
-  const swapMutation = useMutation({
-    mutationFn: ({
-      assignmentId,
-      targetResourceId,
-    }: {
-      assignmentId: string
-      targetResourceId: string
-    }) => updateAssignment(assignmentId, { resource_id: targetResourceId }),
-    onSuccess: async () => {
-      setSwapPreview(null)
-      notifications.show({
-        title: t('common.saved'),
-        message: t('conflicts.swapDone'),
-        color: 'green',
-      })
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.assignments.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.planning.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.digest.all }),
-        // The Gantt perspectives DRAW the dates and bars this write moves. Adding it here rather than
-        // leaving each screen to remember is the same argument as the rest of this layer.
-        queryClient.invalidateQueries({ queryKey: queryKeys.gantt.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.resources.all }),
-      ])
-      onChanged()
-    },
-    onError: (err) => showErrorNotification(err, t('common.error'), t('conflicts.swapFailed')),
-  })
-
-  const previewSwapMutation = useMutation({
-    mutationFn: async (target: ResourceSuggestion) => {
-      const assignment = await getAssignment(firstRawAssignmentId!)
-      const result = await previewAssignment(
-        previewPayloadForPatch(assignment, { resource_id: target.resource_id }),
-      )
-      return {
-        assignmentId: assignment.id,
-        targetResourceId: target.resource_id,
-        targetResourceName: target.resource_name,
-        result,
-      }
-    },
-    onSuccess: setSwapPreview,
-    onError: (err) => {
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.conflicts.swapCandidates(
-          firstRawAssignmentId ?? 'none',
-          bucket.resource_id,
-        ),
-      })
-      showErrorNotification(err, t('common.error'), t('common.genericError'))
-    },
-  })
 
   // --- Badge & summary ---
   const badgeColor = isCapacity ? 'red' : 'orange'
@@ -292,54 +137,6 @@ export const ProblemCard = React.memo(function ProblemCard({
           : undefined,
       }}
     >
-      <Modal
-        opened={swapPreview !== null}
-        onClose={() => {
-          if (!swapMutation.isPending) setSwapPreview(null)
-        }}
-        title={
-          swapPreview
-            ? t('suggestions.previewAction', {
-                action: t('suggestions.descSwap', { name: swapPreview.targetResourceName }),
-              })
-            : ''
-        }
-        size="lg"
-        closeOnClickOutside={!swapMutation.isPending}
-        closeOnEscape={!swapMutation.isPending}
-      >
-        {swapPreview && (
-          <Stack gap="md">
-            <AssignmentPreviewSummary
-              preview={swapPreview.result}
-              disclaimer={t('suggestions.previewDisclaimer')}
-            />
-            <Text size="xs" c="dimmed">
-              {t('suggestions.skillPreviewNote')}
-            </Text>
-            <Group justify="flex-end">
-              <Button
-                variant="default"
-                onClick={() => setSwapPreview(null)}
-                disabled={swapMutation.isPending}
-              >
-                {t('common.cancel')}
-              </Button>
-              <Button
-                onClick={() =>
-                  swapMutation.mutate({
-                    assignmentId: swapPreview.assignmentId,
-                    targetResourceId: swapPreview.targetResourceId,
-                  })
-                }
-                loading={swapMutation.isPending}
-              >
-                {t('suggestions.apply')}
-              </Button>
-            </Group>
-          </Stack>
-        )}
-      </Modal>
       <UnstyledButton
         onClick={() => setOpen((s) => !s)}
         aria-expanded={open}
@@ -379,7 +176,7 @@ export const ProblemCard = React.memo(function ProblemCard({
             {/* Details section — type-specific */}
             <Box>
               <Text fw={600} size="sm" mb={4}>
-                {isCapacity ? t('conflicts.phases') : t('conflicts.missingSkills')}
+                {isCapacity ? t('conflicts.phases') : t('conflicts.qualificationCheck')}
               </Text>
 
               {isCapacity ? (
@@ -437,38 +234,9 @@ export const ProblemCard = React.memo(function ProblemCard({
                   )}
                 </>
               ) : (
-                <>
-                  {missingSkills.length > 0 ? (
-                    <Table.ScrollContainer minWidth={560} type="native">
-                      <Table withTableBorder fz="xs" layout="fixed">
-                        <Table.Thead>
-                          <Table.Tr>
-                            <Table.Th style={{ width: '50%' }}>{t('requirements.skill')}</Table.Th>
-                            <Table.Th style={{ width: '30%' }}>
-                              {t('requirements.attribute')}
-                            </Table.Th>
-                            <Table.Th style={{ width: '20%' }}>
-                              {t('requirements.quantity')}
-                            </Table.Th>
-                          </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>
-                          {missingSkills.map((req) => (
-                            <Table.Tr key={req.id}>
-                              <Table.Td>{req.skill_name}</Table.Td>
-                              <Table.Td>{req.skill_attribute_name || '—'}</Table.Td>
-                              <Table.Td>{req.quantity}</Table.Td>
-                            </Table.Tr>
-                          ))}
-                        </Table.Tbody>
-                      </Table>
-                    </Table.ScrollContainer>
-                  ) : (
-                    <Text size="sm" c="dimmed">
-                      {t('suggestionList.loading')}
-                    </Text>
-                  )}
-                </>
+                <Text size="sm" c="dimmed">
+                  {t('conflicts.qualificationRule')}
+                </Text>
               )}
             </Box>
 
@@ -483,79 +251,16 @@ export const ProblemCard = React.memo(function ProblemCard({
                 focusedWorkPackageId={focusedWorkPackageId}
               />
 
-              {/* Suggestions */}
-              {isCapacity && conflicts.length > 0 && (
-                <ConflictSuggestions conflictId={conflicts[0].id} onApplied={onChanged} />
-              )}
-
-              {!isCapacity && (
-                <Box mt="sm">
-                  {loadingSuggestions ? (
-                    <Group justify="center" py="sm">
-                      <Loader size="sm" />
-                      <Text size="sm" c="dimmed">
-                        {t('suggestionList.loading')}
-                      </Text>
-                    </Group>
-                  ) : suggestions.length > 0 ? (
-                    <>
-                      <Text fw={500} size="xs" c="dimmed" mb={4}>
-                        {t('conflicts.alternativeResources')}
-                      </Text>
-                      <DataTable
-                        head={
-                          <Table.Tr>
-                            <Table.Th>{t('suggestionList.name')}</Table.Th>
-                            <Table.Th>{t('suggestionList.qualification')}</Table.Th>
-                            <Table.Th>{t('suggestionList.freeCapacity')}</Table.Th>
-                            <Table.Th style={{ width: 120 }}>{t('common.actions')}</Table.Th>
-                          </Table.Tr>
-                        }
-                      >
-                        {suggestions.slice(0, 5).map((s) => (
-                          <Table.Tr key={s.resource_id}>
-                            <Table.Td>
-                              <Text size="xs">{s.resource_name}</Text>
-                              <Text size="xs" c="dimmed">
-                                {s.department}
-                              </Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="xs">{s.qualification_summary || '—'}</Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Text size="xs">
-                                {t('suggestionList.freePercent', {
-                                  value: s.average_free_capacity.toFixed(0),
-                                })}
-                              </Text>
-                            </Table.Td>
-                            <Table.Td>
-                              <Button
-                                size="compact-xs"
-                                variant="light"
-                                color="teal"
-                                leftSection={<IconSwitchHorizontal size={14} />}
-                                loading={
-                                  previewSwapMutation.isPending &&
-                                  previewSwapMutation.variables === s
-                                }
-                                disabled={previewSwapMutation.isPending || swapMutation.isPending}
-                                onClick={() => {
-                                  setSwapPreview(null)
-                                  previewSwapMutation.mutate(s)
-                                }}
-                                aria-label={t('conflicts.previewSwap')}
-                              >
-                                {t('assignmentForm.preview')}
-                              </Button>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </DataTable>
-                    </>
-                  ) : null}
-                </Box>
+              {open && (
+                <ConflictSuggestions
+                  assignmentIds={
+                    isCapacity
+                      ? bucket.assignments.map((a) => a.assignment_id)
+                      : (bucket.rawAssignments ?? []).map((a) => a.id)
+                  }
+                  alternativesOnly={!isCapacity}
+                  onApplied={onChanged}
+                />
               )}
             </Box>
           </Stack>

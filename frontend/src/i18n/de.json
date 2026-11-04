@@ -345,9 +345,16 @@
     "type_swap_resource": "Tauschen",
     "descShiftForward": "{days} Tage nach vorne verschieben",
     "descShiftBackward": "{days} Tage nach hinten verschieben",
-    "descShiftIntoWindow": "Auf {time} Uhr innerhalb der Betriebszeit verschieben",
+    "descShiftIntoWindow": "Auf {time} innerhalb der Betriebszeit verschieben",
     "descReduce": "Auf {percent}% reduzieren",
-    "descSwap": "Zu '{name}' wechseln (verfügbar)"
+    "descSwap": "Zu '{name}' wechseln (verfügbar)",
+    "loadFailed": "Die Vorschläge konnten nicht geladen werden. Erneut versuchen oder die Buchung manuell prüfen.",
+    "noAlternatives": "Kein qualifizierter Ersatz desselben Ressourcentyps hat für diese gesamte Buchung freie Kapazität.",
+    "noneAvailable": "Keine automatische Lösung gefunden. Verschiebungen suchen freie Betriebsfenster innerhalb des Arbeitspakets, höchstens 30 Tage in beide Richtungen. Buchungen oder Verfügbarkeit manuell prüfen.",
+    "rankingScope": "Wenigste verbleibende Kapazitäts- und Belegungskonflikte zuerst. Die Zahlen gelten für die betroffenen Ressourcen und Zeiträume; die Vorschau prüft vor dem Anwenden erneut.",
+    "impactUnavailable": "Wirkung nicht prüfbar",
+    "remainingConflicts": "{count} verbleibend",
+    "previousConflicts": "vorher {count}"
   },
   "absences": {
     "title": "Abwesenheiten",
@@ -500,7 +507,9 @@
     "assignmentRemoved": "Zuweisung wurde entfernt",
     "workPackage": "Arbeitspaket",
     "allocation": "Zuweisung",
-    "openInGantt": "Im Gantt öffnen"
+    "openInGantt": "Im Gantt öffnen",
+    "qualificationCheck": "Qualifikationsprüfung",
+    "qualificationRule": "Ein Ersatz muss eine passende Anforderung für den gesamten Buchungszeitraum erfüllen, einschließlich Mindeststufe und Gültigkeit."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1230,5 +1239,65 @@
     "density": "Tabellendichte",
     "comfortable": "Komfortabel",
     "compact": "Kompakt"
+  },
+  "readiness": {
+    "title": "Planbarkeit je Arbeitspaket",
+    "selectPackage": "Arbeitspaket prüfen",
+    "choosePackage": "Arbeitspaket auswählen",
+    "noPackages": "Keine aktiven Arbeitspakete",
+    "introduction": "Wählen Sie ein Arbeitspaket, um Anforderungen, Qualifikationen und aktuelle Ressourcenkonflikte gemeinsam zu prüfen.",
+    "personnel": "Personaldeckung und Kapazität",
+    "infrastructure": "Infrastrukturdeckung und Buchungen",
+    "qualification": "Qualifikationen der Zuordnungen",
+    "status": {
+      "covered": "Keine Blocker im Prüfumfang",
+      "missing_requirements": "Anforderungen fehlen",
+      "conflicting": "Konflikte vorhanden",
+      "not_fully_assessable": "Nicht vollständig prüfbar"
+    },
+    "unavailable": "Planbarkeit konnte nicht geprüft werden",
+    "failedCheck": "Die aktuelle Prüfung ist fehlgeschlagen. Frühere positive Ergebnisse bestätigen den aktuellen Plan nicht.",
+    "retry": "Erneut versuchen",
+    "checking": "Aktuelle Daten werden geprüft…",
+    "refresh": "Erneut prüfen",
+    "checkedAt": "Geprüft: {time}",
+    "snapshot": "Der Zeitstempel zeigt den Abschluss dieser Prüfungen. Prüfen Sie nach gleichzeitigen Änderungen erneut; Ressourcen werden nicht reserviert. Die allgemeine Konfliktliste wird getrennt aktualisiert.",
+    "requirementCount": "Anforderungen: {count}",
+    "scope": "Aussageumfang der Prüfungen",
+    "limits": {
+      "no_personnel_requirements": "Es sind keine Personalanforderungen definiert; der Personalbedarf kann nicht bestätigt werden.",
+      "no_infrastructure_requirements": "Es sind keine Infrastrukturanforderungen definiert; der Infrastrukturbedarf kann nicht bestätigt werden.",
+      "no_standard_profile": "Es ist kein Standard-Arbeitszeitprofil eingerichtet. Die tägliche Personaldeckung kann nicht festgestellt werden.",
+      "missing_calendar": "Für mindestens eine Personalbuchung fehlt ein gültiges Arbeitszeitprofil.",
+      "personnel_clock_times": "Personal wird nach Datum und Anteil gebucht. Eine gemeinsame Anwesenheit während einer bestimmten Maschinenschicht lässt sich daraus nicht bestätigen.",
+      "infrastructure_continuity": "Die Infrastrukturdeckung zählt qualifizierte gebuchte Ressourcen. Sie bestätigt keine durchgängige Verfügbarkeit während des gesamten Arbeitspakets.",
+      "capacity_window_limit": "Die aktuelle Kapazitätsprüfung umfasst Zeiträume bis 366 Tage. Dieser längere Zeitraum wurde nicht vollständig geprüft."
+    },
+    "noSupply": "Mindestens am {day} fehlt persönliche Kalenderkapazität, obwohl an einem Arbeitstag des Standardprofils gebucht wurde. Gedeckte Buchungszusagen allein bestätigen keine verfügbare Besetzung.",
+    "inspectBookings": "Buchungen des Arbeitspakets prüfen",
+    "inspectResourceBookings": "Alle Buchungen der Ressource prüfen",
+    "qualificationRule": "Diese Buchungen erfüllen keine der Qualifikationsanforderungen des Arbeitspakets für den gesamten Buchungszeitraum, einschließlich Mindeststufe und Gültigkeit. Öffnen Sie eine Karte, um qualifizierte Alternativen zu prüfen.",
+    "currentConflicts": "Aktuelle Buchungskonflikte",
+    "causes": {
+      "over_allocation": "Zugeordnete Kapazität übersteigt verfügbare Kapazität",
+      "booking_overlap": "Exklusive Infrastrukturbuchungen überschneiden sich",
+      "outside_availability": "Buchung liegt außerhalb der Betriebszeiten"
+    },
+    "affectedBookings": "Betroffene Buchungen: {count}",
+    "bookingsFiltered": "Buchungen nach dem gewählten Arbeitspaket oder der Ressource gefiltert.",
+    "showAllBookings": "Alle Buchungen anzeigen",
+    "undefinedRequirements": "Keine Anforderungen definiert"
+  },
+  "assignmentChange": {
+    "title": "Geplante Änderung",
+    "createTitle": "Neue Buchung",
+    "field": "Angabe",
+    "before": "Vorher",
+    "after": "Nachher",
+    "new": "Neu",
+    "changed": "Geändert",
+    "unchanged": "Unverändert",
+    "duration": "Dauer",
+    "timeZone": "Zeitzone: {zone}"
   }
 }

@@ -95,10 +95,9 @@ class ConflictService:
     ) -> ConflictService:
         """Build a service with data supplied directly, bypassing the database.
 
-        A seam for tests: the conflict-detection logic is a pure function over
-        these inputs, and the project tests services with hand-built doubles
-        rather than a live database. Reaching into private caches from a test
-        would couple it to internals that are free to change.
+        Batch-loaded assessments and tests reuse the same conflict logic without
+        per-resource queries or access to private caches. Database writes remain
+        confined to the explicit refresh methods.
         """
         service = cls(session)
         service._working_time = working_time

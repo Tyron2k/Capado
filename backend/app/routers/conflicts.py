@@ -83,7 +83,9 @@ async def get_conflict_check_status(
             minutes=CONFLICT_CHECK_INTERVAL_MINUTES * 2
         )
     return {
-        "last_checked_at": last_checked.isoformat() + "Z" if last_checked else None,
+        "last_checked_at": last_checked.isoformat().replace("+00:00", "Z")
+        if last_checked
+        else None,
         "status": latest.status if latest else "never",
         "stale": stale,
         "enabled": settings.scheduler_enabled if settings else True,
@@ -113,20 +115,7 @@ async def get_conflict_suggestions(
     """
     service = ConflictSuggestionService(session)
     suggestions = await service.get_suggestions(conflict_id)
-    return [
-        ConflictSuggestionResponse(
-            type=s.type,
-            assignment_id=s.assignment_id,
-            description=s.description,
-            shift_days=s.shift_days,
-            new_allocation_percent=s.new_allocation_percent,
-            target_resource_id=s.target_resource_id,
-            target_resource_name=s.target_resource_name,
-            new_start_at=s.new_start_at,
-            new_end_at=s.new_end_at,
-        )
-        for s in suggestions
-    ]
+    return [ConflictSuggestionResponse(**vars(s)) for s in suggestions]
 
 
 @router.get(

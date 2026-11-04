@@ -84,6 +84,16 @@ export async function deleteAssignment(id: string): Promise<void> {
 
 export type ConflictSuggestion = components['schemas']['ConflictSuggestionResponse']
 
+/** Resolve a current booking, including typed and qualified replacements. */
+export async function getAssignmentSuggestions(id: string, alternativesOnly = false) {
+  return (
+    await apiClient.get<ApiResponse<'/api/assignments/{assignment_id}/suggestions', 'get'>>(
+      `/api/assignments/${id}/suggestions`,
+      { params: { alternatives_only: alternativesOnly } },
+    )
+  ).data
+}
+
 /** Fetch resolution suggestions for a conflict. */
 export async function getConflictSuggestions(conflictId: string): Promise<ConflictSuggestion[]> {
   const response = await apiClient.get<
@@ -110,4 +120,13 @@ export async function getPlanningOverview(signal?: AbortSignal): Promise<Plannin
     },
   )
   return response.data
+}
+
+/** Current, read-only checks for one active work package. */
+export async function getWorkPackageReadiness(id: string, signal?: AbortSignal) {
+  return (
+    await apiClient.get<
+      ApiResponse<'/api/assignments/planning/work-packages/{work_package_id}', 'get'>
+    >(`/api/assignments/planning/work-packages/${id}`, { signal })
+  ).data
 }
