@@ -39,11 +39,18 @@ import { useSettings } from '../../context/SettingsContext'
 import { formatDateTime } from '../../utils/date'
 
 type Props = (
-  | { conflictId: string; assignmentId?: never; alternativesOnly?: never }
+  | { conflictId: string; assignmentId?: never; assignmentIds?: never; alternativesOnly?: never }
   | {
       assignmentId: string
+      assignmentIds?: never
       alternativesOnly?: boolean
       conflictId?: never
+    }
+  | {
+      assignmentIds: string[]
+      assignmentId?: never
+      conflictId?: never
+      alternativesOnly?: boolean
     }
 ) & {
   onApplied: () => void
@@ -92,6 +99,7 @@ function buildDescription(
 export function ConflictSuggestions({
   conflictId,
   assignmentId,
+  assignmentIds,
   alternativesOnly = false,
   onApplied,
 }: Props) {
@@ -106,18 +114,27 @@ export function ConflictSuggestions({
     result: AssignmentPreview
   } | null>(null)
 
-  const suggestionsKey = assignmentId
-    ? queryKeys.conflicts.assignmentSuggestions(assignmentId, alternativesOnly)
-    : queryKeys.conflicts.suggestions(conflictId!)
+  const ids = [...new Set(assignmentIds ?? (assignmentId ? [assignmentId] : []))].sort()
+  const suggestionsKey = conflictId
+    ? queryKeys.conflicts.suggestions(conflictId)
+    : queryKeys.conflicts.assignmentSuggestions(ids.join(','), alternativesOnly)
   const suggestionsQuery = useQuery({
     queryKey: suggestionsKey,
     refetchOnMount: 'always',
-    queryFn: () =>
-      assignmentId
-        ? getAssignmentSuggestions(assignmentId, alternativesOnly)
-        : getConflictSuggestions(conflictId!),
+    queryFn: async () =>
+      conflictId
+        ? getConflictSuggestions(conflictId)
+        : (
+            await Promise.all(ids.map((id) => getAssignmentSuggestions(id, alternativesOnly)))
+          ).flat(),
   })
-  const suggestions: ConflictSuggestion[] = suggestionsQuery.data ?? []
+  // Merge all involved bookings before ranking: the complete fix may belong to
+  // the second booking rather than the first card's original suggestion order.
+  const suggestions: ConflictSuggestion[] = [...(suggestionsQuery.data ?? [])].sort(
+    (a, b) =>
+      (a.conflicts_after ?? Number.MAX_SAFE_INTEGER) -
+      (b.conflicts_after ?? Number.MAX_SAFE_INTEGER),
+  )
   const loading = suggestionsQuery.isPending
 
   /**
@@ -252,36 +269,75 @@ export function ConflictSuggestions({
           {t('suggestions.title')}
         </Text>
       </Group>
-      {suggestions.map((s, idx) => {
-        const Icon = ICON_MAP[s.type] ?? IconBulb
-        const color = COLOR_MAP[s.type] ?? 'gray'
-        const key = `${s.assignment_id}-${s.type}-${idx}`
-        const label = t(`suggestions.type_${s.type}`)
-        const desc = buildDescription(s, t, settings.timeZone, locale)
-        return (
-          <Group key={key} gap="xs" wrap="nowrap">
-            <Badge size="xs" color={color} variant="light" leftSection={<Icon size={10} />}>
-              {label}
-            </Badge>
-            <Text size="xs" style={{ flex: 1 }}>
-              {desc}
-            </Text>
-            <Button
-              size="compact-xs"
-              variant="light"
-              color={color}
-              loading={previewMutation.isPending && previewMutation.variables === s}
-              disabled={previewMutation.isPending || applyMutation.isPending}
-              onClick={() => {
-                setActive(null)
-                previewMutation.mutate(s)
-              }}
-            >
-              {t('assignmentForm.preview')}
-            </Button>
-          </Group>
-        )
-      })}
+      <Text size="xs" c="dimmed">
+        {t('suggestions.rankingScope')}
+      </Text>
+      <Stack
+        component="ol"
+        aria-label={t('suggestions.title')}
+        gap="xs"
+        m={0}
+        p={0}
+        style={{ listStyle: 'none' }}
+      >
+        {suggestions.map((s, idx) => {
+          const Icon = ICON_MAP[s.type] ?? IconBulb
+          const color = COLOR_MAP[s.type] ?? 'gray'
+          const key = `${s.assignment_id}-${s.type}-${idx}`
+          const label = t(`suggestions.type_${s.type}`)
+          const desc = buildDescription(s, t, settings.timeZone, locale)
+          return (
+            <Group component="li" key={key} gap="xs" wrap="nowrap">
+              <Badge size="xs" color={color} variant="light" leftSection={<Icon size={10} />}>
+                {label}
+              </Badge>
+              <Stack gap={3} style={{ flex: 1, minWidth: 0 }}>
+                {s.work_package_name && (
+                  <Text size="xs" fw={600}>
+                    {s.work_package_name}
+                  </Text>
+                )}
+                <Text size="xs">{desc}</Text>
+                <Group gap={6}>
+                  <Badge
+                    size="xs"
+                    variant="light"
+                    color={
+                      s.conflicts_after == null
+                        ? 'gray'
+                        : s.conflicts_after === 0
+                          ? 'green'
+                          : 'orange'
+                    }
+                  >
+                    {s.conflicts_after == null
+                      ? t('suggestions.impactUnavailable')
+                      : t('suggestions.remainingConflicts', { count: s.conflicts_after })}
+                  </Badge>
+                  {s.conflicts_before != null && (
+                    <Text size="xs" c="dimmed">
+                      {t('suggestions.previousConflicts', { count: s.conflicts_before })}
+                    </Text>
+                  )}
+                </Group>
+              </Stack>
+              <Button
+                size="compact-xs"
+                variant="light"
+                color={color}
+                loading={previewMutation.isPending && previewMutation.variables === s}
+                disabled={previewMutation.isPending || applyMutation.isPending}
+                onClick={() => {
+                  setActive(null)
+                  previewMutation.mutate(s)
+                }}
+              >
+                {t('assignmentForm.preview')}
+              </Button>
+            </Group>
+          )
+        })}
+      </Stack>
     </Stack>
   )
 }

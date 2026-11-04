@@ -126,6 +126,9 @@ test('combined planning: explain and repair an overnight machine overlap', async
   await expect(
     verdict.getByText('Booking extends outside operating windows', { exact: true }),
   ).toBeVisible()
+  const ranked = verdict.getByRole('list', { name: 'Resolution Suggestions', exact: true })
+  await expect(ranked.getByRole('listitem')).toHaveCount(5)
+  await expect(ranked.getByRole('listitem').first()).toContainText('0 remaining')
   await measure.diagnostic(() =>
     page.screenshot({ path: info.outputPath('readiness-machine-blockers.png'), fullPage: true }),
   )

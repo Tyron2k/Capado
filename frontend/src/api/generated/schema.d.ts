@@ -4186,6 +4186,10 @@ export interface components {
              * Format: uuid
              */
             assignment_id: string;
+            /** Conflicts After */
+            conflicts_after: number | null;
+            /** Conflicts Before */
+            conflicts_before: number | null;
             /** Description */
             description: string;
             /** New Allocation Percent */
@@ -4205,6 +4209,8 @@ export interface components {
              * @enum {string}
              */
             type: "shift_forward" | "shift_backward" | "shift_into_window" | "reduce_allocation" | "swap_resource";
+            /** Work Package Name */
+            work_package_name: string | null;
         };
         /**
          * CustomerCreate

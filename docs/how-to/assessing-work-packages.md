@@ -51,6 +51,13 @@ For a missing requirement, expand its existing requirement card and preview a
 qualified resource suggestion. Confirming the preview saves the assignment;
 opening or cancelling it does not. The preview is an estimate, not a reservation.
 
+Each conflict card combines suggestions for its involved bookings, with the fewest
+remaining capacity/booking conflicts first. The list shows the number remaining
+and the count before the change, using the ordinary preview calculation. Counts
+cover the affected resources and old/proposed periods, not a full project verdict.
+An unassessable effect is marked explicitly and sorted last. Opening the preview
+checks the current data again; it can differ after concurrent changes.
+
 Before confirming a suggestion, review the **Proposed change** comparison. It shows
 resource, start/end and personnel allocation before and after, and marks unchanged
 values. Equipment bookings include exact clock times, UTC offsets, the display time

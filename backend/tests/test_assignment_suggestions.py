@@ -18,6 +18,80 @@ from app.services.conflict_suggestion_service import ConflictSuggestionService
 from tests.planning_reference import MONDAY, WEDNESDAY, _clock, _seed_plan
 
 
+async def test_impact_ranks_the_complete_window_fix_first_without_writes(db_session):
+    plan = await _seed_plan(db_session)
+    extra = Assignment(
+        resource_id=plan.machine.id,
+        resource_type=ResourceType.infrastructure,
+        work_package_id=plan.package.id,
+        start_at=_clock(MONDAY, 21),
+        end_at=_clock(MONDAY + timedelta(days=1), 1),
+    )
+    db_session.add(extra)
+    await db_session.commit()
+    suggestions = await ConflictSuggestionService(
+        db_session
+    ).get_assignment_suggestions(extra.id)
+    assert len(suggestions) >= 3
+    assert suggestions[0].type == "shift_into_window"
+    assert suggestions[0].conflicts_before == 2
+    assert suggestions[0].conflicts_after == 0
+    assert [s.conflicts_after for s in suggestions] == sorted(
+        s.conflicts_after for s in suggestions
+    )
+    for suggestion in suggestions:
+        impact = await AssignmentPreviewService(db_session).preview(
+            AssignmentPreviewRequest(
+                assignment_id=extra.id,
+                resource_id=extra.resource_id,
+                resource_type=extra.resource_type,
+                work_package_id=extra.work_package_id,
+                start_at=suggestion.new_start_at,
+                end_at=suggestion.new_end_at,
+            )
+        )
+        assert suggestion.conflicts_before == sum(
+            len(r.conflicts_before) for r in impact.resources
+        )
+        assert suggestion.conflicts_after == sum(
+            len(r.conflicts_after) for r in impact.resources
+        )
+        assert suggestion.work_package_name == plan.package.name
+    assert extra.start_at == _clock(MONDAY, 21)
+    assert not db_session.new and not db_session.dirty
+    assert (await db_session.scalars(select(Conflict))).all() == []
+
+
+async def test_unassessable_suggestion_is_last_and_never_claims_zero(db_session):
+    from uuid import uuid4
+
+    from app.services.conflict_suggestion_service import ResolutionSuggestion
+
+    plan = await _seed_plan(db_session)
+    booking = plan.machine_booking
+    missing = ResolutionSuggestion(
+        type="swap_resource",
+        assignment_id=booking.id,
+        description="Removed candidate",
+        target_resource_id=uuid4(),
+        conflicts_before=2,
+        conflicts_after=0,
+    )
+    valid = ResolutionSuggestion(
+        type="shift_into_window",
+        assignment_id=booking.id,
+        description="Available interval",
+        new_start_at=_clock(MONDAY + timedelta(days=1), 2),
+        new_end_at=_clock(MONDAY + timedelta(days=1), 6),
+    )
+    result = await ConflictSuggestionService(db_session)._assess_suggestions(
+        [missing, valid], {booking.id: booking}
+    )
+    assert result == [valid, missing]
+    assert valid.conflicts_after == 0
+    assert missing.conflicts_before is None and missing.conflicts_after is None
+
+
 @pytest.mark.parametrize("kind", [ResourceType.personal, ResourceType.infrastructure])
 async def test_replacement_keeps_type_and_previews_then_applies(db_session, kind):
     plan = await _seed_plan(db_session)

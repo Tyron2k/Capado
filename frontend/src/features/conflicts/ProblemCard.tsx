@@ -251,22 +251,17 @@ export const ProblemCard = React.memo(function ProblemCard({
                 focusedWorkPackageId={focusedWorkPackageId}
               />
 
-              {open &&
-                (isCapacity ? bucket.assignments : (bucket.rawAssignments ?? [])).map((booking) => {
-                  const id = 'assignment_id' in booking ? booking.assignment_id : booking.id
-                  return (
-                    <Box key={id} mt="sm">
-                      <Text size="xs" fw={600}>
-                        {booking.work_package_name}
-                      </Text>
-                      <ConflictSuggestions
-                        assignmentId={id}
-                        alternativesOnly={!isCapacity}
-                        onApplied={onChanged}
-                      />
-                    </Box>
-                  )
-                })}
+              {open && (
+                <ConflictSuggestions
+                  assignmentIds={
+                    isCapacity
+                      ? bucket.assignments.map((a) => a.assignment_id)
+                      : (bucket.rawAssignments ?? []).map((a) => a.id)
+                  }
+                  alternativesOnly={!isCapacity}
+                  onApplied={onChanged}
+                />
+              )}
             </Box>
           </Stack>
         </Box>

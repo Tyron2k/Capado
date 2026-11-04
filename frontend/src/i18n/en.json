@@ -350,7 +350,11 @@
     "descSwap": "Swap to '{name}' (available)",
     "loadFailed": "Suggestions could not be loaded. Try again or review the booking manually.",
     "noAlternatives": "No qualified replacement of the same resource type has capacity for this entire booking.",
-    "noneAvailable": "No automatic resolution found. Window shifts search free operating hours within the work package, up to 30 days either side. Review the bookings or availability manually."
+    "noneAvailable": "No automatic resolution found. Window shifts search free operating hours within the work package, up to 30 days either side. Review the bookings or availability manually.",
+    "rankingScope": "Fewest remaining capacity and booking conflicts first. Counts cover the affected resources and periods; preview checks again before applying.",
+    "impactUnavailable": "Impact not assessable",
+    "remainingConflicts": "{count} remaining",
+    "previousConflicts": "previously {count}"
   },
   "absences": {
     "title": "Absences",

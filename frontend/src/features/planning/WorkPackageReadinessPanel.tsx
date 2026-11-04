@@ -214,18 +214,21 @@ export function WorkPackageReadinessPanel({
                   )}
                 </Group>
                 {data.conflicts.findIndex((c) => c.resource_id === conflict.resource_id) ===
-                  index &&
-                  data.assignments
-                    .filter(
-                      (a) =>
-                        a.resource_id === conflict.resource_id &&
-                        data.conflicts.some(
-                          (c) => c.resource_id === a.resource_id && c.assignment_ids.includes(a.id),
-                        ),
-                    )
-                    .map((a) => (
-                      <ConflictSuggestions key={a.id} assignmentId={a.id} onApplied={onChanged} />
-                    ))}
+                  index && (
+                  <ConflictSuggestions
+                    assignmentIds={data.assignments
+                      .filter(
+                        (a) =>
+                          a.resource_id === conflict.resource_id &&
+                          data.conflicts.some(
+                            (c) =>
+                              c.resource_id === a.resource_id && c.assignment_ids.includes(a.id),
+                          ),
+                      )
+                      .map((a) => a.id)}
+                    onApplied={onChanged}
+                  />
+                )}
               </Paper>
             ))}
           </Stack>

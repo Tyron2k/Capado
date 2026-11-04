@@ -350,7 +350,11 @@
     "descSwap": "Zu '{name}' wechseln (verfügbar)",
     "loadFailed": "Die Vorschläge konnten nicht geladen werden. Erneut versuchen oder die Buchung manuell prüfen.",
     "noAlternatives": "Kein qualifizierter Ersatz desselben Ressourcentyps hat für diese gesamte Buchung freie Kapazität.",
-    "noneAvailable": "Keine automatische Lösung gefunden. Verschiebungen suchen freie Betriebsfenster innerhalb des Arbeitspakets, höchstens 30 Tage in beide Richtungen. Buchungen oder Verfügbarkeit manuell prüfen."
+    "noneAvailable": "Keine automatische Lösung gefunden. Verschiebungen suchen freie Betriebsfenster innerhalb des Arbeitspakets, höchstens 30 Tage in beide Richtungen. Buchungen oder Verfügbarkeit manuell prüfen.",
+    "rankingScope": "Wenigste verbleibende Kapazitäts- und Belegungskonflikte zuerst. Die Zahlen gelten für die betroffenen Ressourcen und Zeiträume; die Vorschau prüft vor dem Anwenden erneut.",
+    "impactUnavailable": "Wirkung nicht prüfbar",
+    "remainingConflicts": "{count} verbleibend",
+    "previousConflicts": "vorher {count}"
   },
   "absences": {
     "title": "Abwesenheiten",

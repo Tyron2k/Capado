@@ -15,11 +15,13 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import BusinessRuleError
+from app.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.models.assignment import Assignment
 from app.models.conflict import Conflict, ConflictAssignment, ConflictCause
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.schemas.assignment import AssignmentPreviewRequest
 from app.schemas.conflict_suggestion import SuggestionType
+from app.services.assignment_preview import AssignmentPreviewService
 from app.services.assignment_service import AssignmentService, clip_assignment
 from app.services.conflict_service import ConflictService
 from app.services.qualification import HeldQualification, satisfies
@@ -55,6 +57,9 @@ class ResolutionSuggestion:
     new_start_at: datetime | None = None
     new_end_at: datetime | None = None
     """Every infrastructure time shift carries the exact UTC interval to apply."""
+    work_package_name: str | None = None
+    conflicts_before: int | None = None
+    conflicts_after: int | None = None
 
 
 def _shift_booking(
@@ -360,7 +365,13 @@ class ConflictSuggestionService:
                     )
                 )
 
-        return suggestions
+        return (
+            suggestions
+            if self._preloaded
+            else await self._assess_suggestions(
+                suggestions, {a.id: a for a in assignments}
+            )
+        )
 
     async def get_assignment_suggestions(
         self, assignment_id: UUID, *, alternatives_only: bool = False
@@ -416,7 +427,77 @@ class ConflictSuggestionService:
                     if s.type != "swap_resource"
                 )
         # One booking can participate in several conflict phases.
-        return list({tuple(vars(s).values()): s for s in suggestions}.values())
+        unique = list({tuple(vars(s).values()): s for s in suggestions}.values())
+        return await self._assess_suggestions(unique, {assignment.id: assignment})
+
+    async def _assess_suggestions(
+        self,
+        suggestions: list[ResolutionSuggestion],
+        assignments: dict[UUID, Assignment],
+    ) -> list[ResolutionSuggestion]:
+        """Use the ordinary read-only preview; an unassessable effect is never zero."""
+        preview = AssignmentPreviewService(self.session)
+        for suggestion in suggestions:
+            suggestion.conflicts_before = suggestion.conflicts_after = None
+            booking = assignments[suggestion.assignment_id]
+            suggestion.work_package_name = await self._get_work_package_name(
+                booking.work_package_id
+            )
+            try:
+                data = AssignmentPreviewRequest(
+                    assignment_id=booking.id,
+                    resource_id=suggestion.target_resource_id or booking.resource_id,
+                    resource_type=booking.resource_type,
+                    work_package_id=booking.work_package_id,
+                    start_date=booking.start_date,
+                    end_date=booking.end_date,
+                    allocation_percent=booking.allocation_percent,
+                    start_at=booking.start_at,
+                    end_at=booking.end_at,
+                )
+                if suggestion.type == "reduce_allocation":
+                    data.allocation_percent = suggestion.new_allocation_percent
+                elif suggestion.type in {
+                    "shift_forward",
+                    "shift_backward",
+                    "shift_into_window",
+                }:
+                    if booking.resource_type == ResourceType.personal:
+                        if (
+                            data.start_date is None
+                            or data.end_date is None
+                            or suggestion.shift_days is None
+                        ):
+                            raise ValueError("Incomplete suggested period")
+                        offset = timedelta(days=suggestion.shift_days)
+                        data.start_date += offset
+                        data.end_date += offset
+                    else:
+                        data.start_at, data.end_at = (
+                            suggestion.new_start_at,
+                            suggestion.new_end_at,
+                        )
+                impact = await preview.preview(data)
+            except (
+                BusinessRuleError,
+                ConflictError,
+                NotFoundError,
+                ValueError,
+                OverflowError,
+            ):
+                continue
+            suggestion.conflicts_before = sum(
+                len(r.conflicts_before) for r in impact.resources
+            )
+            suggestion.conflicts_after = sum(
+                len(r.conflicts_after) for r in impact.resources
+            )
+        return sorted(
+            suggestions,
+            key=lambda s: (
+                s.conflicts_after if s.conflicts_after is not None else float("inf")
+            ),
+        )
 
     async def _qualified_alternatives(
         self, assignment: Assignment
