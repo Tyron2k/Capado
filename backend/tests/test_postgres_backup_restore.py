@@ -324,6 +324,13 @@ async def test_real_dump_restore_upgrade_and_authenticated_application(
         await connection.execute(sa.text(f'CREATE DATABASE "{name}"'))
     try:
         if backup_revision == "head":
+            # Keep the whole TOC readable and fail only while restoring data.
+            # Cutting halfway fails before SQL and cannot test atomic rollback.
+            damaged = dump[:-64]
+            assert (
+                await pg_tool("pg_restore", source_url, "--list", data=damaged)
+                == contents
+            )
             with pytest.raises(AssertionError, match="pg_restore:"):
                 await pg_tool(
                     "pg_restore",
@@ -333,7 +340,7 @@ async def test_real_dump_restore_upgrade_and_authenticated_application(
                     "--no-privileges",
                     "--exit-on-error",
                     "--single-transaction",
-                    data=dump[: len(dump) // 2],
+                    data=damaged,
                 )
             async with restored_engine.connect() as connection:
                 assert (

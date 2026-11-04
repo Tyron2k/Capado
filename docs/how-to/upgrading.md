@@ -120,8 +120,9 @@ two qualified people, dated qualification validity, both requirement types, an
 overnight machine window and conflicting machine bookings. After restore, the
 authenticated work-package check must return the same qualification gap, conflicts,
 bookings and stated precision limits as before the backup (apart from its check
-timestamp). A deliberately truncated archive must fail without leaving partial
-application tables; the intact archive must then restore into that same empty target.
+timestamp). A deliberately truncated archive retains a readable table of contents,
+then fails in the data phase without leaving partial application tables. The intact
+archive must then restore into that same empty target.
 
 This test is part of the existing backend test suite on both CI Python versions,
 using the existing PostgreSQL service. The release workflow requires successful
