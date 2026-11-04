@@ -71,7 +71,8 @@ access JWTs retain their normal expiry: they are blocked by the password-change 
 the temporary password is changed, but are not individually revoked. This procedure is for
 forgotten credentials. For suspected account/token compromise, also rotate the deployment's
 `JWT_SECRET_KEY` consistently across all API replicas before restarting; that invalidates
-**all users'** existing access tokens and requires them to sign in again.
+**all users'** existing access tokens. Other accounts' stored refresh sessions remain
+valid; the recovered account's revoked refresh tokens require a new sign-in.
 
 Password input uses Python's [getpass](https://docs.python.org/3/library/getpass.html), with
 its insecure echo fallback disabled. Session invalidation follows the recovery considerations

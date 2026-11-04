@@ -4,10 +4,10 @@
 
 - Docker Desktop (or Docker Engine + Compose plugin)
 - Git
-- Node.js 20 or newer for frontend development outside Docker. CI builds on 24; the test toolchain
-  (Vitest 5, jsdom 30) does not run on Node 18, which is past end of life
+- Node.js 26 for frontend development outside Docker, matching the current Docker images
+  and CI toolchain. Using the same version avoids test/build dependency engine mismatches.
 - Python 3.12 or newer and [uv](https://docs.astral.sh/uv/) for backend development outside Docker.
-  `requires-python` in `backend/pyproject.toml` is the authority, and CI runs 3.12
+  `requires-python` in `backend/pyproject.toml` is the authority; CI runs 3.12 and 3.15.
 
 ## Quick start (Docker)
 
@@ -35,6 +35,10 @@ that omits the backend's `/api` prefix and makes login return 404.
 
 On first visit, you'll be redirected to the setup page to create the
 initial admin account.
+
+For a complete fictional people/machine/qualification example, follow
+[your first combined plan](first-combined-plan.md). It supplies a normal CSV ZIP
+for an empty installation and explains the expected gaps, conflicts and repairs.
 
 The default database is PostgreSQL 18. Its volume is mounted at `/var/lib/postgresql`, with
 database files in `18/docker`. An existing PostgreSQL 16 volume cannot be reused directly;
