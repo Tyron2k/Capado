@@ -135,7 +135,7 @@ remain actions on individual projects, according to your permissions.
 
 ### Note for editors
 
-As an editor, you can only create and edit projects that are within your configured project scope.
+As an editor, you can create new projects even if you have no project permissions yet. Each new project is automatically added to your project scope so you can edit it. Other projects still require an explicit permission.
     `.trim(),
   },
 
@@ -165,6 +165,8 @@ Editors can only modify entities within their configured scope:
 | Departments | People resources, assignments, qualification matrix |
 | Locations | Infrastructure resources, infrastructure assignments |
 | Projects | Projects, work packages |
+
+Editors can also create new projects; these are automatically added to their project scope.
 
 ### Master data
 
