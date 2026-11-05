@@ -25,7 +25,7 @@ config = context.config
 
 # Logging-Konfiguration aus alembic.ini
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # SQLAlchemy-Metadaten für Autogenerate
 # Alle Models müssen hier importiert werden, damit sie in den Metadaten registriert sind.
