@@ -26,8 +26,9 @@ async function login(page: Page) {
   return body.access_token
 }
 
-test.beforeEach(async ({ page }) => {
-  await command('uv', ['--directory', '../backend', 'run', '--frozen', '--no-dev', 'python', '-m', 'tests.e2e_server', 'reset'])
+test.beforeEach(async ({ page }, testInfo) => {
+  const reset = testInfo.tags.includes('@first-project') ? 'reset-first-project' : 'reset'
+  await command('uv', ['--directory', '../backend', 'run', '--frozen', '--no-dev', 'python', '-m', 'tests.e2e_server', reset])
   seed = JSON.parse(await readFile('.e2e-state.json', 'utf8')) as Seed
   await page.addInitScript(() => localStorage.setItem('user-preferences', JSON.stringify({ locale: 'en', colorScheme: 'light', navCollapsed: false })))
 })
@@ -112,23 +113,14 @@ test('OIDC cookie login, reload, expiry refresh and logout never navigate with t
   expect(secrets.every(secret => Object.values(state).every(value => !value.includes(secret)))).toBe(true)
 })
 
-test('editor without project scope creates a project and package, checks overview/Gantt and edits the project', async ({ page, request }) => {
-  const adminLogin = await request.post('/api/auth/login', {
-    data: { email: 'admin@example.test', password: 'browser-tests-only' },
-  })
-  expect(adminLogin.status()).toBe(200)
-  const adminHeaders = { Authorization: `Bearer ${(await adminLogin.json()).access_token}` }
-  const users = await request.get('/api/users', { headers: adminHeaders })
-  expect(users.status()).toBe(200)
-  const editor = ((await users.json()) as { items: { id: string; email: string }[] })
-    .items.find(user => user.email === 'editor@example.test')!
-  const cleared = await request.put(`/api/users/${editor.id}`, {
-    headers: adminHeaders, data: { scope_project_ids: [] },
-  })
-  expect(cleared.status()).toBe(200)
+test('editor without project scope creates a project and package, checks overview/Gantt and edits the project', { tag: '@first-project' }, async ({ page, request }) => {
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
   const editorToken = await login(page)
+  const editorHeaders = { Authorization: `Bearer ${editorToken}` }
+  const before = await request.get('/api/users/me', { headers: editorHeaders })
+  expect(before.status()).toBe(200)
+  expect((await before.json()).scope_project_ids).toEqual([])
   await page.getByRole('navigation').getByText('Projects', { exact: true }).click()
   await page.getByRole('button', { name: 'New Project', exact: true }).click()
   let dialog = page.getByRole('dialog')
@@ -140,7 +132,6 @@ test('editor without project scope creates a project and package, checks overvie
   expect(created.status()).toBe(201)
   const projectId = ((await created.json()) as { id: string }).id
   await expect(dialog).toBeHidden()
-  const editorHeaders = { Authorization: `Bearer ${editorToken}` }
   const me = await request.get('/api/users/me', { headers: editorHeaders })
   expect(me.status()).toBe(200)
   expect((await me.json()).scope_project_ids).toEqual([projectId])
@@ -175,6 +166,15 @@ test('editor without project scope creates a project and package, checks overvie
   expect(pageErrors).toEqual([])
 })
 
+async function allocation(dialog: Locator, value: string) {
+  const input = dialog.getByLabel(/^Allocation/)
+  await input.focus()
+  await input.press('ControlOrMeta+A')
+  await input.pressSequentially(value)
+  await input.press('Tab')
+  await expect(input).toHaveValue(`${value}%`)
+}
+
 async function assignment(page: Page, packageName: string, warning = false) {
   await page.getByRole('button', { name: 'New Assignment', exact: true }).click()
   const dialog = page.getByRole('dialog')
@@ -185,8 +185,12 @@ async function assignment(page: Page, packageName: string, warning = false) {
   await dialog.getByLabel(/^Work Package/).fill(packageName)
   await page.getByRole('option', { name: packageName, exact: true }).click()
   await dates(dialog)
-  await dialog.getByLabel(/^Allocation/).fill('60')
+  await allocation(dialog, '60')
+  const response = page.waitForResponse(r => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/assignments')
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const saved = await response
+  expect(saved.status()).toBe(201)
+  expect((await saved.json()).assignment.allocation_percent).toBe(60)
   if (warning) {
     await expect(dialog.getByRole('alert', { name: 'Capacity Warning' })).toBeVisible()
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -206,8 +210,12 @@ test('overbooking becomes a conflict and correcting allocation clears it', async
   await page.getByRole('tab', { name: 'Assignments', exact: true }).click()
   await page.getByRole('button', { name: 'Edit assignment', exact: true }).last().click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByLabel(/^Allocation/).fill('40')
+  await allocation(dialog, '40')
+  const response = page.waitForResponse(r => r.request().method() === 'PUT' && new URL(r.url()).pathname.startsWith('/api/assignments/'))
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const saved = await response
+  expect(saved.status()).toBe(200)
+  expect((await saved.json()).assignment.allocation_percent).toBe(40)
   await expect(dialog).toBeHidden()
   await page.getByRole('tab', { name: 'Overview', exact: true }).click()
   await expect(page.getByText('No problems detected.', { exact: true })).toBeVisible()

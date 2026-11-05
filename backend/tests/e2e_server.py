@@ -52,7 +52,7 @@ def guarded_url(value):
     return url
 
 
-async def seed(value):
+async def seed(value, *, editor_has_projects=True):
     guarded_url(value)
     os.environ.update(environment(value))
     # Import after configuration; use actual application models and auth.
@@ -120,7 +120,7 @@ async def seed(value):
                     password_hash=hash_password(PASSWORD),
                     must_change_password=False,
                     scope_group_ids=[group.id],
-                    scope_project_ids=[owned.id],
+                    scope_project_ids=[owned.id] if editor_has_projects else [],
                 ),
             ]
         )
@@ -363,11 +363,18 @@ async def seed_planning_reference(scenario):
 if __name__ == "__main__":
     if sys.argv[1:] == ["serve"]:
         asyncio.run(serve())
-    elif sys.argv[1:] == ["reset"]:
-        asyncio.run(seed(json.loads(STATE.read_text())["url"]))
+    elif sys.argv[1:] in (["reset"], ["reset-first-project"]):
+        asyncio.run(
+            seed(
+                json.loads(STATE.read_text())["url"],
+                editor_has_projects=sys.argv[1] == "reset",
+            )
+        )
     elif sys.argv[1:] == ["legacy-logo"]:
         asyncio.run(seed_legacy_logo())
     elif len(sys.argv) == 3 and sys.argv[1] == "planning-reference":
         asyncio.run(seed_planning_reference(sys.argv[2]))
     else:
-        raise SystemExit("Usage: python -m tests.e2e_server {serve|reset|legacy-logo}")
+        raise SystemExit(
+            "Usage: python -m tests.e2e_server {serve|reset|reset-first-project|legacy-logo}"
+        )
