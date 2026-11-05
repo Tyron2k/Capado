@@ -240,9 +240,19 @@ async def test_editor_cannot_write_dependencies_in_foreign_project(db_session, m
         )
 
 
-async def creation_case(engine, role, fail):
+async def creation_case(engine, role, fail, scope_state="existing"):
     async with AsyncSession(engine, expire_on_commit=False) as seed_session:
         data = await seed(seed_session)
+        initial_scope = (
+            [data.own]
+            if scope_state == "existing"
+            else None
+            if scope_state == "null"
+            else []
+        )
+        editor = await seed_session.get(User, data.editor)
+        editor.scope_project_ids = initial_scope
+        await seed_session.commit()
     if fail:
 
         def fail_scope(session, *_):
@@ -254,7 +264,9 @@ async def creation_case(engine, role, fail):
                 ),
                 None,
             )
-            if editor is not None and len(editor.scope_project_ids or []) > 1:
+            if editor is not None and len(editor.scope_project_ids or []) > len(
+                initial_scope or []
+            ):
                 raise RuntimeError(
                     "Injected failure after SQL writes but before commit"
                 )
@@ -286,7 +298,7 @@ async def creation_case(engine, role, fail):
             )
             editor = await check.get(User, data.editor)
             if fail or role == "viewer":
-                assert project is None and editor.scope_project_ids == [data.own]
+                assert project is None and editor.scope_project_ids == initial_scope
                 assert commits == []
                 # Includes flushed creation audit rows: none may escape the failed transaction.
                 assert (
@@ -299,11 +311,29 @@ async def creation_case(engine, role, fail):
                 )
             else:
                 assert project is not None and commits == [True]
-                assert (project.id in editor.scope_project_ids) == (role == "editor")
+                assert editor.scope_project_ids == (
+                    [*(initial_scope or []), project.id]
+                    if role == "editor"
+                    else initial_scope
+                )
+                assert data.foreign not in (editor.scope_project_ids or [])
                 log = await check.scalar(
                     sa.select(AuditLog).where(AuditLog.entity_id == project.id)
                 )
                 assert log is not None and log.actor_id == getattr(data, role)
+        if role == "editor" and not fail:
+            async with client_for(engine, data.editor) as client:
+                assert (
+                    await client.put(
+                        f"/api/projects/{project.id}",
+                        json={"name": "Updated own project"},
+                    )
+                ).status_code == 200
+                assert (
+                    await client.put(
+                        f"/api/projects/{data.foreign}", json={"name": "Forbidden edit"}
+                    )
+                ).status_code == 403
     finally:
         sa.event.remove(Session, "after_commit", committed)
         if fail:
@@ -327,11 +357,32 @@ async def test_creation_with_real_postgres_arrays_and_audit(
     await creation_case(resource_database, role, fail)
 
 
+@pytest.mark.parametrize("scope_state", ["null", "empty"])
+@pytest.mark.parametrize("fail", [False, True], ids=["success", "rollback"])
+async def test_editor_can_create_first_project_atomically(
+    db_session, scope_state, fail
+):
+    await creation_case(db_session.bind, "editor", fail, scope_state)
+
+
+@pytest.mark.parametrize("scope_state", ["null", "empty"])
+@pytest.mark.parametrize("fail", [False, True], ids=["success", "rollback"])
+async def test_editor_first_project_with_real_postgres(
+    resource_database, scope_state, fail
+):
+    await creation_case(resource_database, "editor", fail, scope_state)
+
+
+@pytest.mark.parametrize("scope_state", ["existing", "empty"])
 async def test_concurrent_editor_creations_retain_both_scopes(
-    resource_database, monkeypatch
+    resource_database, monkeypatch, scope_state
 ):
     async with AsyncSession(resource_database, expire_on_commit=False) as session:
         data = await seed(session)
+        if scope_state == "empty":
+            editor = await session.get(User, data.editor)
+            editor.scope_project_ids = []
+            await session.commit()
     original = ProjectService.create
     ready = asyncio.Event()
     arrived = 0
@@ -363,6 +414,6 @@ async def test_concurrent_editor_creations_retain_both_scopes(
     async with AsyncSession(resource_database) as session:
         editor = await session.get(User, data.editor)
         assert set(map(str, editor.scope_project_ids)) == {
-            str(data.own),
+            *([str(data.own)] if scope_state == "existing" else []),
             *(response.json()["id"] for response in responses),
         }

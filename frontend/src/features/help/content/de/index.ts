@@ -144,7 +144,7 @@ sich nach Ihren Berechtigungen.
 
 ### Hinweis für Editoren
 
-Als Editor können Sie nur Projekte erstellen und bearbeiten, die in Ihrem konfigurierten Projektbereich liegen.
+Als Editor können Sie neue Projekte auch ohne bisherige Projektfreigabe anlegen. Jedes neue Projekt wird automatisch Ihrem Projektbereich hinzugefügt, damit Sie es bearbeiten können. Für andere Projekte benötigen Sie weiterhin eine ausdrückliche Freigabe.
     `.trim(),
   },
 
@@ -174,6 +174,8 @@ Editoren können nur Entitäten bearbeiten, die in ihrem konfigurierten Bereich 
 | Abteilungen | Personelle Ressourcen, Zuweisungen, Qualifikationsmatrix |
 | Standorte | Infrastruktur-Ressourcen, Infrastruktur-Zuweisungen |
 | Projekte | Projekte, Arbeitspakete |
+
+Editoren können außerdem neue Projekte anlegen; diese werden automatisch ihrem Projektbereich hinzugefügt.
 
 ### Stammdaten
 
