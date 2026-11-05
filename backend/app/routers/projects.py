@@ -113,9 +113,8 @@ async def create_project(
 ):
     """Create a new project.
 
-    Admins can always create projects. Editors with at least one project
-    in their scope can also create new projects — the new project is
-    automatically added to their scope_project_ids.
+    Admins and editors can create projects, including an editor's first project.
+    New projects are automatically added to the creating editor's scope_project_ids.
 
     Args:
         data: Project creation data.
@@ -126,17 +125,12 @@ async def create_project(
         The newly created project.
 
     Raises:
-        HTTPException: 403 if the user is a viewer or an editor without
-            any project scope.
+        HTTPException: 403 if the user is neither an admin nor an editor.
 
     """
     from app.models.user import UserRole
 
-    if current_user.role == UserRole.viewer:
-        check_write_permission(current_user, EntityType.project, project_id=None)
-
-    if current_user.role == UserRole.editor and not current_user.scope_project_ids:
-        # Editors need at least one project in their scope to create new ones
+    if current_user.role not in (UserRole.admin, UserRole.editor):
         check_write_permission(current_user, EntityType.project, project_id=None)
 
     service = ProjectService(session)

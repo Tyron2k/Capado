@@ -112,15 +112,41 @@ test('OIDC cookie login, reload, expiry refresh and logout never navigate with t
   expect(secrets.every(secret => Object.values(state).every(value => !value.includes(secret)))).toBe(true)
 })
 
-test('editor creates a project and package, checks overview/Gantt and edits the project', async ({ page }) => {
-  await login(page)
+test('editor without project scope creates a project and package, checks overview/Gantt and edits the project', async ({ page, request }) => {
+  const adminLogin = await request.post('/api/auth/login', {
+    data: { email: 'admin@example.test', password: 'browser-tests-only' },
+  })
+  expect(adminLogin.status()).toBe(200)
+  const adminHeaders = { Authorization: `Bearer ${(await adminLogin.json()).access_token}` }
+  const users = await request.get('/api/users', { headers: adminHeaders })
+  expect(users.status()).toBe(200)
+  const editor = ((await users.json()) as { items: { id: string; email: string }[] })
+    .items.find(user => user.email === 'editor@example.test')!
+  const cleared = await request.put(`/api/users/${editor.id}`, {
+    headers: adminHeaders, data: { scope_project_ids: [] },
+  })
+  expect(cleared.status()).toBe(200)
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  const editorToken = await login(page)
   await page.getByRole('navigation').getByText('Projects', { exact: true }).click()
   await page.getByRole('button', { name: 'New Project', exact: true }).click()
   let dialog = page.getByRole('dialog')
-  await dialog.getByLabel(/^Name/).fill('Browser created project')
+  await dialog.getByLabel(/^Name/).pressSequentially('Browser created project')
   await dates(dialog)
+  const creation = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/projects')
   await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const created = await creation
+  expect(created.status()).toBe(201)
+  const projectId = ((await created.json()) as { id: string }).id
   await expect(dialog).toBeHidden()
+  const editorHeaders = { Authorization: `Bearer ${editorToken}` }
+  const me = await request.get('/api/users/me', { headers: editorHeaders })
+  expect(me.status()).toBe(200)
+  expect((await me.json()).scope_project_ids).toEqual([projectId])
+  expect((await request.put(`/api/projects/${seed.foreign}`, {
+    headers: editorHeaders, data: { name: 'Forbidden edit' },
+  })).status()).toBe(403)
   let row = page.getByRole('row').filter({ hasText: 'Browser created project' })
   await row.getByRole('button', { name: 'Show work packages' }).click()
   await page.getByRole('button', { name: 'New Work Package', exact: true }).click()
@@ -146,6 +172,7 @@ test('editor creates a project and package, checks overview/Gantt and edits the 
   await page.getByRole('navigation').getByText('Dashboard', { exact: true }).click()
   await expect(page.getByText('Browser edited project', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('Browser created project', { exact: true })).toHaveCount(0)
+  expect(pageErrors).toEqual([])
 })
 
 async function assignment(page: Page, packageName: string, warning = false) {
