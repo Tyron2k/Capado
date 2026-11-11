@@ -167,6 +167,7 @@ test('editor without project scope creates a project and package, checks overvie
 })
 
 test('folder dialog keeps typed name and order number when creating and editing', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 })
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
   await login(page, 'admin@example.test')
@@ -175,6 +176,7 @@ test('folder dialog keeps typed name and order number when creating and editing'
 
   const name = 'Projekt Müller & Söhne'
   const order = 'AUF-2026-42'
+  const tree = page.locator('.capado-folder-surface')
   let dialog = page.getByRole('dialog')
   await dialog.getByLabel(/^Name/).pressSequentially(name)
   await expect(dialog.getByLabel(/^Name/)).toHaveValue(name)
@@ -188,9 +190,11 @@ test('folder dialog keeps typed name and order number when creating and editing'
   const folder = await created.json() as { id: string; name: string; external_ref: string }
   expect(folder).toMatchObject({ name, external_ref: order })
   await expect(dialog).toBeHidden()
+  await expect(tree.getByText(name, { exact: true })).toBeVisible()
 
-  const row = page.getByText(name, { exact: true }).locator('..')
-  await row.getByRole('button', { name: 'Edit', exact: true }).click()
+  const row = tree.getByText(name, { exact: true }).locator('..')
+  await row.getByRole('button', { name: `Actions: ${name}`, exact: true }).press('Enter')
+  await page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
   dialog = page.getByRole('dialog')
   await dialog.getByLabel(/^Name/).fill('')
   await dialog.getByLabel(/^Name/).pressSequentially(`${name} aktualisiert`)
@@ -205,10 +209,36 @@ test('folder dialog keeps typed name and order number when creating and editing'
   expect(await updated.json()).toMatchObject({ name: `${name} aktualisiert`, external_ref: `${order}-NEU` })
   await expect(dialog).toBeHidden()
   await page.reload()
-  await page.getByText(`${name} aktualisiert`, { exact: true }).locator('..').getByRole('button', { name: 'Edit', exact: true }).click()
+  await expect(tree.getByText(`${name} aktualisiert`, { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: `Actions: ${name} aktualisiert`, exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
   dialog = page.getByRole('dialog')
   await expect(dialog.getByLabel(/^Name/)).toHaveValue(`${name} aktualisiert`)
   await expect(dialog.getByLabel(/^Order number/)).toHaveValue(`${order}-NEU`)
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(tree.getByText(`${name} aktualisiert`, { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: `Actions: ${name} aktualisiert`, exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Add subfolder', exact: true }).click()
+  dialog = page.getByRole('dialog')
+  await dialog.getByLabel(/^Name/).fill('Browser child folder')
+  const childCreation = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/project-folders')
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const childResponse = await childCreation
+  expect(childResponse.status()).toBe(201)
+  const child = await childResponse.json() as { id: string; parent_id: string }
+  expect(child.parent_id).toBe(folder.id)
+  await expect(dialog).toBeHidden()
+  await page.getByTitle(`${name} aktualisiert`, { exact: true }).locator('..').getByRole('button', { name: 'Expand', exact: true }).click()
+  await expect(tree.getByText('Browser child folder', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Actions: Browser child folder', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+  const deletion = page.waitForResponse(response => response.request().method() === 'DELETE' && new URL(response.url()).pathname === `/api/project-folders/${child.id}`)
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click()
+  expect((await deletion).status()).toBe(200)
+  await expect(tree.getByText('Browser child folder', { exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   expect(pageErrors).toEqual([])
 })
 

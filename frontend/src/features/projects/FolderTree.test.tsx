@@ -57,6 +57,7 @@ describe.each(['create', 'edit'] as const)('folder %s dialog', (mode) => {
   ])('keeps repeated typing in $field and submits its value', async ({ label, field, value }) => {
     const onCreate = vi.fn().mockResolvedValue(undefined)
     const onUpdate = vi.fn().mockResolvedValue(undefined)
+    const onSelect = vi.fn()
     render(
       <StrictMode>
         <MantineProvider env="test">
@@ -65,7 +66,7 @@ describe.each(['create', 'edit'] as const)('folder %s dialog', (mode) => {
               folders={[folder]}
               projectCounts={{}}
               selectedId={null}
-              onSelect={vi.fn()}
+              onSelect={onSelect}
               onCreate={onCreate}
               onUpdate={onUpdate}
               onDelete={vi.fn()}
@@ -75,7 +76,13 @@ describe.each(['create', 'edit'] as const)('folder %s dialog', (mode) => {
       </StrictMode>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: mode === 'create' ? 'Folder' : 'Edit' }))
+    if (mode === 'create') {
+      fireEvent.click(screen.getByRole('button', { name: 'Folder' }))
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: `Actions: ${folder.name}` }))
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }))
+    }
+    expect(onSelect).not.toHaveBeenCalled()
     const dialog = within(await screen.findByRole('dialog'))
     const input = dialog.getByLabelText(label)
     // Multiple changes expose event reads deferred into React's state updater.
