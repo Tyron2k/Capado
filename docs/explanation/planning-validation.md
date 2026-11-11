@@ -78,6 +78,32 @@ only under equivalent conditions rather than treating these samples as targets.
 The browser tests also cover an insufficient qualification, desktop light/dark
 presentation, and 390 × 844 layout without page-wide horizontal overflow.
 
+## Release-candidate internal check — 11 November 2026
+
+The existing browser tasks ran successfully in the
+[full v0.2.0 candidate CI](https://github.com/Tyron2k/Capado/actions/runs/42998887777)
+on source `aaeef47bb95bea85ade1f533d7c819119631957c`. The measurements below reuse its
+`browser-test-report` attachments; no extra benchmark pipeline was introduced.
+These are single automated runs on a GitHub runner, with the default 1280 × 720
+desktop viewport and the same synthetic scenarios and counting rules above.
+
+| Task | Interactions | Automated elapsed | Result |
+|---|---:|---:|---|
+| Complete staffing | 5 | 1,735 ms | Personnel covered; machine-shift precision limit retained |
+| Repair machine booking manually | 15 | 2,665 ms | Overlap and operating-window violations cleared |
+
+The remaining qualification, overnight-window and typed equipment-replacement
+browser scenarios also pass. This is correctness and path evidence, not reading
+time, human decision time or an independent usability result. Runner and viewport
+conditions differ from the 3 November local sample, so the elapsed values do not
+establish an improvement or regression between versions.
+
+**Internal hypothesis for #144:** the manual machine correction is the longer of
+these two paths. Compare it with the already available ranked proposal and its
+remaining-conflict preview before adding another reassignment interaction. This
+sample does not establish that resource reassignment is the user's main bottleneck
+or that new bulk-edit functionality would help. Keep #145/#146 evidence-led.
+
 ## Planner observation protocol — not yet performed
 
 The [first combined plan walkthrough](../how-to/first-combined-plan.md) now provides
@@ -108,3 +134,29 @@ consequential problems by evidence and report the participant/sample limits.
 have been performed. Internal automated execution must not be relabelled as that
 validation. Issues #135 and the evidence-led conflict workflow analysis #144 remain
 open; the existing reference cases and procedure make those sessions repeatable.
+
+## Record a session
+
+Use one record per attempt and keep failed attempts. The same record supports the
+[installation walkthrough](../how-to/first-combined-plan.md) and planning tasks.
+Use fictional data and an anonymous participant identifier; include no credentials,
+personnel records or customer plans.
+
+| Field | Record |
+|---|---|
+| Date and evidence type | Internal automation, internal human trial, or independent participant |
+| Application | Version shown in the UI; source SHA or paired image digests when available |
+| Environment | Browser, viewport, display time zone, role and fresh/existing installation |
+| Attempt | Anonymous identifier; task and starting scenario; any coaching or deviations |
+| Startup/import | Setup completed? Original complete ZIP used? Import counts and full area/row/field error |
+| Planning result | Staffing gap, machine conflicts, qualification result and displayed precision limit |
+| Completion | Completed, failed, or stopped; elapsed time; interaction and error counts |
+| Understanding | What the participant believed the result established; uncertainty and confusing steps |
+| Finding | Confirmed observation, its impact, reproduction and a separately labelled improvement hypothesis |
+| Follow-up | Smallest correction or missing evidence; issue/PR link; repeat result |
+
+An internally completed checklist does not establish independent onboarding or a
+human usability benefit. If only internal checks are available, keep that limit
+explicit and leave the independent acceptance outstanding. For a comparison, use
+the same task, dataset, role and measurement rules; label comparisons of different
+paths in one version separately from before/after changes between versions.

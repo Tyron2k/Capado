@@ -6,22 +6,72 @@ Thanks for your interest in contributing to Capado!
 
 1. Fork the repository
 2. Clone your fork and create a branch: `git checkout -b feat/my-feature`
-3. Install pre-commit hooks: `pre-commit install`
-4. Start the dev environment: `docker compose up`
+3. Follow [local setup](docs/how-to/local-setup.md), including the local environment variables.
+4. Install the project's hook runner: `uv tool install prek`, then `prek install`.
+5. Start the dev environment: `docker compose up --build`.
 
 ## Development
 
-- **Backend:** `cd backend && uv sync` — Python 3.12, FastAPI
+- **Backend:** `cd backend && uv sync` — Python 3.12 or newer, FastAPI; CI checks
+  Python 3.12 and 3.15 and the current runtime image uses 3.15.
 - **Frontend:** `cd frontend && npm ci` — TypeScript, React, Mantine
 
 ## Before Submitting
 
-- Run `pre-commit run --all-files` and fix any issues
+- Run `prek run -a` and fix any issues
 - Add tests for new features or bug fixes
 - Update documentation (docstrings, help pages if user-facing)
 - Describe user-visible changes in the pull request title and description; Release Drafter
   generates the release notes from merged pull requests (see below)
 - Add i18n strings to both `de.json` and `en.json`
+
+## Product and change boundaries
+
+Capado is a self-hosted, GPL-3.0-or-later planner for qualified people and equipment.
+The existing [combined-planning model](docs/explanation/combined-planning.md),
+[capacity rules](docs/explanation/capacity-model.md),
+[conflict detection](docs/explanation/conflict-detection.md) and
+[architecture decisions](docs/decisions/README.md) are the starting point for a change.
+Time recording, automatic scheduling and costing are outside the committed product scope.
+An open discussion or roadmap idea is not a promise to implement it.
+
+Open an issue before a substantial behavior, schema or architecture change: describe the
+problem, a concrete example, the intended outcome and constraints. Small fixes with a clear
+reproducer can go directly into a focused PR. Reuse the existing services and contracts;
+explain a new abstraction through the problem it solves. Code correctness, an executable
+workflow and an observed usability benefit are different claims and need different evidence.
+
+## Issue triage and maintenance
+
+Use the existing [bug](.github/ISSUE_TEMPLATE/bug_report.yml) and
+[feature](.github/ISSUE_TEMPLATE/feature_request.yml) forms. Record the motivation,
+actual and expected result, reproducible steps, version/environment, relevant constraints
+and acceptance criteria. Use a descriptive Conventional Commit-style issue title, such
+as `fix(planning): explain an overlapping machine booking`. Mark unknown information as
+unknown. For imports, preserve the
+reported area, row and field and use a synthetic sample with its headers. Never publish
+credentials or real employee/customer records. Follow [SECURITY.md](SECURITY.md) for
+vulnerabilities instead of opening a public disclosure issue.
+
+For each report, check the current implementation and related issues, reproduce it where
+possible, and separate confirmed behavior from hypotheses. Use the existing labels such
+as `bug`, `enhancement` and `documentation`; no new priority-label or epic hierarchy is needed.
+Link duplicates to their original report. Close a fixed issue with the merged PR and its
+verification; a request for missing evidence or an automatic stale notice is not proof that
+a problem has been fixed.
+
+Record a dependency only when it actually prevents completion. For example, an import-feedback
+change needs a reproducible failed import; a measured workflow improvement needs the same
+before/after task. Independent documentation or UI fixes do not need to wait for a hosting
+decision or an unrelated refactoring. When a prerequisite is missing, state exactly what
+evidence is needed and continue independent work.
+
+Dependency automation and release handling are described below and in the
+[CI reference](docs/reference/ci.md). Keep major upgrades reviewable, retain the required
+checks, and use the [release procedure](docs/how-to/publishing-a-release.md) rather than
+publishing unvalidated images. Maintainers may decline unsupported scope with a linked rationale
+rather than an implied promise. Revisit deferred suggestions when new evidence appears;
+do not add a framework or recurring maintenance burden just to keep a ticket moving.
 
 ## Languages
 
