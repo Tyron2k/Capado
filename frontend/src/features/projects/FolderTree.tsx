@@ -13,17 +13,18 @@ import {
   Box,
   Button,
   Group,
+  Menu,
   Modal,
   NumberInput,
   Select,
   Stack,
   Text,
   TextInput,
-  Tooltip,
 } from '@mantine/core'
 import {
   IconChevronDown,
   IconChevronRight,
+  IconDotsVertical,
   IconFolder,
   IconPencil,
   IconPlus,
@@ -208,68 +209,65 @@ export function FolderTree({
           ) : (
             <Box w={26} />
           )}
-          <IconFolder size={16} />
-          <Text size="sm" style={{ flex: 1 }} truncate>
+          <IconFolder size={16} style={{ flexShrink: 0 }} />
+          <Text size="sm" style={{ flex: 1, minWidth: '2rem' }} truncate title={folder.name}>
             {folder.name}
           </Text>
           <Text size="xs" c="dimmed">
             {count}
           </Text>
-          <Tooltip label={t('folders.addSubfolder')}>
-            <ActionIcon
-              variant="subtle"
-              size="sm"
-              aria-label={t('folders.addSubfolder')}
-              onClick={(event) => {
-                event.stopPropagation()
-                setForm({
-                  mode: 'create',
-                  name: '',
-                  parentId: folder.id,
-                  position: 0,
-                  externalRef: '',
-                  customerId: null,
-                })
-              }}
-            >
-              <IconPlus size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label={t('common.edit')}>
-            <ActionIcon
-              variant="subtle"
-              size="sm"
-              aria-label={t('common.edit')}
-              onClick={(event) => {
-                event.stopPropagation()
-                setForm({
-                  mode: 'edit',
-                  id: folder.id,
-                  name: folder.name,
-                  parentId: folder.parent_id,
-                  position: folder.position,
-                  externalRef: folder.external_ref ?? '',
-                  customerId: folder.customer_id ?? null,
-                })
-              }}
-            >
-              <IconPencil size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label={t('common.delete')}>
-            <ActionIcon
-              variant="subtle"
-              color="red"
-              size="sm"
-              aria-label={t('common.delete')}
-              onClick={(event) => {
-                event.stopPropagation()
-                setPendingDelete(folder)
-              }}
-            >
-              <IconTrash size={14} />
-            </ActionIcon>
-          </Tooltip>
+          <Menu position="bottom-end" withinPortal>
+            <Menu.Target>
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label={`${t('common.actions')}: ${folder.name}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <IconDotsVertical size={14} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown onClick={(event) => event.stopPropagation()}>
+              <Menu.Item
+                leftSection={<IconPlus size={14} />}
+                onClick={() => {
+                  setForm({
+                    mode: 'create',
+                    name: '',
+                    parentId: folder.id,
+                    position: 0,
+                    externalRef: '',
+                    customerId: null,
+                  })
+                }}
+              >
+                {t('folders.addSubfolder')}
+              </Menu.Item>
+              <Menu.Item
+                leftSection={<IconPencil size={14} />}
+                onClick={() => {
+                  setForm({
+                    mode: 'edit',
+                    id: folder.id,
+                    name: folder.name,
+                    parentId: folder.parent_id,
+                    position: folder.position,
+                    externalRef: folder.external_ref ?? '',
+                    customerId: folder.customer_id ?? null,
+                  })
+                }}
+              >
+                {t('common.edit')}
+              </Menu.Item>
+              <Menu.Item
+                color="red"
+                leftSection={<IconTrash size={14} />}
+                onClick={() => setPendingDelete(folder)}
+              >
+                {t('common.delete')}
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
         </Group>
         {isOpen && children.map((child) => renderNode(child, depth + 1))}
       </Box>
@@ -277,7 +275,7 @@ export function FolderTree({
   }
 
   return (
-    <Stack gap="xs">
+    <Stack gap="xs" style={{ overflowX: 'auto' }}>
       <Group justify="space-between">
         <Text fw={500} size="sm">
           {t('folders.title')}
