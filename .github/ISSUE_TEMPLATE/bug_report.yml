@@ -64,7 +64,15 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Browser, OS, or deployment details
-      placeholder: "e.g. Chrome 125, macOS 15, self-hosted v1.2.0"
+      description: Capado version from the footer, user role, browser/OS and deployment details; write "unknown" for anything unavailable.
+      placeholder: "e.g. v0.2.0, Editor, Firefox on Windows, Docker; opened Projects → New Project"
+    validations:
+      required: false
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Error details or a safe sample
+      description: Paste the complete error or attach a screenshot. For CSV imports include the reported area/row/field and synthetic rows with headers. Remove credentials and real employee/customer data.
     validations:
       required: false

@@ -94,6 +94,32 @@ For operational recovery use the [verified backup procedure](upgrading.md#1-back
 
 For an independent setup/usage session, record the application version, task completion,
 elapsed time, explicit interactions, errors, confusing steps and what the final verdict means.
-Use the [existing observation protocol](../explanation/planning-validation.md)
+Use the [existing observation protocol and session record](../explanation/planning-validation.md#record-a-session)
 with synthetic data only. Distinguish a real person's observations from an automated or internal
 simulation; publishing the walkthrough does not by itself establish that it is easy to use.
+
+## Internal release check — 11 November 2026
+
+This walkthrough was exercised through the browser with the published **v0.2.0**
+images from source `aaeef47bb95bea85ade1f533d7c819119631957c`, using two isolated,
+empty PostgreSQL 18 Compose installations. Both images could be pulled anonymously.
+The release's [publication record](https://github.com/Tyron2k/Capado/actions/runs/42999796370)
+records the paired image digests; the UI displayed `Capado v0.2.0`.
+
+- First-run administrator setup and the original ZIP import succeeded (23 records,
+  no import errors); the bootstrap account was retained.
+- Adding Sam through the proposal preview closed the personnel gap while keeping
+  both machine conflict causes visible. The documented manual machine correction
+  then cleared both causes and retained the scope/precision warning.
+- The complete ZIP export contained ten area CSVs and a manifest. Importing it into
+  the second empty installation preserved all four bookings, including their IDs,
+  resource types, dates, percentages and timestamps. Its own administrator remained
+  usable, and both the API and UI showed the covered result and precision limit.
+- Reimport into the populated first installation was rejected with the explicit
+  empty-destination error, zero writes and the corrected plan unchanged.
+
+These are internal automated checks in Chromium at 1440 × 1000 with English labels
+and Europe/Berlin display time. They establish a working published-image data flow,
+not an independent operator's understanding or a human usability result. Independent
+setup and planning sessions remain outstanding; only internal checks are currently
+available. Use the session record below when those sessions become possible.
