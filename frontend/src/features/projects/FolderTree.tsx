@@ -352,9 +352,10 @@ export function FolderTree({
             required
             value={form?.name ?? ''}
             error={nameError}
-            onChange={(event) =>
-              setForm((prev) => (prev ? { ...prev, name: event.currentTarget.value } : prev))
-            }
+            onChange={(event) => {
+              const name = event.currentTarget.value
+              setForm((prev) => (prev ? { ...prev, name } : prev))
+            }}
           />
           <Select
             label={t('folders.parent')}
@@ -380,9 +381,10 @@ export function FolderTree({
             description={t('folders.externalRefDesc')}
             maxLength={128}
             value={form?.externalRef ?? ''}
-            onChange={(event) =>
-              setForm((prev) => (prev ? { ...prev, externalRef: event.currentTarget.value } : prev))
-            }
+            onChange={(event) => {
+              const externalRef = event.currentTarget.value
+              setForm((prev) => (prev ? { ...prev, externalRef } : prev))
+            }}
           />
           <NumberInput
             label={t('folders.position')}
