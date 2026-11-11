@@ -15,9 +15,9 @@ async function dates(dialog: Locator) {
   await dialog.getByLabel(/^End Date/).fill(dateText(seed.end))
   await dialog.getByLabel(/^End Date/).press('Tab')
 }
-async function login(page: Page) {
+async function login(page: Page, email = 'editor@example.test') {
   await page.goto('/login')
-  await page.getByLabel(/^Email/).fill('editor@example.test')
+  await page.getByLabel(/^Email/).fill(email)
   await page.getByLabel(/^Password/).fill('browser-tests-only')
   const response = page.waitForResponse(r => r.url().endsWith('/api/auth/login') && r.request().method() === 'POST')
   await page.getByRole('button', { name: 'Sign In', exact: true }).click()
@@ -163,6 +163,52 @@ test('editor without project scope creates a project and package, checks overvie
   await page.getByRole('navigation').getByText('Dashboard', { exact: true }).click()
   await expect(page.getByText('Browser edited project', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('Browser created project', { exact: true })).toHaveCount(0)
+  expect(pageErrors).toEqual([])
+})
+
+test('folder dialog keeps typed name and order number when creating and editing', async ({ page }) => {
+  const pageErrors: string[] = []
+  page.on('pageerror', error => pageErrors.push(error.message))
+  await login(page, 'admin@example.test')
+  await page.getByRole('navigation').getByText('Projects', { exact: true }).click()
+  await page.getByRole('button', { name: 'Folder', exact: true }).click()
+
+  const name = 'Projekt Müller & Söhne'
+  const order = 'AUF-2026-42'
+  let dialog = page.getByRole('dialog')
+  await dialog.getByLabel(/^Name/).pressSequentially(name)
+  await expect(dialog.getByLabel(/^Name/)).toHaveValue(name)
+  expect(pageErrors).toEqual([])
+  await dialog.getByLabel(/^Order number/).pressSequentially(order)
+  await expect(dialog.getByLabel(/^Order number/)).toHaveValue(order)
+  const creation = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/project-folders')
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const created = await creation
+  expect(created.status()).toBe(201)
+  const folder = await created.json() as { id: string; name: string; external_ref: string }
+  expect(folder).toMatchObject({ name, external_ref: order })
+  await expect(dialog).toBeHidden()
+
+  const row = page.getByText(name, { exact: true }).locator('..')
+  await row.getByRole('button', { name: 'Edit', exact: true }).click()
+  dialog = page.getByRole('dialog')
+  await dialog.getByLabel(/^Name/).fill('')
+  await dialog.getByLabel(/^Name/).pressSequentially(`${name} aktualisiert`)
+  await dialog.getByLabel(/^Order number/).fill('')
+  await dialog.getByLabel(/^Order number/).pressSequentially(`${order}-NEU`)
+  await expect(dialog.getByLabel(/^Name/)).toHaveValue(`${name} aktualisiert`)
+  await expect(dialog.getByLabel(/^Order number/)).toHaveValue(`${order}-NEU`)
+  const update = page.waitForResponse(response => response.request().method() === 'PUT' && new URL(response.url()).pathname === `/api/project-folders/${folder.id}`)
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click()
+  const updated = await update
+  expect(updated.status()).toBe(200)
+  expect(await updated.json()).toMatchObject({ name: `${name} aktualisiert`, external_ref: `${order}-NEU` })
+  await expect(dialog).toBeHidden()
+  await page.reload()
+  await page.getByText(`${name} aktualisiert`, { exact: true }).locator('..').getByRole('button', { name: 'Edit', exact: true }).click()
+  dialog = page.getByRole('dialog')
+  await expect(dialog.getByLabel(/^Name/)).toHaveValue(`${name} aktualisiert`)
+  await expect(dialog.getByLabel(/^Order number/)).toHaveValue(`${order}-NEU`)
   expect(pageErrors).toEqual([])
 })
 
