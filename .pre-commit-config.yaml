@@ -58,7 +58,7 @@ repos:
     # Keep this in step with ruff in backend/pyproject.toml. Two ruff versions means the hook and a
     # developer's own `ruff check` can disagree, which produces a CI failure nobody can reproduce
     # locally. Renovate includes both in the same non-major update group.
-    rev: c0f278f1254ccc8fb09676bcdb8d847e7db493e5 # frozen: v0.17.4
+    rev: ef6cf06c079dd6b299dfc720b0f14400c9d168e1 # frozen: v0.17.5
     hooks:
       - id: ruff
         name: ruff (lint, backend)
