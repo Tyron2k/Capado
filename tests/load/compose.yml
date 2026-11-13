@@ -39,7 +39,7 @@ services:
     command: ["python", "-m", "tests.seed_load_test"]
 
   load:
-    image: grafana/k6:2.3.0
+    image: grafana/k6:2.4.0
     environment:
       LOAD_PROFILE: ${LOAD_PROFILE:-full}
       LOAD_P95_MS: ${LOAD_P95_MS:-1000}
