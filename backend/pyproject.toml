@@ -13,13 +13,13 @@ dependencies = [
     "fastapi==0.163.1",
     "uvicorn[standard]==0.54.0",  # CLI entry point: uv run uvicorn app.main:app
     "asyncpg==0.32.0",  # Engine driver loaded via postgresql+asyncpg:// URI
-    "sqlalchemy[asyncio]==2.1.8",
+    "sqlalchemy[asyncio]==2.1.9",
     "alembic==1.20.1",
     "pydantic==2.14.3",
     "bcrypt==5.0.0",
     "PyJWT==2.15.1",  # Imported as 'jwt' in app/services/auth_service.py
     "openpyxl==3.1.5",
-    "python-multipart==0.0.33",  # Required by FastAPI for UploadFile/Form parsing
+    "python-multipart==0.0.34",  # Required by FastAPI for UploadFile/Form parsing
     "httpx==0.28.1",  # HTTP client for OIDC token exchange and userinfo requests
     "pydantic-settings==2.16.3",  # BaseSettings for centralized app.config.settings
     "tzdata==2026.6",  # IANA zones, including in slim images without OS tzdata
