@@ -72,6 +72,9 @@ must exist in the destination. A missing dependency, invalid field/reference/gra
 failure rejects the entire area with zero rows written. Public user fields can be updated without
 replacing existing credentials. Imported organization settings disable email and maintenance.
 
+If a quoted cell makes a versioned CSV unreadable, the error identifies the area and record
+number when available. File format and size rejections stay in the import log until you close it.
+
 For manual imports into an empty installation, use this order:
 
 1. `working-time.csv`, then `skills.csv`.

@@ -59,6 +59,24 @@ function toolbar(csvBundle = true) {
 }
 
 describe('complete CSV migration toolbar', () => {
+  it.each([400, 413])('keeps HTTP %s file rejections in the import log', async (status) => {
+    const detail = 'projects.csv, row 4: malformed CSV.'
+    vi.mocked(apiClient.post).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status, data: { detail } },
+    })
+    const { container, invalidate } = toolbar(false)
+    fireEvent.change(container.querySelector('input[type="file"]')!, {
+      target: { files: [new File(['bad'], 'projects.csv')] },
+    })
+    expect(await screen.findByText(detail)).toBeInTheDocument()
+    expect(screen.getByText('importExport.bundleRejectedBody')).toBeInTheDocument()
+    expect(screen.getByText('importExport.created: 0')).toBeInTheDocument()
+    expect(invalidate).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('importExport.logClose'))
+    await waitFor(() => expect(screen.queryByText(detail)).not.toBeInTheDocument())
+  })
+
   it('shows the backend field diagnostic from a failed blob download', async () => {
     const detail = 'history.csv, row 4, field payload: exceeds the 4 MiB field limit.'
     const body = new Blob([JSON.stringify({ detail })], { type: 'application/json' })

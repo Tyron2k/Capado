@@ -130,7 +130,7 @@ def _parse_archive(content: bytes) -> tuple[CsvBatch, ...]:
             if sum(item.file_size for item in members) > MAX_EXPANDED_BYTES:
                 raise ValueError("CSV migration exceeds the 100 MiB expanded limit.")
             files = {item.filename: archive.read(item) for item in members}
-        manifest = _read_csv(files["manifest.csv"])
+        manifest = _read_csv(files["manifest.csv"], "manifest.csv")
         if (
             not manifest
             or tuple(manifest[0]) != _MANIFEST
