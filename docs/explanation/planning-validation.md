@@ -121,6 +121,10 @@ The existing suggestion saves 11 interactions in this scenario. In a separate
 qualification scenario, previewing and applying the qualified crane replacement
 took 5 interactions in each of three successful browser runs (median 1,632 ms).
 The saved booking retained its equipment type and the qualification blocker cleared.
+The keyboard check reproduced a focus loss when dismissing the preview or applying
+a successful replacement. The browser regression now verifies that Escape returns
+focus to Preview, and that applying a replacement keeps focus on the work-package
+assessment when its conflict card disappears.
 
 The allocation reduction check found a reproducible defect. With 450 of 480
 minutes available and bookings at 60% and 50%, the first booking has 43.75%

@@ -313,8 +313,17 @@ test('combined planning: equipment alternatives never offer a person and apply w
     verdict.getByText("Swap to 'Replacement crane' (available)", { exact: true }),
   ).toBeVisible()
   await expect(verdict.getByText(/Swap to 'Available person'/)).toHaveCount(0)
-  await measure.step(() => verdict.getByRole('button', { name: 'Preview', exact: true }).click())
+  const previewButton = verdict.getByRole('button', { name: 'Preview', exact: true })
+  await measure.step(() => previewButton.press('Enter'))
   const dialog = page.getByRole('dialog', { name: /Preview: Swap to 'Replacement crane'/ })
+  await expect(dialog).toBeVisible()
+  await measure.diagnostic(async () => {
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(previewButton).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(dialog).toBeVisible()
+  })
   await expect(dialog.getByText('Conflicts: 0 → 0', { exact: true })).toHaveCount(2)
   const proposal = dialog.getByRole('table', { name: 'Proposed change' })
   const resource = proposal.getByRole('row', { name: /Resource/ })
@@ -331,12 +340,15 @@ test('combined planning: equipment alternatives never offer a person and apply w
     (response) =>
       response.url().includes('/api/assignments/') && response.request().method() === 'PUT',
   )
-  await measure.step(() => dialog.getByRole('button', { name: 'Apply', exact: true }).click())
+  await measure.step(() =>
+    dialog.getByRole('button', { name: 'Apply', exact: true }).press('Enter'),
+  )
   const response = await updated
   expect(response.ok()).toBe(true)
   expect((await response.json()).assignment.resource_type).toBe('infrastructure')
   await expect(dialog).toBeHidden()
   await expect(verdict.getByText('No blockers within scope', { exact: true })).toHaveCount(4)
+  await expect(page.getByRole('region', { name: 'Work package readiness' })).toBeFocused()
   await info.attach('equipment-swap-measurement', {
     body: JSON.stringify(measure.result()),
     contentType: 'application/json',
