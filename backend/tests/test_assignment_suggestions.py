@@ -5,6 +5,7 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import select
 
+from app.models.absence import Absence, AbsenceReason
 from app.models.assignment import Assignment
 from app.models.calendar import InfrastructureAvailabilityWindow
 from app.models.conflict import Conflict
@@ -16,6 +17,44 @@ from app.services.assignment_service import AssignmentService
 from app.services.conflict_service import ConflictService
 from app.services.conflict_suggestion_service import ConflictSuggestionService
 from tests.planning_reference import MONDAY, WEDNESDAY, _clock, _seed_plan
+
+
+async def test_allocation_reduction_clears_conflict_with_fractional_headroom(
+    db_session,
+):
+    plan = await _seed_plan(db_session)
+    booking = plan.crew_bookings[0]
+    booking.allocation_percent = 60
+    db_session.add_all(
+        [
+            Assignment(
+                resource_id=booking.resource_id,
+                resource_type=booking.resource_type,
+                work_package_id=booking.work_package_id,
+                start_date=MONDAY,
+                end_date=WEDNESDAY,
+                allocation_percent=50,
+            ),
+            Absence(
+                resource_id=booking.resource_id,
+                resource_type=booking.resource_type,
+                start_date=MONDAY,
+                end_date=WEDNESDAY,
+                allocation_percent=6.25,
+                reason=AbsenceReason.planned,
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    suggestions = await ConflictSuggestionService(
+        db_session
+    ).get_assignment_suggestions(booking.id)
+    (reduction,) = (s for s in suggestions if s.type == "reduce_allocation")
+    assert reduction.conflicts_before == 1
+    assert reduction.conflicts_after == 0
+    assert reduction.new_allocation_percent == 43
+    assert booking.allocation_percent == 60
 
 
 async def test_impact_ranks_the_complete_window_fix_first_without_writes(db_session):

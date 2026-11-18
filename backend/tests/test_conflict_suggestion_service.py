@@ -277,7 +277,7 @@ class TestReduceAllocationPartTimeCeiling:
     async def test_reduce_suggests_max_allowed_respecting_others(self) -> None:
         """Reducing one assignment: max_allowed = available - others."""
         conflict = _conflict(available_percent=93.75)
-        # a1=60%, a2=50%; for a1: max_allowed = 93.75 - 50 = 43.75 → 43
+        # a1=60%, a2=50%; for a1: floor(93.75 - 50) = 43
         a1 = _personal_assignment(percent=60.0)
         a2 = _personal_assignment(percent=50.0)
 
@@ -292,9 +292,7 @@ class TestReduceAllocationPartTimeCeiling:
             if s.type == "reduce_allocation" and s.assignment_id == a1.id
         ]
         assert len(reduce_a1) == 1
-        assert (
-            reduce_a1[0].new_allocation_percent == 44.0
-        )  # max(93.75 - 50, 10) → 43.75 → round → 44
+        assert reduce_a1[0].new_allocation_percent == 43
 
 
 class TestReduceAllocationZeroAvailability:

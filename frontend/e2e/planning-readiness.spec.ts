@@ -305,14 +305,15 @@ test('combined planning: equipment alternatives never offer a person and apply w
   page,
 }, info) => {
   await start(page, 'replacement')
-  await selectPackage(page, measurement().step)
+  const measure = measurement()
+  await selectPackage(page, measure.step)
   const verdict = page.getByTestId('work-package-readiness')
-  await verdict.getByRole('button').filter({ hasText: 'SKILL' }).click()
+  await measure.step(() => verdict.getByRole('button').filter({ hasText: 'SKILL' }).click())
   await expect(
     verdict.getByText("Swap to 'Replacement crane' (available)", { exact: true }),
   ).toBeVisible()
   await expect(verdict.getByText(/Swap to 'Available person'/)).toHaveCount(0)
-  await verdict.getByRole('button', { name: 'Preview', exact: true }).click()
+  await measure.step(() => verdict.getByRole('button', { name: 'Preview', exact: true }).click())
   const dialog = page.getByRole('dialog', { name: /Preview: Swap to 'Replacement crane'/ })
   await expect(dialog.getByText('Conflicts: 0 → 0', { exact: true })).toHaveCount(2)
   const proposal = dialog.getByRole('table', { name: 'Proposed change' })
@@ -320,18 +321,24 @@ test('combined planning: equipment alternatives never offer a person and apply w
   await expect(resource.getByText('Fictional crane', { exact: true })).toBeVisible()
   await expect(resource.getByText('Replacement crane', { exact: true })).toBeVisible()
   await expect(proposal.getByRole('row', { name: /Occupied From/ })).toContainText('Unchanged')
-  await page.screenshot({
-    path: info.outputPath('readiness-equipment-swap-preview.png'),
-    fullPage: true,
-  })
+  await measure.diagnostic(() =>
+    page.screenshot({
+      path: info.outputPath('readiness-equipment-swap-preview.png'),
+      fullPage: true,
+    }),
+  )
   const updated = page.waitForResponse(
     (response) =>
       response.url().includes('/api/assignments/') && response.request().method() === 'PUT',
   )
-  await dialog.getByRole('button', { name: 'Apply', exact: true }).click()
+  await measure.step(() => dialog.getByRole('button', { name: 'Apply', exact: true }).click())
   const response = await updated
   expect(response.ok()).toBe(true)
   expect((await response.json()).assignment.resource_type).toBe('infrastructure')
   await expect(dialog).toBeHidden()
   await expect(verdict.getByText('No blockers within scope', { exact: true })).toHaveCount(4)
+  await info.attach('equipment-swap-measurement', {
+    body: JSON.stringify(measure.result()),
+    contentType: 'application/json',
+  })
 })

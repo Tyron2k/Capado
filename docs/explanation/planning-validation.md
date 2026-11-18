@@ -117,11 +117,20 @@ includes selecting the work package. Elapsed time includes automated checks.
 | Edit the booking manually | 3/3 | 15 | 2,055 ms |
 | Preview and apply the first suggestion | 3/3 | 4 | 991 ms |
 
-The existing suggestion saves 11 interactions in this scenario. A change to the
-reassignment workflow (#145) would need evidence from a case where the existing
-suggestions leave a blocker or make the choice difficult. The comparison uses
-one type of conflict and provides only automated evidence. A human bottleneck
-and a before/after product improvement (#146) still require separate evidence.
+The existing suggestion saves 11 interactions in this scenario. In a separate
+qualification scenario, previewing and applying the qualified crane replacement
+took 5 interactions in each of three successful browser runs (median 1,632 ms).
+The saved booking retained its equipment type and the qualification blocker cleared.
+
+The allocation reduction check found a reproducible defect. With 450 of 480
+minutes available and bookings at 60% and 50%, the first booking has 43.75%
+headroom. Rounding that up to 44% leaves 451 minutes booked and one conflict.
+Rounding down to 43% books 446 minutes and removes that conflict. The backend
+regression exercises the actual suggestion and its impact calculation.
+
+These are automated findings. A change to the reassignment workflow (#145) still
+needs evidence of friction with replacement selection. Human timing and
+before/after usability evidence (#146) remain outstanding.
 
 ## Planner observation protocol — not yet performed
 
