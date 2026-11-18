@@ -98,11 +98,30 @@ time, human decision time or an independent usability result. Runner and viewpor
 conditions differ from the 3 November local sample, so the elapsed values do not
 establish an improvement or regression between versions.
 
-**Internal hypothesis for #144:** the manual machine correction is the longer of
-these two paths. Compare it with the already available ranked proposal and its
-remaining-conflict preview before adding another reassignment interaction. This
-sample does not establish that resource reassignment is the user's main bottleneck
-or that new bulk-edit functionality would help. Keep #145/#146 evidence-led.
+## Manual correction and ranked proposal — 18 November 2026
+
+For [#144](https://github.com/Tyron2k/Capado/issues/144), run the two machine-overlap
+tests in `planning-readiness.spec.ts`. Each starts with the same reference data:
+the extra crane booking overlaps another booking and starts outside its operating
+window. The manual path above edits that booking. The ranked path selects the
+work package, opens the first suggestion (zero remaining conflicts), checks the
+new 02:00–06:00 slot and applies it. The test verifies the saved booking, that
+both blockers clear and that the personnel precision warning remains visible.
+
+Three runs per path used local Chromium at 1280 × 720 on source `f90470b`,
+with a fresh PostgreSQL test fixture for each attempt. The interaction count
+includes selecting the work package. Elapsed time includes automated checks.
+
+| Path | Successful runs | Interactions per run | Median automated elapsed |
+|---|---:|---:|---:|
+| Edit the booking manually | 3/3 | 15 | 2,055 ms |
+| Preview and apply the first suggestion | 3/3 | 4 | 991 ms |
+
+The existing suggestion saves 11 interactions in this scenario. A change to the
+reassignment workflow (#145) would need evidence from a case where the existing
+suggestions leave a blocker or make the choice difficult. The comparison uses
+one type of conflict and provides only automated evidence. A human bottleneck
+and a before/after product improvement (#146) still require separate evidence.
 
 ## Planner observation protocol — not yet performed
 

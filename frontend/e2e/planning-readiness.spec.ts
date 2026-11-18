@@ -32,7 +32,10 @@ async function start(
   await page.getByRole('button', { name: 'Sign In', exact: true }).click()
   await expect(page).toHaveURL('/')
   await page.getByRole('navigation').getByText('Planning', { exact: true }).click()
-  return JSON.parse(await readFile('.e2e-state.json', 'utf8')) as { planning_package: string }
+  return JSON.parse(await readFile('.e2e-state.json', 'utf8')) as {
+    planning_package: string
+    planning_extra: string | null
+  }
 }
 function measurement() {
   const started = performance.now()
@@ -178,6 +181,54 @@ test('combined planning: explain and repair an overnight machine overlap', async
     verdict.getByText('Booking extends outside operating windows', { exact: true }),
   ).toHaveCount(0)
   await info.attach('machine-task-measurement', {
+    body: JSON.stringify(measure.result()),
+    contentType: 'application/json',
+  })
+})
+
+test('combined planning: apply the top-ranked fix for the same machine overlap', async ({
+  page,
+}, info) => {
+  const seed = await start(page, 'machine')
+  const measure = measurement()
+  await selectPackage(page, measure.step)
+  const verdict = page.getByTestId('work-package-readiness')
+  await expect(
+    verdict.getByText('Exclusive equipment bookings overlap', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    verdict.getByText('Booking extends outside operating windows', { exact: true }),
+  ).toBeVisible()
+  const top = verdict
+    .getByRole('list', { name: 'Resolution Suggestions', exact: true })
+    .getByRole('listitem')
+    .first()
+  await expect(top).toContainText('0 remaining')
+  await measure.step(() => top.getByRole('button', { name: 'Preview', exact: true }).click())
+  const preview = page.getByRole('dialog', { name: /Preview: Move to/ })
+  await expect(preview.getByText('Conflicts: 2 → 0', { exact: true })).toBeVisible()
+  const changes = preview.getByRole('table', { name: 'Proposed change' })
+  await expect(changes.getByRole('row', { name: /Occupied From/ })).toContainText(
+    '2099-01-06 02:00:00 (UTC+01:00)',
+  )
+  await expect(changes.getByRole('row', { name: /Occupied Until/ })).toContainText(
+    '2099-01-06 06:00:00 (UTC+01:00)',
+  )
+  const updated = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === `/api/assignments/${seed.planning_extra}` &&
+      response.request().method() === 'PUT',
+  )
+  await measure.step(() => preview.getByRole('button', { name: 'Apply', exact: true }).click())
+  const response = await updated
+  expect(response.ok()).toBe(true)
+  const { assignment } = await response.json()
+  expect(assignment.start_at).toBe('2099-01-06T01:00:00Z')
+  expect(assignment.end_at).toBe('2099-01-06T05:00:00Z')
+  await expect(preview).toBeHidden()
+  await expect(verdict.getByText('No blockers within scope', { exact: true })).toHaveCount(4)
+  await expect(verdict.getByText(/Shared presence during a particular machine shift/)).toBeVisible()
+  await info.attach('machine-suggestion-measurement', {
     body: JSON.stringify(measure.result()),
     contentType: 'application/json',
   })
