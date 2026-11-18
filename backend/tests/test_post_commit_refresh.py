@@ -202,7 +202,10 @@ async def test_scheduler_records_failure_then_retries_and_refresh_is_idempotent(
         )
         patch.setattr(ConflictService, "_replace_periods", fail_derived_write)
         async with AsyncSession(resource_database, expire_on_commit=False) as session:
-            assert await scheduler.run_due_jobs(session, now) == [CONFLICT_CHECK_JOB]
+            with pytest.raises(
+                RuntimeError, match=f"Maintenance jobs failed: {CONFLICT_CHECK_JOB}"
+            ):
+                await scheduler.run_due_jobs(session, now, fail_on_error=True)
     async with AsyncSession(resource_database) as session:
         runs = (await session.scalars(sa.select(ScheduledJobRun))).all()
         assert len(runs) == 1 and runs[0].status == JobRunStatus.failed

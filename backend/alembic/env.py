@@ -41,7 +41,8 @@ DATABASE_URL = os.getenv(
 
 # Für Alembic brauchen wir die synchrone URL (psycopg2) oder async
 # Wir verwenden hier die async-Variante
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+# ConfigParser interprets percent signs; keep URL-encoded credentials intact.
+config.set_main_option("sqlalchemy.url", DATABASE_URL.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
