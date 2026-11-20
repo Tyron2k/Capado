@@ -205,22 +205,28 @@ def _read_csv(content: bytes, filename: str = "CSV") -> list[list[str]]:
         strict=True,
     )
     rows: list[list[str]] = []
-    for row in islice(reader, MAX_ROWS + 3):
-        index = len(rows) + 1
-        if (
-            not rows
-            and filename == "CSV"
-            and len(row) == 3
-            and row[0] == _CSV_FORMAT
-            and re.fullmatch(r"[a-z][a-z0-9-]{0,40}", row[2])
-        ):
-            filename = row[2] + ".csv"
-        header_index = 1 if rows and rows[0][0:1] == [_CSV_FORMAT] else 0
-        columns = rows[header_index] if len(rows) > header_index else []
-        for offset, value in enumerate(row):
-            column = columns[offset] if offset < len(columns) else str(offset + 1)
-            _check_field(value, filename, index, column)
-        rows.append(row)
+    try:
+        for row in islice(reader, MAX_ROWS + 3):
+            index = len(rows) + 1
+            if (
+                not rows
+                and filename == "CSV"
+                and len(row) == 3
+                and row[0] == _CSV_FORMAT
+                and re.fullmatch(r"[a-z][a-z0-9-]{0,40}", row[2])
+            ):
+                filename = row[2] + ".csv"
+            header_index = 1 if rows and rows[0][0:1] == [_CSV_FORMAT] else 0
+            columns = rows[header_index] if len(rows) > header_index else []
+            for offset, value in enumerate(row):
+                column = columns[offset] if offset < len(columns) else str(offset + 1)
+                _check_field(value, filename, index, column)
+            rows.append(row)
+    except csv.Error as exc:
+        raise ValueError(
+            f"{filename}, row {len(rows) + 1}: malformed CSV ({exc}). "
+            "Check the cell quoting or export the file again."
+        ) from exc
     if len(rows) > MAX_ROWS + 2:
         raise ValueError("CSV migration exceeds the 200,000 row limit.")
     return rows

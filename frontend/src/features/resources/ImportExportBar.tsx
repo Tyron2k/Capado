@@ -146,7 +146,14 @@ export function ImportExportBar({
       if ((data.atomic || csvBundle) && data.success) void queryClient.invalidateQueries()
       onImportSuccess?.()
     } catch (error: unknown) {
-      showErrorNotification(error, t('common.error'), t('importExport.importFailed'))
+      const response = axios.isAxiosError<{ detail?: unknown }>(error) ? error.response : undefined
+      const detail = response?.data?.detail
+      if ((response?.status === 400 || response?.status === 413) && typeof detail === 'string') {
+        // The import endpoints reject the file before writing on these statuses.
+        setOutcome({ created: 0, updated: 0, skipped: 0, errors: [detail], atomic: true })
+      } else {
+        showErrorNotification(error, t('common.error'), t('importExport.importFailed'))
+      }
     } finally {
       setImporting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''

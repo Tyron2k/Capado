@@ -67,3 +67,16 @@ async def test_small_csv_upload_still_parses() -> None:
     upload = UploadFile(file=io.BytesIO(b"Name;Group\nA;One\n"), filename="import.csv")
 
     assert await _parse_upload(upload) == [("Name", "Group"), ("A", "One")]
+
+
+async def test_malformed_area_csv_identifies_the_failing_record() -> None:
+    content = (
+        b'Capado CSV;2;projects\nRecord Type;id\n"quoted\nrecord";one\n"unclosed\n'
+    )
+    upload = UploadFile(file=io.BytesIO(content), filename="projects.csv")
+
+    with pytest.raises(HTTPException) as exc:
+        await _parse_upload(upload)
+
+    assert exc.value.status_code == 400
+    assert "projects.csv, row 4: malformed CSV" in exc.value.detail
