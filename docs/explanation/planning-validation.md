@@ -129,8 +129,9 @@ assessment when its conflict card disappears.
 The allocation reduction check found a reproducible defect. With 450 of 480
 minutes available and bookings at 60% and 50%, the first booking has 43.75%
 headroom. Rounding that up to 44% leaves 451 minutes booked and one conflict.
-Rounding down to 43% books 446 minutes and removes that conflict. The backend
-regression exercises the actual suggestion and its impact calculation.
+The suggestion now checks the same rounded minutes as conflict detection. It
+uses 43% in that case and retains 44% if 451 minutes are available. The backend
+regression checks the suggestion and its impact in both cases.
 
 These are automated findings. A change to the reassignment workflow (#145) still
 needs evidence of friction with replacement selection. Human timing and

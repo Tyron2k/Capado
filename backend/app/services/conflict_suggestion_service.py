@@ -9,7 +9,6 @@ Analyzes a conflict and proposes concrete actions to resolve it:
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
-from math import floor
 from typing import cast
 from uuid import UUID
 
@@ -721,8 +720,13 @@ class ConflictSuggestionService:
                 for a in all_assignments
                 if a.id != assignment.id
             )
-            # A whole-percent proposal must round down to fit fractional capacity.
-            new_percent = max(floor(conflict.available_percent - other_total), 10)
+            new_percent = round(conflict.available_percent - other_total)
+            # Use the same rounded-minute comparison as conflict detection.
+            if percent_to_minutes(other_total + new_percent) > percent_to_minutes(
+                conflict.available_percent
+            ):
+                new_percent -= 1
+            new_percent = max(new_percent, 10)
             if new_percent < assignment.allocation_percent:
                 suggestions.append(
                     ResolutionSuggestion(

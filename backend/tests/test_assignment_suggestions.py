@@ -19,8 +19,11 @@ from app.services.conflict_suggestion_service import ConflictSuggestionService
 from tests.planning_reference import MONDAY, WEDNESDAY, _clock, _seed_plan
 
 
+@pytest.mark.parametrize("absence_percent, expected_percent", [(6.25, 43), (6, 44)])
 async def test_allocation_reduction_clears_conflict_with_fractional_headroom(
     db_session,
+    absence_percent,
+    expected_percent,
 ):
     plan = await _seed_plan(db_session)
     booking = plan.crew_bookings[0]
@@ -40,7 +43,7 @@ async def test_allocation_reduction_clears_conflict_with_fractional_headroom(
                 resource_type=booking.resource_type,
                 start_date=MONDAY,
                 end_date=WEDNESDAY,
-                allocation_percent=6.25,
+                allocation_percent=absence_percent,
                 reason=AbsenceReason.planned,
             ),
         ]
@@ -53,7 +56,7 @@ async def test_allocation_reduction_clears_conflict_with_fractional_headroom(
     (reduction,) = (s for s in suggestions if s.type == "reduce_allocation")
     assert reduction.conflicts_before == 1
     assert reduction.conflicts_after == 0
-    assert reduction.new_allocation_percent == 43
+    assert reduction.new_allocation_percent == expected_percent
     assert booking.allocation_percent == 60
 
 
