@@ -274,10 +274,13 @@ async def lock_maintenance_for_migration(session: AsyncSession) -> None:
 async def run_due_jobs(
     session: AsyncSession,
     now: datetime | None = None,
+    *,
+    fail_on_error: bool = False,
 ) -> list[str]:
     """Run every job that is due. Returns the names of the jobs that were started.
 
     Each job is independent: one raising is recorded as a failure and the rest still run.
+    One-off invocations can report a failed pass after all due jobs have been tried.
     """
     moment = now or datetime.now(UTC)
     settings = (
@@ -287,6 +290,7 @@ async def run_due_jobs(
     hour = settings.maintenance_hour if settings else 2
 
     started: list[str] = []
+    failed: list[str] = []
     for job_name, job in JOBS.items():
         if not _job_due(
             job_name, moment, await _last_success(session, job_name), enabled, hour
@@ -330,6 +334,9 @@ async def run_due_jobs(
                     f"{type(exc).__name__}: {exc}",
                 )
                 logger.exception("Job %s fehlgeschlagen", job_name)
+                failed.append(job_name)
+    if fail_on_error and failed:
+        raise RuntimeError(f"Maintenance jobs failed: {', '.join(failed)}")
     return started
 
 

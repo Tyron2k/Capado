@@ -338,6 +338,50 @@ say which one:
 docker compose -f docker-compose.prod.yml logs backend | grep -i alembic
 ```
 
+### Optional separate migration, API and maintenance
+
+The regular Compose setup starts all three together. Operators who need separate
+processes can use the same backend image and database configuration.
+
+After backing up and pulling the matching frontend and backend images, pause any
+external maintenance schedule and let active jobs finish. Stop the old frontend
+and backend, then run the migration command:
+
+```bash
+docker compose -f docker-compose.prod.yml stop frontend backend
+docker compose -f docker-compose.prod.yml run --rm backend python -m app.runtime migrate
+```
+
+Start the new pair only after migration exits successfully. For the API-only
+backend, add this command to your local Compose override:
+
+```yaml
+services:
+  backend:
+    command: ["python", "-m", "app.runtime", "api"]
+```
+
+Include the override when starting the stack. The API runs one worker, listens
+on port 3001 by default and verifies this image's exact Alembic revision.
+It refuses startup on a missing, older, or newer schema. If the schema changes
+while it runs, `/api/health` reports HTTP 503. Avoid serving the same database
+from old and new images across a schema-changing upgrade. The older combined
+server can keep serving while migrations run, so stop it before migrating.
+
+Invoke a single maintenance cycle with:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm backend python -m app.runtime maintain
+```
+
+Resume recurring maintenance with the new backend image. In API-only mode,
+invoke the command from your scheduler at the usual 15-minute interval. It honors maintenance
+settings and due times, skips jobs locked by another run, and records results
+in the existing maintenance log. Exit status zero includes a cycle with no due
+jobs. If any job fails, the other jobs can finish and the command exits nonzero.
+After correcting the error, rerun it. Successful jobs are skipped until due
+again, and failed jobs remain eligible according to their schedule.
+
 ## 6. Rolling back
 
 Migration `002` intentionally cannot be downgraded: once booking instants and

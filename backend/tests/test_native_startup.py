@@ -5,14 +5,16 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app.main import run_migrations
+from app.runtime import DATABASE_URL
 
 
 def test_migrations_use_backend_directory():
     with patch("subprocess.run", return_value=SimpleNamespace(returncode=0)) as run:
         run_migrations()
     root = Path(__file__).resolve().parents[1]
-    assert run.call_args.kwargs["cwd"] == str(root)
+    assert Path(run.call_args.kwargs["cwd"]) == root
     assert run.call_args.kwargs["env"]["PYTHONPATH"] == str(root)
+    assert run.call_args.kwargs["env"]["DATABASE_URL"] == DATABASE_URL
 
 
 def test_test_runtime_ignores_dotenv(tmp_path):
