@@ -9,7 +9,6 @@ import sys
 from functools import cache
 from pathlib import Path
 
-from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 
@@ -42,9 +41,7 @@ def run_migrations() -> None:
 
 @cache
 def _image_heads() -> frozenset[str]:
-    config = Config(str(BACKEND_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-    return frozenset(ScriptDirectory.from_config(config).get_heads())
+    return frozenset(ScriptDirectory(str(BACKEND_ROOT / "alembic")).get_heads())
 
 
 class SchemaMismatch(RuntimeError):
@@ -98,8 +95,13 @@ def main() -> None:
     if args.command == "api":
         import uvicorn
 
+        # A supervisor would restart workers on schema mismatch instead of exiting.
         uvicorn.run(
-            "app.main:create_api_app", factory=True, host=args.host, port=args.port
+            "app.main:create_api_app",
+            factory=True,
+            host=args.host,
+            port=args.port,
+            workers=1,
         )
     else:
         asyncio.run(_run_once(args.command))

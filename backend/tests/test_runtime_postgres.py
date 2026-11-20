@@ -43,7 +43,9 @@ async def _run(url: str, *args: str) -> tuple[int | None, str]:
 
 async def test_api_requires_migration_and_loses_readiness_if_revision_changes(
     legacy_database,
+    monkeypatch,
 ):
+    monkeypatch.setenv("WEB_CONCURRENCY", "2")
     url, engine = legacy_database
     code, log = await _run(url, "api", "--host", "127.0.0.1", "--port", "0")
     assert code != 0
