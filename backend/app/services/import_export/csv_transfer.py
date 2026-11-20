@@ -163,7 +163,7 @@ def _parse_archive(content: bytes) -> tuple[CsvBatch, ...]:
                 raise ValueError("CSV migration exceeds the 200,000 row limit.")
             batches.append(domain.parse_csv(rows))
         return tuple(batches)
-    except (BadZipFile, UnicodeError, csv.Error, KeyError, RuntimeError) as exc:
+    except (BadZipFile, UnicodeError, KeyError, RuntimeError) as exc:
         raise ValueError("Invalid or unreadable CSV migration archive.") from exc
 
 

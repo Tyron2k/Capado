@@ -59,8 +59,10 @@ function toolbar(csvBundle = true) {
 }
 
 describe('complete CSV migration toolbar', () => {
-  it.each([400, 413])('keeps HTTP %s file rejections in the import log', async (status) => {
-    const detail = 'projects.csv, row 4: malformed CSV.'
+  it.each([
+    [400, 'projects.csv, row 4: malformed CSV.'],
+    [413, 'CSV imports must not exceed 100 MiB.'],
+  ])('keeps HTTP %s file rejections in the import log', async (status, detail) => {
     vi.mocked(apiClient.post).mockRejectedValueOnce({
       isAxiosError: true,
       response: { status, data: { detail } },

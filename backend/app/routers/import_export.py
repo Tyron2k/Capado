@@ -663,7 +663,7 @@ def _parse_csv(content: bytes) -> list[tuple]:
     if content.removeprefix(b"\xef\xbb\xbf").startswith(b"Capado CSV;"):
         try:
             return [tuple(row) for row in _read_csv(content)]
-        except (ValueError, csv.Error) as exc:
+        except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
     text = content.decode("utf-8-sig")
     delimiter = ";" if ";" in text.split("\n")[0] else ","
