@@ -720,14 +720,20 @@ class ConflictSuggestionService:
                 for a in all_assignments
                 if a.id != assignment.id
             )
-            max_allowed = max(conflict.available_percent - other_total, 10.0)
-            if max_allowed < (assignment.allocation_percent or 0):
+            new_percent = round(conflict.available_percent - other_total)
+            # Use the same rounded-minute comparison as conflict detection.
+            if percent_to_minutes(other_total + new_percent) > percent_to_minutes(
+                conflict.available_percent
+            ):
+                new_percent -= 1
+            new_percent = max(new_percent, 10)
+            if new_percent < assignment.allocation_percent:
                 suggestions.append(
                     ResolutionSuggestion(
                         type="reduce_allocation",
                         assignment_id=assignment.id,
-                        description=f"Reduce '{wp_name}' from {int(assignment.allocation_percent)}% to {int(max_allowed)}%",
-                        new_allocation_percent=round(max_allowed, 0),
+                        description=f"Reduce '{wp_name}' from {int(assignment.allocation_percent)}% to {new_percent}%",
+                        new_allocation_percent=new_percent,
                     )
                 )
 

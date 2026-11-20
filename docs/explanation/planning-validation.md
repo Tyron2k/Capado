@@ -98,11 +98,44 @@ time, human decision time or an independent usability result. Runner and viewpor
 conditions differ from the 3 November local sample, so the elapsed values do not
 establish an improvement or regression between versions.
 
-**Internal hypothesis for #144:** the manual machine correction is the longer of
-these two paths. Compare it with the already available ranked proposal and its
-remaining-conflict preview before adding another reassignment interaction. This
-sample does not establish that resource reassignment is the user's main bottleneck
-or that new bulk-edit functionality would help. Keep #145/#146 evidence-led.
+## Manual correction and ranked proposal — 18 November 2026
+
+For [#144](https://github.com/Tyron2k/Capado/issues/144), run the two machine-overlap
+tests in `planning-readiness.spec.ts`. Each starts with the same reference data:
+the extra crane booking overlaps another booking and starts outside its operating
+window. The manual path above edits that booking. The ranked path selects the
+work package, opens the first suggestion (zero remaining conflicts), checks the
+new 02:00–06:00 slot and applies it. The test verifies the saved booking, that
+both blockers clear and that the personnel precision warning remains visible.
+
+Three runs per path used local Chromium at 1280 × 720 on source `f90470b`,
+with a fresh PostgreSQL test fixture for each attempt. The interaction count
+includes selecting the work package. Elapsed time includes automated checks.
+
+| Path | Successful runs | Interactions per run | Median automated elapsed |
+|---|---:|---:|---:|
+| Edit the booking manually | 3/3 | 15 | 2,055 ms |
+| Preview and apply the first suggestion | 3/3 | 4 | 991 ms |
+
+The existing suggestion saves 11 interactions in this scenario. In a separate
+qualification scenario, previewing and applying the qualified crane replacement
+took 5 interactions in each of three successful browser runs (median 1,632 ms).
+The saved booking retained its equipment type and the qualification blocker cleared.
+The keyboard check reproduced a focus loss when dismissing the preview or applying
+a successful replacement. The browser regression now verifies that Escape returns
+focus to Preview, and that applying a replacement keeps focus on the work-package
+assessment when its conflict card disappears.
+
+The allocation reduction check found a reproducible defect. With 450 of 480
+minutes available and bookings at 60% and 50%, the first booking has 43.75%
+headroom. Rounding that up to 44% leaves 451 minutes booked and one conflict.
+The suggestion now checks the same rounded minutes as conflict detection. It
+uses 43% in that case and retains 44% if 451 minutes are available. The backend
+regression checks the suggestion and its impact in both cases.
+
+These are automated findings. A change to the reassignment workflow (#145) still
+needs evidence of friction with replacement selection. Human timing and
+before/after usability evidence (#146) remain outstanding.
 
 ## Planner observation protocol — not yet performed
 

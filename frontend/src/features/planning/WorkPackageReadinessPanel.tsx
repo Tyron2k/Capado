@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import {
   Alert,
   Badge,
@@ -49,6 +50,12 @@ export function WorkPackageReadinessPanel({
 }) {
   const { t, locale } = useTranslation()
   const { settings } = useSettings()
+  const panel = useRef<HTMLDivElement>(null)
+  const onResolutionApplied = () => {
+    // The resolved suggestion can disappear after refresh.
+    if (document.activeElement === document.body) panel.current?.focus()
+    onChanged()
+  }
   const query = useQuery({
     queryKey: queryKeys.planning.readiness(selected ?? ''),
     queryFn: ({ signal }) => getWorkPackageReadiness(selected!, signal),
@@ -185,7 +192,11 @@ export function WorkPackageReadinessPanel({
         {mismatch.length > 0 && (
           <>
             <Text size="sm">{t('readiness.qualificationRule')}</Text>
-            <ConflictsSection conflicts={[]} mismatches={mismatch} onChanged={onChanged} />
+            <ConflictsSection
+              conflicts={[]}
+              mismatches={mismatch}
+              onChanged={onResolutionApplied}
+            />
           </>
         )}
         {data.conflicts.length > 0 && (
@@ -226,7 +237,7 @@ export function WorkPackageReadinessPanel({
                           ),
                       )
                       .map((a) => a.id)}
-                    onApplied={onChanged}
+                    onApplied={onResolutionApplied}
                   />
                 )}
               </Paper>
@@ -245,7 +256,7 @@ export function WorkPackageReadinessPanel({
     )
   }
   return (
-    <Stack gap="md">
+    <Stack gap="md" ref={panel} role="region" aria-label={t('readiness.title')} tabIndex={-1}>
       <SectionHeader title={t('readiness.title')} />
       <Select
         label={t('readiness.selectPackage')}

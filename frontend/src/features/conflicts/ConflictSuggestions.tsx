@@ -191,6 +191,7 @@ export function ConflictSuggestions({
     },
     onError: (error) => showErrorNotification(error, t('common.error'), t('common.genericError')),
   })
+  const busy = previewMutation.isPending || applyMutation.isPending
 
   if (loading) return <Loader size="xs" />
   if (suggestionsQuery.isError)
@@ -286,6 +287,7 @@ export function ConflictSuggestions({
           const key = `${s.assignment_id}-${s.type}-${idx}`
           const label = t(`suggestions.type_${s.type}`)
           const desc = buildDescription(s, t, settings.timeZone, locale)
+          const previewing = previewMutation.isPending && previewMutation.variables === s
           return (
             <Group component="li" key={key} gap="xs" wrap="nowrap">
               <Badge size="xs" color={color} variant="light" leftSection={<Icon size={10} />}>
@@ -325,9 +327,13 @@ export function ConflictSuggestions({
                 size="compact-xs"
                 variant="light"
                 color={color}
-                loading={previewMutation.isPending && previewMutation.variables === s}
-                disabled={previewMutation.isPending || applyMutation.isPending}
+                aria-disabled={busy}
+                data-disabled={busy || undefined}
+                aria-busy={previewing}
+                leftSection={previewing ? <Loader size="xs" /> : undefined}
                 onClick={() => {
+                  // Keep DOM focus while loading so the modal can restore it on dismissal.
+                  if (busy) return
                   setActive(null)
                   previewMutation.mutate(s)
                 }}
