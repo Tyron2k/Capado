@@ -15,7 +15,7 @@ dependencies = [
     "asyncpg==0.32.0",  # Engine driver loaded via postgresql+asyncpg:// URI
     "sqlalchemy[asyncio]==2.1.9",
     "alembic==1.20.1",
-    "pydantic==2.14.3",
+    "pydantic==2.14.4",
     "bcrypt==5.0.0",
     "PyJWT==2.15.1",  # Imported as 'jwt' in app/services/auth_service.py
     "openpyxl==3.1.5",
@@ -125,7 +125,7 @@ dev = [
     # pytest-md-report was dropped: it silently stops producing any report from
     # pytest 8.4 on, and pytest-asyncio >= 1.0 requires pytest >= 8.4.
     "pytest-xdist>=3.8.0",  # Parallel test execution (addopts -n auto)
-    "ruff==0.17.5",  # Lint + format — must equal the rev in .pre-commit-config.yaml
+    "ruff==0.17.6",  # Lint + format — must equal the rev in .pre-commit-config.yaml
     "mypy==2.4.1",  # Type check — runs as its own CI job, see .github/workflows/ci.yml
     "types-openpyxl>=3.1.5",  # Stubs for the import/export workbook writers
 ]
