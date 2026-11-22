@@ -313,6 +313,11 @@ test('combined planning: equipment alternatives never offer a person and apply w
     verdict.getByText("Swap to 'Replacement crane' (available)", { exact: true }),
   ).toBeVisible()
   await expect(verdict.getByText(/Swap to 'Available person'/)).toHaveCount(0)
+  await expect(
+    verdict.getByText(
+      'Matching qualifications: Fictional lifting capability · Fictional assessed lifting',
+    ),
+  ).toBeVisible()
   const previewButton = verdict.getByRole('button', { name: 'Preview', exact: true })
   await measure.step(() => previewButton.press('Enter'))
   const dialog = page.getByRole('dialog', { name: /Preview: Swap to 'Replacement crane'/ })

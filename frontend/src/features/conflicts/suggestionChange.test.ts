@@ -39,6 +39,7 @@ function suggestion(type: ConflictSuggestion['type'], extras: Partial<ConflictSu
     description: 'test',
     conflicts_before: null,
     conflicts_after: null,
+    matched_qualifications: [],
     work_package_name: null,
     shift_days: null,
     new_allocation_percent: null,

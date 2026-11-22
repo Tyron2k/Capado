@@ -60,6 +60,7 @@ class ResolutionSuggestion:
     work_package_name: str | None = None
     conflicts_before: int | None = None
     conflicts_after: int | None = None
+    matched_qualifications: tuple[str, ...] = ()
 
 
 def _shift_booking(
@@ -504,8 +505,8 @@ class ConflictSuggestionService:
     ) -> list[ResolutionSuggestion]:
         """Same resource type, valid qualification and room for the whole booking.
 
-        A replacement needs one applicable role, matching mismatch detection;
-        a person is not expected to hold the package's machine qualifications.
+        Preserve the original booking's applicable qualifications. If it has
+        none, a replacement can repair the mismatch with any applicable role.
         """
         from app.models.skill import (
             InfrastructureResourceSkill,
@@ -530,21 +531,30 @@ class ConflictSuggestionService:
             if assignment.resource_type == ResourceType.personal
             else InfrastructureResourceSkill
         )
-        requirements = list(
-            (
-                await self.session.scalars(
-                    select(WorkPackageRequirement)
-                    .join(Skill, WorkPackageRequirement.skill_id == Skill.id)
-                    .where(
-                        WorkPackageRequirement.work_package_id
-                        == assignment.work_package_id,
-                        Skill.resource_type == assignment.resource_type.value,
-                    )
+        requirement_rows = (
+            await self.session.execute(
+                select(WorkPackageRequirement, Skill.name, SkillAttribute.name)
+                .join(Skill, WorkPackageRequirement.skill_id == Skill.id)
+                .outerjoin(
+                    SkillAttribute,
+                    SkillAttribute.id == WorkPackageRequirement.skill_attribute_id,
                 )
-            ).all()
-        )
-        if not requirements:
+                .where(
+                    WorkPackageRequirement.work_package_id
+                    == assignment.work_package_id,
+                    Skill.resource_type == assignment.resource_type.value,
+                )
+            )
+        ).all()
+        if not requirement_rows:
             return []
+        requirements: dict[UUID, list[WorkPackageRequirement]] = {}
+        names: dict[UUID, str] = {}
+        for req, skill_name, attribute_name in requirement_rows:
+            requirements.setdefault(req.skill_id, []).append(req)
+            names[req.id] = (
+                f"{skill_name} · {attribute_name}" if attribute_name else skill_name
+            )
         rows = cast(
             "Sequence[tuple[PersonalResource | InfrastructureResource, PersonalResourceSkill | InfrastructureResourceSkill, UUID]]",
             (
@@ -558,35 +568,42 @@ class ConflictSuggestionService:
                         SkillAttribute.id == qualification_model.skill_attribute_id,
                     )
                     .where(
-                        model.is_active.is_(True),
-                        model.id != assignment.resource_id,
-                        SkillAttribute.skill_id.in_({r.skill_id for r in requirements}),
+                        model.is_active.is_(True)
+                        | (model.id == assignment.resource_id),
+                        SkillAttribute.skill_id.in_(requirements),
                     )
                     .order_by(model.name, model.id)
                 )
             ).all(),
         )
         candidates: dict[UUID, PersonalResource | InfrastructureResource] = {}
+        matching: dict[UUID, set[UUID]] = {}
         for resource, qualification, skill_id in rows:
-            if any(
-                req.skill_id == skill_id
-                and (
-                    req.skill_attribute_id is None
-                    or req.skill_attribute_id == qualification.skill_attribute_id
-                )
+            held = HeldQualification(
+                valid_from=qualification.valid_from,
+                valid_until=qualification.valid_until,
+                level=qualification.level,
+            )
+            matches = {
+                req.id
+                for req in requirements[skill_id]
+                if req.skill_attribute_id in (None, qualification.skill_attribute_id)
                 and satisfies(
-                    HeldQualification(
-                        valid_from=qualification.valid_from,
-                        valid_until=qualification.valid_until,
-                        level=qualification.level,
-                    ),
+                    held,
                     req.min_level,
                     start,
                     end,
                 )
-                for req in requirements
-            ):
+            }
+            if matches:
                 candidates[resource.id] = resource
+                matching.setdefault(resource.id, set()).update(matches)
+        original_matches = matching.get(assignment.resource_id, set())
+        candidates = {
+            rid: resource
+            for rid, resource in candidates.items()
+            if rid != assignment.resource_id and original_matches <= matching[rid]
+        }
         if not candidates:
             return []
         bookings = list(
@@ -669,6 +686,9 @@ class ConflictSuggestionService:
                     description=f"Swap to '{resource.name}'",
                     target_resource_id=rid,
                     target_resource_name=resource.name,
+                    matched_qualifications=tuple(
+                        sorted({names[req_id] for req_id in matching[rid]})
+                    ),
                 )
             )
             if len(suggestions) == 5:

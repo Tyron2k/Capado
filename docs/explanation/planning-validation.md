@@ -133,9 +133,13 @@ The suggestion now checks the same rounded minutes as conflict detection. It
 uses 43% in that case and retains 44% if 451 minutes are available. The backend
 regression checks the suggestion and its impact in both cases.
 
-These are automated findings. A change to the reassignment workflow (#145) still
-needs evidence of friction with replacement selection. Human timing and
-before/after usability evidence (#146) remain outstanding.
+An internal multi-skill case found that a replacement could match a different
+package requirement and drop a qualification the booking had provided. The
+suggestion now preserves the applicable qualifications of the original booking
+and names the matches. If the original had no applicable qualification, any
+matching role can repair that mismatch. Package coverage is checked separately
+by the readiness assessment. Human timing and before/after usability evidence
+(#146) remain outstanding.
 
 ## Planner observation protocol — not yet performed
 

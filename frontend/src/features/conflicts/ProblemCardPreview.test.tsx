@@ -100,6 +100,7 @@ beforeEach(() => {
       shift_days: null,
       conflicts_before: null,
       conflicts_after: null,
+      matched_qualifications: ['Fiktive Hebeberechtigung'],
       work_package_name: null,
       new_allocation_percent: null,
       new_start_at: null,

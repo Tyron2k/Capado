@@ -10,7 +10,13 @@ from app.models.assignment import Assignment
 from app.models.calendar import InfrastructureAvailabilityWindow
 from app.models.conflict import Conflict
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
-from app.models.skill import InfrastructureResourceSkill, PersonalResourceSkill
+from app.models.skill import (
+    InfrastructureResourceSkill,
+    PersonalResourceSkill,
+    Skill,
+    SkillAttribute,
+)
+from app.models.work_package_requirement import WorkPackageRequirement
 from app.schemas.assignment import AssignmentPreviewRequest
 from app.services.assignment_preview import AssignmentPreviewService
 from app.services.assignment_service import AssignmentService
@@ -197,6 +203,67 @@ async def test_replacement_keeps_type_and_previews_then_applies(db_session, kind
         original.id, resource_id=replacement.id
     )
     assert updated.resource_id == replacement.id and updated.resource_type == kind
+
+
+@pytest.mark.parametrize("original_qualified", [True, False])
+async def test_replacement_preserves_the_original_role_when_qualified(
+    db_session,
+    original_qualified,
+):
+    plan = await _seed_plan(db_session)
+    if not original_qualified:
+        plan.machine_qualification.level = 1
+    inspection = Skill(name="Inspection", resource_type="infrastructure")
+    other = InfrastructureResource(
+        name="Inspection machine", group_id=plan.machine.group_id
+    )
+    replacement = InfrastructureResource(
+        name="Replacement crane", group_id=plan.machine.group_id
+    )
+    db_session.add_all([inspection, other, replacement])
+    await db_session.flush()
+    attribute = SkillAttribute(name="Visual inspection", skill_id=inspection.id)
+    db_session.add(attribute)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            WorkPackageRequirement(
+                work_package_id=plan.package.id,
+                skill_id=inspection.id,
+                skill_attribute_id=attribute.id,
+                min_level=3,
+            ),
+            InfrastructureResourceSkill(
+                resource_id=other.id,
+                skill_attribute_id=attribute.id,
+                level=3,
+            ),
+            InfrastructureResourceSkill(
+                resource_id=replacement.id,
+                skill_attribute_id=plan.machine_qualification.skill_attribute_id,
+                level=3,
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    suggestions = await ConflictSuggestionService(
+        db_session
+    ).get_assignment_suggestions(
+        plan.machine_booking.id,
+        alternatives_only=True,
+    )
+    expected = {replacement.id} if original_qualified else {other.id, replacement.id}
+    assert {suggestion.target_resource_id for suggestion in suggestions} == expected
+    matches = {
+        suggestion.target_resource_id: suggestion.matched_qualifications
+        for suggestion in suggestions
+    }
+    assert matches[replacement.id] == (
+        "Fictional lifting capability · Fictional assessed lifting",
+    )
+    if not original_qualified:
+        assert matches[other.id] == ("Inspection · Visual inspection",)
 
 
 @pytest.mark.parametrize(
