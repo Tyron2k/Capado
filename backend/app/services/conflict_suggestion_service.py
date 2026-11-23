@@ -6,6 +6,7 @@ Analyzes a conflict and proposes concrete actions to resolve it:
 - Swap to an available resource
 """
 
+from bisect import insort
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
@@ -606,15 +607,19 @@ class ConflictSuggestionService:
         }
         if not candidates:
             return []
-        bookings = list(
-            (
-                await self.session.scalars(
-                    select(Assignment).where(Assignment.resource_id.in_(candidates))
-                )
-            ).all()
-        )
+        bookings: dict[UUID, list[Assignment]] = {}
+        for booking in await self.session.scalars(
+            select(Assignment).where(Assignment.resource_id.in_(candidates))
+        ):
+            bookings.setdefault(booking.resource_id, []).append(booking)
         working = WorkingTimeService(self.session)
         await working.prepare(list(candidates), start, end)
+        engine = ConflictService.from_data(
+            session=self.session,
+            working_time=working,
+            resources=candidates,
+            assignments=bookings,
+        )
         from app.models.calendar import WorkWeekProfile
 
         standard = (
@@ -624,9 +629,10 @@ class ConflictSuggestionService:
             if assignment.resource_type == ResourceType.personal
             else None
         )
-        suggestions = []
+        limit = 5
+        ranked: list[tuple[int, ResolutionSuggestion]] = []
         for rid, resource in candidates.items():
-            own = [a for a in bookings if a.resource_id == rid]
+            own = bookings.get(rid, [])
             # Preserve distinct booking intervals, but never offer an exact duplicate.
             if any(
                 a.work_package_id == assignment.work_package_id
@@ -654,46 +660,45 @@ class ConflictSuggestionService:
                     assignment.allocation_percent or 100
                 ):
                     continue
-            else:
-                proposed = Assignment(
-                    resource_id=rid,
-                    resource_type=assignment.resource_type,
-                    work_package_id=assignment.work_package_id,
-                    start_at=assignment.start_at,
-                    end_at=assignment.end_at,
-                )
-                engine = ConflictService.from_data(
-                    session=self.session,
-                    working_time=working,
-                    resources={rid: resource},
-                    assignments={
-                        rid: [
-                            clipped
-                            for a in [*own, proposed]
-                            if (clipped := clip_assignment(a, start, end)) is not None
-                        ]
-                    },
-                )
-                if any(
-                    proposed.id in p.assignment_ids
-                    for p in await engine.calculate_periods(rid)
-                ):
-                    continue
-            suggestions.append(
-                ResolutionSuggestion(
-                    type="swap_resource",
-                    assignment_id=assignment.id,
-                    description=f"Swap to '{resource.name}'",
-                    target_resource_id=rid,
-                    target_resource_name=resource.name,
-                    matched_qualifications=tuple(
-                        sorted({names[req_id] for req_id in matching[rid]})
-                    ),
-                )
+            proposed = Assignment(
+                resource_id=rid,
+                resource_type=assignment.resource_type,
+                work_package_id=assignment.work_package_id,
+                start_date=assignment.start_date,
+                end_date=assignment.end_date,
+                allocation_percent=assignment.allocation_percent,
+                start_at=assignment.start_at,
+                end_at=assignment.end_at,
             )
-            if len(suggestions) == 5:
+            periods = await engine.calculate_periods(
+                rid,
+                [
+                    clipped
+                    for a in [*own, proposed]
+                    if (clipped := clip_assignment(a, start, end)) is not None
+                ],
+            )
+            if assignment.resource_type == ResourceType.infrastructure and any(
+                proposed.id in period.assignment_ids for period in periods
+            ):
+                continue
+            suggestion = ResolutionSuggestion(
+                type="swap_resource",
+                assignment_id=assignment.id,
+                description=f"Swap to '{resource.name}'",
+                target_resource_id=rid,
+                target_resource_name=resource.name,
+                matched_qualifications=tuple(
+                    sorted({names[req_id] for req_id in matching[rid]})
+                ),
+            )
+            # All swaps remove the same source booking. Rank by remaining
+            # conflicts on the target before running full previews on the shortlist.
+            insort(ranked, (len(periods), suggestion), key=lambda entry: entry[0])
+            del ranked[limit:]
+            if len(ranked) == limit and ranked[-1][0] == 0:
                 break
-        return suggestions
+        return [suggestion for _, suggestion in ranked]
 
     async def _batch_load_work_package_names(
         self, wp_ids: list[UUID]
