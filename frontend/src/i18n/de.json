@@ -343,6 +343,7 @@
     "type_shift_into_window": "Betriebszeit",
     "type_reduce_allocation": "Reduzieren",
     "type_swap_resource": "Tauschen",
+    "matchedQualifications": "Passende Qualifikationen: {names}",
     "descShiftForward": "{days} Tage nach vorne verschieben",
     "descShiftBackward": "{days} Tage nach hinten verschieben",
     "descShiftIntoWindow": "Auf {time} innerhalb der Betriebszeit verschieben",

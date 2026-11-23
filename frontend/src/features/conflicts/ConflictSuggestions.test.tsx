@@ -100,6 +100,7 @@ beforeEach(() => {
     {
       conflicts_before: null,
       conflicts_after: null,
+      matched_qualifications: [],
       work_package_name: null,
       new_allocation_percent: null,
       new_end_at: null,
@@ -177,6 +178,7 @@ it('shows the exact allocation reduction before saving the same value', async ()
     {
       conflicts_before: null,
       conflicts_after: null,
+      matched_qualifications: [],
       work_package_name: null,
       type: 'reduce_allocation',
       assignment_id: 'a1',
@@ -216,6 +218,7 @@ it('ranks every involved booking by remaining conflicts, with unknown effects la
     target_resource_id: null,
     target_resource_name: null,
     conflicts_before: 2,
+    matched_qualifications: [],
   }
   vi.mocked(getAssignmentSuggestions).mockImplementation(async (id) =>
     id === 'a1'

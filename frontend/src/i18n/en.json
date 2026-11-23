@@ -343,6 +343,7 @@
     "type_shift_into_window": "Operating hours",
     "type_reduce_allocation": "Reduce",
     "type_swap_resource": "Swap",
+    "matchedQualifications": "Matching qualifications: {names}",
     "descShiftForward": "Shift {days} days forward",
     "descShiftBackward": "Shift {days} days backward",
     "descShiftIntoWindow": "Move to {time} within operating hours",

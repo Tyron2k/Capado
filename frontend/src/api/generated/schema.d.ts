@@ -4190,6 +4190,11 @@ export interface components {
             conflicts_before: number | null;
             /** Description */
             description: string;
+            /**
+             * Matched Qualifications
+             * @default []
+             */
+            matched_qualifications: string[];
             /** New Allocation Percent */
             new_allocation_percent: number | null;
             /** New End At */

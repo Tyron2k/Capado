@@ -239,7 +239,7 @@ export function ConflictSuggestions({
               preview={active.result}
               disclaimer={t('suggestions.previewDisclaimer')}
             />
-            {alternativesOnly && (
+            {(alternativesOnly || !!active.suggestion.matched_qualifications?.length) && (
               <Text size="xs" c="dimmed">
                 {t('suggestions.skillPreviewNote')}
               </Text>
@@ -300,6 +300,13 @@ export function ConflictSuggestions({
                   </Text>
                 )}
                 <Text size="xs">{desc}</Text>
+                {!!s.matched_qualifications?.length && (
+                  <Text size="xs" c="dimmed">
+                    {t('suggestions.matchedQualifications', {
+                      names: s.matched_qualifications.join(', '),
+                    })}
+                  </Text>
+                )}
                 <Group gap={6}>
                   <Badge
                     size="xs"

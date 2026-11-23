@@ -30,3 +30,4 @@ class ConflictSuggestionResponse(ResponseModel):
     work_package_name: str | None = None
     conflicts_before: int | None = None
     conflicts_after: int | None = None
+    matched_qualifications: tuple[str, ...] = ()
