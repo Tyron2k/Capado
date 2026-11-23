@@ -215,6 +215,13 @@ that concurrent cap. Manual updates are sorted after the automatic group and fal
 GitHub vulnerability alerts retain their separate budget and priority. These exceptions
 can create additional review/security PRs; this policy does not promise one PR of any kind.
 
+PostgreSQL major updates for Compose require approval in the Dependency Dashboard before
+Renovate opens a PR. Prepare and rehearse the data migration on a copy of an existing
+volume, verify rollback, and run Capado's database checks on the new major before merging.
+Regular CI uses the current major and cannot verify an isolated tag change. See the
+[database upgrade guidance](../how-to/upgrading.md#postgresql-16-to-18) for the previous
+migration.
+
 `statusCheckWhen.artifactError: always` makes Renovate publish `renovate/artifacts` on
 updated heads. The existing **CI passed** gate requires that status to be successful for
 Renovate-authored PRs, in addition to every existing CI job. A failed, pending, absent or

@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "dependencyDashboard": true,
+  "dependencyDashboard": {
+    "enabled": true
+  },
   "timezone": "Europe/Berlin",
   "semanticCommits": "enabled",
   "semanticCommitType": "chore",
@@ -85,6 +87,19 @@
       "prHourlyLimit": 0,
       "prConcurrentLimit": 2,
       "automerge": false
+    },
+    {
+      "description": "Approve PostgreSQL major updates after preparing the database migration.",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "postgres"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "dependencyDashboardApproval": true
     },
     {
       "description": "Review Python runtime upgrades together after local multi-platform builds.",
