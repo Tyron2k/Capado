@@ -28,6 +28,7 @@ from app.services.conflict_service import ConflictService
 from app.services.qualification import HeldQualification, satisfies
 from app.services.time_zone import (
     local_date,
+    local_day_bounds,
     local_time,
     local_wall_time_to_utc,
     planning_zone,
@@ -607,10 +608,24 @@ class ConflictSuggestionService:
         }
         if not candidates:
             return []
+        statement = select(Assignment).where(
+            Assignment.resource_id.in_(candidates),
+            Assignment.resource_type == assignment.resource_type,
+        )
+        if assignment.resource_type == ResourceType.personal:
+            statement = statement.where(
+                Assignment.start_date <= end, Assignment.end_date >= start
+            )
+        else:
+            # The preview counts conflicts across the affected local days.
+            zone = planning_zone()
+            lower, _ = local_day_bounds(start, zone)
+            _, upper = local_day_bounds(end, zone)
+            statement = statement.where(
+                Assignment.start_at < upper, Assignment.end_at > lower
+            )
         bookings: dict[UUID, list[Assignment]] = {}
-        for booking in await self.session.scalars(
-            select(Assignment).where(Assignment.resource_id.in_(candidates))
-        ):
+        for booking in await self.session.scalars(statement):
             bookings.setdefault(booking.resource_id, []).append(booking)
         working = WorkingTimeService(self.session)
         await working.prepare(list(candidates), start, end)

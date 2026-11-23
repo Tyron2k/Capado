@@ -233,8 +233,9 @@ until somebody defines operating hours.
 ## Individual Excel imports have no dedicated parsing timeout
 
 All five importers reject files over 20 MiB and files over 10,000 rows (including the header) before
-writing anything. Excel uploads also have a 100 MiB expanded limit. The upload is read only up to
-the size limit plus one byte, and parsing runs in a thread pool. Imports remain admin-only.
+writing anything. Excel imports also check the ZIP directory before opening the workbook and
+reject a declared total uncompressed size over 100 MiB. The upload is read only up to the size
+limit plus one byte, and parsing runs in a thread pool. Imports remain admin-only.
 
 Workbook parsing has no dedicated time limit. Parsing time and memory usage depend on the
 workbook structure as well as its size.

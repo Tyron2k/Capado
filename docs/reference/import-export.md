@@ -363,9 +363,9 @@ depends on choosing the ZIP.
 ## Limits
 
 Legacy flat CSV/Excel imports reject uploads over **20 MiB** or **10,000 rows including the header** with HTTP 413,
-before any data is written. Uploads are read only up to 20 MiB plus one byte. Excel workbooks
-also have a **100 MiB expanded limit** across all archive entries, checked before opening
-the workbook. Split an oversized workbook or export it as CSV.
+before any data is written. Uploads are read only up to 20 MiB plus one byte. Before opening
+an Excel workbook, Capado sums the uncompressed entry sizes declared in its ZIP directory
+and rejects totals over **100 MiB**. Split an oversized workbook or export it as CSV.
 
 Parsing runs in a thread pool rather than on the event loop, so a slow file does not block other
 requests.
