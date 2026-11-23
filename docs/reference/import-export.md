@@ -363,8 +363,9 @@ depends on choosing the ZIP.
 ## Limits
 
 Legacy flat CSV/Excel imports reject uploads over **20 MiB** or **10,000 rows including the header** with HTTP 413,
-before any data is written. Uploads are read only up to 20 MiB plus one byte. There is no separate
-time limit or cap on an Excel file's decompressed contents — see [known limitations](known-limitations.md).
+before any data is written. Uploads are read only up to 20 MiB plus one byte. Excel workbooks
+also have a **100 MiB expanded limit** across all archive entries, checked before opening
+the workbook. Split an oversized workbook or export it as CSV.
 
 Parsing runs in a thread pool rather than on the event loop, so a slow file does not block other
 requests.
