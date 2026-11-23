@@ -9,7 +9,7 @@ import csv
 import io
 from collections.abc import Iterable
 from itertools import islice
-from zipfile import BadZipFile
+from zipfile import BadZipFile, ZipFile
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
@@ -158,8 +158,9 @@ async def import_area_endpoint(
 #: browser saves with the right extension and Excel then refuses to open.
 _XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-# Bound both the upload and the parsed rows before an admin import can exhaust the backend.
+# Bound uploads, Excel archive contents and parsed rows before importing.
 _MAX_IMPORT_BYTES = 20 * 1024 * 1024
+_MAX_XLSX_EXPANDED_BYTES = 100 * 1024 * 1024
 _MAX_IMPORT_ROWS = 10_000  # Includes the header row.
 
 
@@ -646,7 +647,20 @@ def _limited_rows(rows: Iterable[tuple]) -> list[tuple]:
 
 def _parse_xlsx(content: bytes) -> list[tuple]:
     """Parse Excel content into row tuples (CPU-bound, runs in thread pool)."""
-    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    stream = io.BytesIO(content)
+    with ZipFile(stream) as archive:
+        if (
+            sum(member.file_size for member in archive.infolist())
+            > _MAX_XLSX_EXPANDED_BYTES
+        ):
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    "Excel files must not exceed 100 MiB after decompression. "
+                    "Split the workbook or export as CSV."
+                ),
+            )
+    wb = load_workbook(stream, read_only=True, data_only=True)
     try:
         ws = wb.active
         if not isinstance(ws, (Worksheet, ReadOnlyWorksheet)):

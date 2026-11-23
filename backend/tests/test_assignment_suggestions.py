@@ -205,6 +205,58 @@ async def test_replacement_keeps_type_and_previews_then_applies(db_session, kind
     assert updated.resource_id == replacement.id and updated.resource_type == kind
 
 
+async def test_replacement_ranks_the_sixth_candidate_before_limiting(db_session):
+    plan = await _seed_plan(db_session)
+    booking = plan.machine_booking
+    candidates = [
+        InfrastructureResource(name=f"Crane {number}", group_id=plan.machine.group_id)
+        for number in range(1, 7)
+    ]
+    db_session.add_all(candidates)
+    await db_session.flush()
+    db_session.add_all(
+        InfrastructureResourceSkill(
+            resource_id=candidate.id,
+            skill_attribute_id=plan.machine_qualification.skill_attribute_id,
+            level=3,
+        )
+        for candidate in candidates
+    )
+    db_session.add(
+        Assignment(
+            resource_id=booking.resource_id,
+            resource_type=booking.resource_type,
+            work_package_id=booking.work_package_id,
+            start_at=_clock(MONDAY, 23),
+            end_at=_clock(MONDAY + timedelta(days=1), 1),
+        )
+    )
+    # Each of the first five cranes has an existing conflict on the same day.
+    # The proposed booking could fit on any crane, but only the sixth leaves no conflict.
+    for candidate in candidates[:5]:
+        for hour in (14, 15):
+            db_session.add(
+                Assignment(
+                    resource_id=candidate.id,
+                    resource_type=booking.resource_type,
+                    work_package_id=booking.work_package_id,
+                    start_at=_clock(MONDAY, hour),
+                    end_at=_clock(MONDAY, hour + 2),
+                )
+            )
+    await db_session.commit()
+
+    suggestions = await ConflictSuggestionService(
+        db_session
+    ).get_assignment_suggestions(booking.id, alternatives_only=True)
+
+    assert [s.target_resource_id for s in suggestions] == [
+        candidate.id for candidate in [candidates[5], *candidates[:4]]
+    ]
+    assert [s.conflicts_after for s in suggestions] == [0, 1, 1, 1, 1]
+    assert not db_session.new and not db_session.dirty
+
+
 @pytest.mark.parametrize("original_qualified", [True, False])
 async def test_replacement_preserves_the_original_role_when_qualified(
     db_session,
