@@ -337,6 +337,7 @@
     "apply": "Anwenden",
     "previewAction": "Vorschau: {action}",
     "bookingChanged": "Diese Buchung wurde seit der Vorschau geändert. Öffne eine neue Vorschau.",
+    "bookingUnavailable": "Die Buchung oder die vorgeschlagene Ressource ist nicht mehr verfügbar.",
     "previewDisclaimer": "Unverbindliche Berechnung. Erst Anwenden übernimmt die Änderung; bis dahin kann sich der Plan ändern.",
     "skillPreviewNote": "Die Vorschau zeigt Kapazitätskonflikte. Die Eignung des Ersatzes wurde für die Vorschlagsliste geprüft, wird hier aber nicht neu berechnet.",
     "type_shift_forward": "Vorwärts",

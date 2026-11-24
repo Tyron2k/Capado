@@ -193,15 +193,14 @@ export function ConflictSuggestions({
       onApplied()
     },
     onError: async (error) => {
-      if (
-        axios.isAxiosError<{ code?: string }>(error) &&
-        error.response?.status === 409 &&
-        error.response.data?.code === 'assignment_changed'
-      ) {
+      const response = axios.isAxiosError<{ code?: string }>(error) ? error.response : undefined
+      const unavailable = response?.status === 404
+      const changed = response?.status === 409 && response.data?.code === 'assignment_changed'
+      if (unavailable || changed) {
         setActive(null)
         notifications.show({
           title: t('common.error'),
-          message: t('suggestions.bookingChanged'),
+          message: t(unavailable ? 'suggestions.bookingUnavailable' : 'suggestions.bookingChanged'),
           color: 'orange',
         })
         await refreshPlan()

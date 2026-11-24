@@ -172,24 +172,31 @@ describe('conflict suggestions in the planning overview', () => {
     expect(screen.queryByRole('button', { name: 'Anwenden' })).not.toBeInTheDocument()
   })
 
-  it('discards an outdated preview and refreshes the suggestions', async () => {
+  it.each([
+    {
+      reason: 'changed',
+      response: { status: 409, data: { code: 'assignment_changed' } },
+      message: 'Diese Buchung wurde seit der Vorschau geändert. Öffne eine neue Vorschau.',
+    },
+    {
+      reason: 'deleted',
+      response: { status: 404, data: { detail: 'Assignment not found.' } },
+      message: 'Die Buchung oder die vorgeschlagene Ressource ist nicht mehr verfügbar.',
+    },
+  ])('discards the preview when the booking is $reason', async ({ response, message }) => {
     vi.mocked(updateAssignment).mockRejectedValueOnce({
       isAxiosError: true,
-      response: { status: 409, data: { code: 'assignment_changed' } },
+      response,
     })
     const onApplied = renderSuggestions()
     fireEvent.click(await screen.findByRole('button', { name: 'Vorschau' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Anwenden' }))
 
-    await waitFor(() =>
-      expect(notifications.show).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Diese Buchung wurde seit der Vorschau geändert. Öffne eine neue Vorschau.',
-        }),
-      ),
-    )
-    expect(screen.queryByRole('button', { name: 'Anwenden' })).not.toBeInTheDocument()
-    expect(getConflictSuggestions).toHaveBeenCalledTimes(2)
+    await waitFor(() => {
+      expect(notifications.show).toHaveBeenCalledWith(expect.objectContaining({ message }))
+      expect(screen.queryByRole('button', { name: 'Anwenden' })).not.toBeInTheDocument()
+      expect(getConflictSuggestions).toHaveBeenCalledTimes(2)
+    })
     expect(onApplied).not.toHaveBeenCalled()
   })
 })
