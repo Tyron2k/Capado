@@ -42,7 +42,13 @@ import { queryKeys } from '../../api/queryClient'
 import { AssignmentForm, type AssignmentFormValues } from './AssignmentForm'
 import { formatDate, formatDateTime } from '../../utils/date'
 import { useSettings } from '../../context/SettingsContext'
-import { formatWarning, groupByProjectAndWorkPackage, toAssignmentPayload } from './assignmentUtils'
+import {
+  assignmentWriteConflict,
+  bookingForPatch,
+  formatWarning,
+  groupByProjectAndWorkPackage,
+  toAssignmentPayload,
+} from './assignmentUtils'
 
 function formatAssignmentStart(assignment: Assignment, locale: Locale, timeZone: string): string {
   if (assignment.resource_type === 'personal' && assignment.start_date) {
@@ -132,12 +138,14 @@ export function AssignmentsPanel({
   }
 
   const handleCreate = () => {
+    saveMutation.reset()
     setEditingAssignment(null)
     setWarnings([])
     setModalOpen(true)
   }
 
   const handleEdit = (assignment: Assignment) => {
+    saveMutation.reset()
     setEditingAssignment(assignment)
     setWarnings([])
     setModalOpen(true)
@@ -173,7 +181,10 @@ export function AssignmentsPanel({
   const saveMutation = useMutation({
     mutationFn: (payload: AssignmentCreate) =>
       editingAssignment
-        ? updateAssignment(editingAssignment.id, payload)
+        ? updateAssignment(editingAssignment.id, {
+            ...payload,
+            expected_booking: bookingForPatch(editingAssignment),
+          })
         : createAssignment(payload),
     onSuccess: async (result) => {
       notifications.show({
@@ -184,6 +195,7 @@ export function AssignmentsPanel({
         color: 'green',
       })
       if (result.warnings && result.warnings.length > 0) {
+        if (editingAssignment) setEditingAssignment(result.assignment)
         setWarnings(result.warnings)
       } else {
         setModalOpen(false)
@@ -191,13 +203,28 @@ export function AssignmentsPanel({
       }
       await invalidateAfterPlanChange()
     },
-    onError: (error) =>
-      showErrorNotification(error, t('common.error'), t('common.unexpectedError')),
+    onError: async (error) => {
+      if (editingAssignment && assignmentWriteConflict(error) === 'changed') {
+        await invalidateAfterPlanChange()
+        return
+      }
+      showErrorNotification(error, t('common.error'), t('common.unexpectedError'))
+    },
   })
 
   const saving = saveMutation.isPending
+  const staleEdit =
+    editingAssignment !== null && assignmentWriteConflict(saveMutation.error) === 'changed'
+
+  const closeEditor = () => {
+    if (saving) return
+    setModalOpen(false)
+    setEditingAssignment(null)
+    setWarnings([])
+  }
 
   const handleSubmit = (values: AssignmentFormValues) => {
+    if (saving || staleEdit) return
     setWarnings([])
     saveMutation.mutate(toAssignmentPayload(values, settings.timeZone))
   }
@@ -402,15 +429,19 @@ export function AssignmentsPanel({
       {/* Create/Edit Modal */}
       <Modal
         opened={modalOpen}
-        onClose={() => {
-          setModalOpen(false)
-          setEditingAssignment(null)
-          setWarnings([])
-        }}
+        onClose={closeEditor}
+        closeOnEscape={!saving}
+        closeOnClickOutside={!saving}
+        closeButtonProps={{ disabled: saving }}
         title={editingAssignment ? t('planning.editAssignment') : t('planning.newAssignment')}
         size="md"
       >
         <Stack gap="md">
+          {staleEdit && (
+            <Alert color="orange" title={t('planning.assignmentChangedTitle')}>
+              {t('planning.assignmentChanged')}
+            </Alert>
+          )}
           {/* Capacity warnings (shown after save, not blocking) */}
           {warnings.length > 0 && (
             <Alert
@@ -436,12 +467,9 @@ export function AssignmentsPanel({
           <AssignmentForm
             assignment={editingAssignment}
             onSubmit={handleSubmit}
-            onCancel={() => {
-              setModalOpen(false)
-              setEditingAssignment(null)
-              setWarnings([])
-            }}
+            onCancel={closeEditor}
             loading={saving}
+            saveDisabled={staleEdit}
           />
         </Stack>
       </Modal>

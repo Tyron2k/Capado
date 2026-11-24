@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Button, Group, NumberInput, SegmentedControl, Select, Stack } from '@mantine/core'
+import { Button, Fieldset, Group, NumberInput, SegmentedControl, Select } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { DateField } from '../../components/DateField'
 import { ZonedDateTimeField } from '../../components/ZonedDateTimeField'
@@ -50,9 +50,16 @@ interface AssignmentFormProps {
   onSubmit: (values: AssignmentFormValues) => void
   onCancel: () => void
   loading?: boolean
+  saveDisabled?: boolean
 }
 
-export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: AssignmentFormProps) {
+export function AssignmentForm({
+  assignment,
+  onSubmit,
+  onCancel,
+  loading,
+  saveDisabled,
+}: AssignmentFormProps) {
   const { t } = useTranslation()
   const { settings } = useSettings()
   // Pin the draft's interpretation while open, even if global settings refresh.
@@ -150,6 +157,7 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
 
   useEffect(() => {
     if (assignment) {
+      setPreview(null)
       form.setValues({
         resource_id: assignment.resource_id,
         resource_type: assignment.resource_type,
@@ -192,6 +200,7 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
   }
 
   const handleSuggestionSelect = (resourceId: string, suggestionResourceType: ResourceType) => {
+    if (loading) return
     form.setFieldValue('resource_id', resourceId)
     form.setFieldValue('resource_type', suggestionResourceType)
     setResourceType(suggestionResourceType)
@@ -234,7 +243,16 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
 
   return (
     <form onSubmit={form.onSubmit(onSubmit)}>
-      <Stack gap="md">
+      <Fieldset
+        variant="unstyled"
+        disabled={loading}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--mantine-spacing-md)',
+          minInlineSize: 0,
+        }}
+      >
         {!isEditing && (
           <SegmentedControl
             value={resourceType}
@@ -345,11 +363,11 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
           >
             {t('assignmentForm.preview')}
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} disabled={saveDisabled}>
             {t('common.save')}
           </Button>
         </Group>
-      </Stack>
+      </Fieldset>
 
       {isPersonal && !isEditing && (
         <SuggestionList

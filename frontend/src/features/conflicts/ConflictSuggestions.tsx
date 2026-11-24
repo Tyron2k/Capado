@@ -7,7 +7,6 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import axios from 'axios'
 import { showErrorNotification } from '../../utils/errorHandling'
 import {
   IconArrowRight,
@@ -35,7 +34,8 @@ import { useTranslation, type Locale } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
 import { AssignmentChangeSummary } from '../planning/AssignmentChangeSummary'
-import { bookingForPatch, patchForSuggestion } from './suggestionChange'
+import { assignmentWriteConflict, bookingForPatch } from '../planning/assignmentUtils'
+import { patchForSuggestion } from './suggestionChange'
 import { useSettings } from '../../context/SettingsContext'
 import { formatDateTime } from '../../utils/date'
 
@@ -181,7 +181,7 @@ export function ConflictSuggestions({
       suggestion: ConflictSuggestion
       patch: AssignmentUpdate
       before: Assignment
-    }) => updateAssignment(before.id, { ...patch, expected_booking: bookingForPatch(before, {}) }),
+    }) => updateAssignment(before.id, { ...patch, expected_booking: bookingForPatch(before) }),
     onSuccess: async (_result, { suggestion }) => {
       notifications.show({
         title: t('common.saved'),
@@ -193,14 +193,16 @@ export function ConflictSuggestions({
       onApplied()
     },
     onError: async (error) => {
-      const response = axios.isAxiosError<{ code?: string }>(error) ? error.response : undefined
-      const unavailable = response?.status === 404
-      const changed = response?.status === 409 && response.data?.code === 'assignment_changed'
-      if (unavailable || changed) {
+      const conflict = assignmentWriteConflict(error)
+      if (conflict) {
         setActive(null)
         notifications.show({
           title: t('common.error'),
-          message: t(unavailable ? 'suggestions.bookingUnavailable' : 'suggestions.bookingChanged'),
+          message: t(
+            conflict === 'unavailable'
+              ? 'suggestions.bookingUnavailable'
+              : 'suggestions.bookingChanged',
+          ),
           color: 'orange',
         })
         await refreshPlan()

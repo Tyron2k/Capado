@@ -1,5 +1,5 @@
 import type { ConflictSuggestion } from '../../api/assignments'
-import type { Assignment, AssignmentCreate, AssignmentUpdate } from '../../types/assignment'
+import type { Assignment, AssignmentUpdate } from '../../types/assignment'
 import { addDaysUtc, dayAnchorToIso, startOfDayUtc } from '../../utils/date'
 
 function shiftCalendarDays(value: string, days: number): string {
@@ -58,28 +58,4 @@ export function patchForSuggestion(
     }
   }
   throw new Error('Suggestion cannot be applied to this assignment')
-}
-
-/** Build the full booking state used by preview and the apply precondition. */
-export function bookingForPatch(assignment: Assignment, patch: AssignmentUpdate): AssignmentCreate {
-  const resource_id = patch.resource_id ?? assignment.resource_id
-  const work_package_id = patch.work_package_id ?? assignment.work_package_id
-  const resource_type = patch.resource_type ?? assignment.resource_type
-  if (resource_type === 'personal') {
-    return {
-      resource_id,
-      resource_type,
-      work_package_id,
-      start_date: patch.start_date ?? assignment.start_date ?? undefined,
-      end_date: patch.end_date ?? assignment.end_date ?? undefined,
-      allocation_percent: patch.allocation_percent ?? assignment.allocation_percent ?? undefined,
-    }
-  }
-  return {
-    resource_id,
-    resource_type,
-    work_package_id,
-    start_at: patch.start_at ?? assignment.start_at ?? undefined,
-    end_at: patch.end_at ?? assignment.end_at ?? undefined,
-  }
 }

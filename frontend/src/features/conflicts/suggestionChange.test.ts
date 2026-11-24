@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { Assignment } from '../../types/assignment'
 import type { ConflictSuggestion } from '../../api/assignments'
-import { bookingForPatch, patchForSuggestion } from './suggestionChange'
+import { bookingForPatch } from '../planning/assignmentUtils'
+import { patchForSuggestion } from './suggestionChange'
 
 const personal = {
   created_at: '2026-01-01T00:00:00Z',

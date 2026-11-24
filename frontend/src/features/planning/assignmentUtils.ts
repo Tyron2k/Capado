@@ -3,9 +3,45 @@
  * Extracted for testability.
  */
 
-import type { Assignment, AssignmentCreate } from '../../types/assignment'
+import axios from 'axios'
+import type { Assignment, AssignmentCreate, AssignmentUpdate } from '../../types/assignment'
 import { formatDate, localDateTimeToUtc, toIsoDate } from '../../utils/date'
 import type { AssignmentFormValues } from './AssignmentForm'
+
+export function assignmentWriteConflict(error: unknown) {
+  if (!axios.isAxiosError<{ code?: string }>(error)) return
+  if (error.response?.status === 404) return 'unavailable'
+  if (error.response?.status === 409 && error.response.data?.code === 'assignment_changed') {
+    return 'changed'
+  }
+}
+
+/** Build a complete booking from persisted values and optional proposed fields. */
+export function bookingForPatch(
+  assignment: Assignment,
+  patch: AssignmentUpdate = {},
+): AssignmentCreate {
+  const resource_id = patch.resource_id ?? assignment.resource_id
+  const work_package_id = patch.work_package_id ?? assignment.work_package_id
+  const resource_type = patch.resource_type ?? assignment.resource_type
+  if (resource_type === 'personal') {
+    return {
+      resource_id,
+      resource_type,
+      work_package_id,
+      start_date: patch.start_date ?? assignment.start_date ?? undefined,
+      end_date: patch.end_date ?? assignment.end_date ?? undefined,
+      allocation_percent: patch.allocation_percent ?? assignment.allocation_percent ?? undefined,
+    }
+  }
+  return {
+    resource_id,
+    resource_type,
+    work_package_id,
+    start_at: patch.start_at ?? assignment.start_at ?? undefined,
+    end_at: patch.end_at ?? assignment.end_at ?? undefined,
+  }
+}
 
 function requireUtc(value: Date | string, timeZone: string): string {
   const instant = localDateTimeToUtc(value, timeZone)
