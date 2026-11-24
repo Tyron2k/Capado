@@ -16,7 +16,7 @@ you must use the date+hours fields, never ``start_at``/``end_at``.
 from datetime import UTC, date, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -434,6 +434,12 @@ class AssignmentService:
         if expected_booking is None:
             assignment = await self.get_by_id(assignment_id)
         else:
+            # Match CSV import's table-before-row order. UPDATE needs this
+            # table lock anyway; acquiring it after FOR UPDATE can deadlock.
+            if self.session.get_bind().dialect.name == "postgresql":
+                await self.session.execute(
+                    text("LOCK TABLE assignments IN ROW EXCLUSIVE MODE")
+                )
             # Refresh any cached row and hold the lock until the write commits.
             assignment = await self.session.get(
                 Assignment, assignment_id, populate_existing=True, with_for_update=True
