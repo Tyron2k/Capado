@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Button, Group, NumberInput, SegmentedControl, Select, Stack } from '@mantine/core'
+import { Button, Fieldset, Group, NumberInput, SegmentedControl, Select } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { DateField } from '../../components/DateField'
 import { ZonedDateTimeField } from '../../components/ZonedDateTimeField'
@@ -200,6 +200,7 @@ export function AssignmentForm({
   }
 
   const handleSuggestionSelect = (resourceId: string, suggestionResourceType: ResourceType) => {
+    if (loading) return
     form.setFieldValue('resource_id', resourceId)
     form.setFieldValue('resource_type', suggestionResourceType)
     setResourceType(suggestionResourceType)
@@ -242,7 +243,16 @@ export function AssignmentForm({
 
   return (
     <form onSubmit={form.onSubmit(onSubmit)}>
-      <Stack gap="md">
+      <Fieldset
+        variant="unstyled"
+        disabled={loading}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--mantine-spacing-md)',
+          minInlineSize: 0,
+        }}
+      >
         {!isEditing && (
           <SegmentedControl
             value={resourceType}
@@ -357,7 +367,7 @@ export function AssignmentForm({
             {t('common.save')}
           </Button>
         </Group>
-      </Stack>
+      </Fieldset>
 
       {isPersonal && !isEditing && (
         <SuggestionList

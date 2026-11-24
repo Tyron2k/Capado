@@ -39,6 +39,7 @@ vi.mock('./AssignmentForm', () => ({
     onSubmit,
     onCancel,
     saveDisabled,
+    loading,
   }: {
     onSubmit: (v: unknown) => void
     onCancel: () => void
@@ -49,7 +50,7 @@ vi.mock('./AssignmentForm', () => ({
     <div data-testid="assignment-form">
       <button
         data-testid="form-submit"
-        disabled={saveDisabled}
+        disabled={saveDisabled || loading}
         onClick={() =>
           onSubmit({
             resource_id: 'res-1',
@@ -296,6 +297,30 @@ describe('AssignmentsPanel', () => {
         }),
       ),
     )
+  })
+
+  it('keeps the current editor open while a save is pending', async () => {
+    const original = fakeAssignments[0]
+    mockedGetAssignments.mockResolvedValue([original])
+    let resolveSave!: (result: AssignmentWithWarnings) => void
+    vi.mocked(updateAssignment).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveSave = resolve
+      }),
+    )
+    renderPanel()
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }))
+    fireEvent.click(await screen.findByTestId('form-submit'))
+    await waitFor(() => expect(updateAssignment).toHaveBeenCalledOnce())
+    fireEvent.click(screen.getByTestId('form-cancel'))
+    resolveSave({ assignment: original, warnings: ['Capacity exceeded'] })
+
+    expect(await screen.findByText('Capacity Warning')).toBeVisible()
+    expect(screen.getByTestId('assignment-form')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('form-submit')).toBeEnabled())
+    fireEvent.click(screen.getByTestId('form-cancel'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
   describe('FilterBar rendering (Requirement 1.5)', () => {

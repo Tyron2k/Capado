@@ -216,8 +216,15 @@ export function AssignmentsPanel({
   const staleEdit =
     editingAssignment !== null && assignmentWriteConflict(saveMutation.error) === 'changed'
 
+  const closeEditor = () => {
+    if (saving) return
+    setModalOpen(false)
+    setEditingAssignment(null)
+    setWarnings([])
+  }
+
   const handleSubmit = (values: AssignmentFormValues) => {
-    if (staleEdit) return
+    if (saving || staleEdit) return
     setWarnings([])
     saveMutation.mutate(toAssignmentPayload(values, settings.timeZone))
   }
@@ -422,11 +429,10 @@ export function AssignmentsPanel({
       {/* Create/Edit Modal */}
       <Modal
         opened={modalOpen}
-        onClose={() => {
-          setModalOpen(false)
-          setEditingAssignment(null)
-          setWarnings([])
-        }}
+        onClose={closeEditor}
+        closeOnEscape={!saving}
+        closeOnClickOutside={!saving}
+        closeButtonProps={{ disabled: saving }}
         title={editingAssignment ? t('planning.editAssignment') : t('planning.newAssignment')}
         size="md"
       >
@@ -461,11 +467,7 @@ export function AssignmentsPanel({
           <AssignmentForm
             assignment={editingAssignment}
             onSubmit={handleSubmit}
-            onCancel={() => {
-              setModalOpen(false)
-              setEditingAssignment(null)
-              setWarnings([])
-            }}
+            onCancel={closeEditor}
             loading={saving}
             saveDisabled={staleEdit}
           />
