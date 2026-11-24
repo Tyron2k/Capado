@@ -10,7 +10,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -19,8 +19,11 @@ import pytest_asyncio
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.exceptions import ConflictError
 from app.models.assignment import Assignment
 from app.models.base import column_values
+from app.schemas.assignment import AssignmentCreate
+from app.services.assignment_service import AssignmentService
 from app.services.baseline_service import diff_payloads, snapshot_payload
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +31,130 @@ BOOKING = UUID("11111111-1111-1111-1111-111111111111")
 BASELINE = UUID("22222222-2222-2222-2222-222222222222")
 PROJECT = UUID("33333333-3333-3333-3333-333333333333")
 PACKAGE = UUID("44444444-4444-4444-4444-444444444444")
+
+
+async def wait_for_blocked_transaction(observer: AsyncSession, pid: int) -> None:
+    async with asyncio.timeout(10):
+        while not await observer.scalar(
+            sa.text("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE pid = :pid AND wait_event_type = 'Lock'
+                )
+            """),
+            {"pid": pid},
+        ):
+            await observer.commit()
+            await asyncio.sleep(0.025)
+
+
+async def test_reviewed_booking_update_checks_the_row_after_a_concurrent_write(
+    legacy_database,
+):
+    url, engine = legacy_database
+    assert (await migrate(url, "head")).returncode == 0
+    async with (
+        AsyncSession(engine) as reviewer,
+        AsyncSession(engine) as writer,
+        AsyncSession(engine) as observer,
+    ):
+        service = AssignmentService(reviewer)
+        original = await service.get_by_id(BOOKING)
+        reviewer_pid = await reviewer.scalar(sa.text("SELECT pg_backend_pid()"))
+        expected = AssignmentCreate.model_validate(original, from_attributes=True)
+        assert original.start_at is not None
+        changed = original.start_at + timedelta(minutes=15)
+        updated_at = original.updated_at
+        # Versioned assignment CSVs can change a booking while preserving updated_at.
+        await writer.execute(
+            sa.update(Assignment)
+            .where(Assignment.id == BOOKING)
+            .values(start_at=changed)
+        )
+        pending = asyncio.create_task(
+            service.update(
+                BOOKING, start_at=original.start_at, expected_booking=expected
+            )
+        )
+        try:
+            await wait_for_blocked_transaction(observer, reviewer_pid)
+            await writer.commit()
+            with pytest.raises(ConflictError) as exc:
+                await asyncio.wait_for(pending, timeout=5)
+            assert exc.value.code == "assignment_changed"
+            await reviewer.rollback()
+            persisted = await service.get_by_id(BOOKING)
+            assert persisted.start_at == changed
+            assert persisted.updated_at == updated_at
+        finally:
+            pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
+
+
+async def test_reviewed_booking_update_runs_safely_with_a_csv_import(
+    legacy_database,
+    monkeypatch,
+):
+    from app.services.import_export import assignments
+    from app.services.import_export.csv_format import _read_csv
+    from app.services.import_export.csv_transfer import import_area_rows
+    from tests.planning_reference import _seed_plan
+
+    url, engine = legacy_database
+    assert (await migrate(url, "head")).returncode == 0
+    async with AsyncSession(engine, expire_on_commit=False) as setup:
+        booking = (await _seed_plan(setup)).machine_booking
+    assert booking.start_at is not None
+    imported_start = booking.start_at + timedelta(minutes=15)
+    expected = AssignmentCreate.model_validate(booking, from_attributes=True)
+    content = assignments.export_csv(
+        {"assignments": [{**column_values(booking), "start_at": imported_start}]}
+    )
+    import_ready = asyncio.Event()
+    resume_import = asyncio.Event()
+    write_import = assignments.write_import
+
+    async def pause_before_writing(session, batch, context):
+        import_ready.set()
+        await resume_import.wait()
+        return await write_import(session, batch, context)
+
+    monkeypatch.setattr(assignments, "write_import", pause_before_writing)
+    async with (
+        AsyncSession(engine) as reviewer,
+        AsyncSession(engine) as importer,
+        AsyncSession(engine) as observer,
+    ):
+        reviewer_pid = await reviewer.scalar(sa.text("SELECT pg_backend_pid()"))
+        importing = asyncio.create_task(
+            import_area_rows(importer, "assignments", _read_csv(content))
+        )
+        applying = None
+        try:
+            await asyncio.wait_for(import_ready.wait(), timeout=10)
+            service = AssignmentService(reviewer)
+            applying = asyncio.create_task(
+                service.update(
+                    booking.id,
+                    start_at=booking.start_at + timedelta(minutes=30),
+                    expected_booking=expected,
+                )
+            )
+            await wait_for_blocked_transaction(observer, reviewer_pid)
+            resume_import.set()
+            with pytest.raises(ConflictError) as exc:
+                await asyncio.wait_for(applying, timeout=5)
+            assert exc.value.code == "assignment_changed"
+            result = await asyncio.wait_for(importing, timeout=5)
+            assert not result.errors and result.updated == 1
+            await reviewer.rollback()
+            assert (await service.get_by_id(booking.id)).start_at == imported_start
+        finally:
+            if applying is not None:
+                applying.cancel()
+                await asyncio.gather(applying, return_exceptions=True)
+            importing.cancel()
+            await asyncio.gather(importing, return_exceptions=True)
 
 
 async def test_small_area_import_allows_concurrent_unrelated_history_writes(

@@ -16,7 +16,7 @@ you must use the date+hours fields, never ``start_at``/``end_at``.
 from datetime import UTC, date, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,7 @@ from app.exceptions import BusinessRuleError, ConflictError, NotFoundError
 from app.models.assignment import Assignment
 from app.models.project import WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
+from app.schemas.assignment import AssignmentCreate
 from app.services.capacity_service import CapacityService
 from app.services.time_zone import local_day_bounds, planning_zone
 
@@ -420,6 +421,8 @@ class AssignmentService:
         allocation_percent: float | None = None,
         start_at: datetime | None = None,
         end_at: datetime | None = None,
+        *,
+        expected_booking: AssignmentCreate | None = None,
     ) -> tuple[Assignment, list[str]]:
         """Update an existing assignment with partial fields.
 
@@ -427,7 +430,30 @@ class AssignmentService:
             Tuple of (updated assignment, list of capacity warnings).
 
         """
-        assignment = await self.get_by_id(assignment_id)
+        assignment: Assignment | None
+        if expected_booking is None:
+            assignment = await self.get_by_id(assignment_id)
+        else:
+            # Match CSV import's table-before-row order. UPDATE needs this
+            # table lock anyway; acquiring it after FOR UPDATE can deadlock.
+            if self.session.get_bind().dialect.name == "postgresql":
+                await self.session.execute(
+                    text("LOCK TABLE assignments IN ROW EXCLUSIVE MODE")
+                )
+            # Refresh any cached row and hold the lock until the write commits.
+            assignment = await self.session.get(
+                Assignment, assignment_id, populate_existing=True, with_for_update=True
+            )
+            if assignment is None:
+                raise NotFoundError("Assignment", assignment_id)
+            if any(
+                getattr(assignment, field) != value
+                for field, value in expected_booking.model_dump().items()
+            ):
+                raise ConflictError(
+                    "This booking changed since the preview. Open a new preview.",
+                    code="assignment_changed",
+                )
 
         effective_resource_id = (
             resource_id if resource_id is not None else assignment.resource_id

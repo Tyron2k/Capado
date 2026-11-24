@@ -1,20 +1,95 @@
 """Integration checks for read-only planning previews against the real schema."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
+from fastapi import FastAPI
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.database import get_session
+from app.exceptions import register_exception_handlers
 from app.models.assignment import Assignment
 from app.models.calendar import WorkWeekProfile
 from app.models.conflict import Conflict
 from app.models.project import Project, WorkPackage
 from app.models.resource import InfrastructureResource, PersonalResource, ResourceType
 from app.models.resource_group import ResourceGroup
-from app.schemas.assignment import AssignmentPreviewRequest
+from app.models.user import User
+from app.routers.assignments import router
+from app.schemas.assignment import AssignmentCreate, AssignmentPreviewRequest
 from app.services.assignment_preview import AssignmentPreviewService
+from app.services.permissions import get_current_user
 from app.services.time_zone import local_wall_time_to_utc, planning_zone
+from tests.planning_reference import MONDAY, _clock, _seed_plan
+
+
+async def test_outdated_review_cannot_overwrite_an_intervening_booking_edit(
+    db_session: AsyncSession,
+) -> None:
+    plan = await _seed_plan(db_session)
+    booking = plan.machine_booking
+    tuesday = MONDAY + timedelta(days=1)
+    path = f"/assignments/{booking.id}"
+    proposed = {
+        "start_at": _clock(tuesday, 2).isoformat(),
+        "end_at": _clock(tuesday, 6).isoformat(),
+    }
+    intervening = {
+        "start_at": _clock(tuesday, 3).isoformat(),
+        "end_at": _clock(tuesday, 5).isoformat(),
+    }
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(router)
+    sessions = async_sessionmaker(db_session.bind, expire_on_commit=False)
+
+    async def session_for_request():
+        async with sessions() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = session_for_request
+    app.dependency_overrides[get_current_user] = lambda: User(
+        email="admin@example.test", name="Admin", password_hash="unused", role="admin"
+    )
+    async with (
+        AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as reviewer,
+        AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as editor,
+    ):
+        original = (await reviewer.get(path)).json()
+        expected = AssignmentCreate.model_validate(original).model_dump(mode="json")
+        preview = await reviewer.post(
+            "/assignments/preview",
+            json={**expected, **proposed, "assignment_id": str(booking.id)},
+        )
+        assert preview.status_code == 200
+        assert (await editor.put(path, json=intervening)).status_code == 200
+
+        response = await reviewer.put(
+            path, json={**proposed, "expected_booking": expected}
+        )
+        assert response.status_code == 409
+        assert response.json()["code"] == "assignment_changed"
+        latest = (await reviewer.get(path)).json()
+        assert datetime.fromisoformat(latest["start_at"]) == _clock(tuesday, 3)
+        assert datetime.fromisoformat(latest["end_at"]) == _clock(tuesday, 5)
+
+        current = AssignmentCreate.model_validate(latest).model_dump(mode="json")
+        new_preview = await reviewer.post(
+            "/assignments/preview",
+            json={**current, **proposed, "assignment_id": str(booking.id)},
+        )
+        assert new_preview.status_code == 200
+        applied = await reviewer.put(
+            path, json={**proposed, "expected_booking": current}
+        )
+        assert applied.status_code == 200
+        assert datetime.fromisoformat(
+            applied.json()["assignment"]["start_at"]
+        ) == _clock(tuesday, 2)
 
 
 @pytest.mark.asyncio

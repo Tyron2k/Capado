@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Assignment } from '../../types/assignment'
 import type { ConflictSuggestion } from '../../api/assignments'
-import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
+import { bookingForPatch, patchForSuggestion } from './suggestionChange'
 
 const personal = {
   created_at: '2026-01-01T00:00:00Z',
@@ -55,8 +55,7 @@ describe('conflict suggestion preview and apply payloads', () => {
   it('shifts calendar dates over DST without changing the assignment duration', () => {
     const patch = patchForSuggestion(suggestion('shift_forward', { shift_days: 2 }), personal)
     expect(patch).toEqual({ start_date: '2026-03-30', end_date: '2026-04-04' })
-    expect(previewPayloadForPatch(personal, patch)).toMatchObject({
-      assignment_id: 'a1',
+    expect(bookingForPatch(personal, patch)).toMatchObject({
       resource_id: 'r1',
       start_date: '2026-03-30',
       end_date: '2026-04-04',
@@ -115,8 +114,7 @@ describe('conflict suggestion preview and apply payloads', () => {
       personal,
     )
     expect(patch).toEqual({ resource_id: 'r2' })
-    expect(previewPayloadForPatch(personal, patch)).toMatchObject({
-      assignment_id: 'a1',
+    expect(bookingForPatch(personal, patch)).toMatchObject({
       resource_id: 'r2',
       start_date: personal.start_date,
       end_date: personal.end_date,

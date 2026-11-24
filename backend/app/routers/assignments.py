@@ -694,6 +694,7 @@ async def update_assignment(
         allocation_percent=data.allocation_percent,
         start_at=data.start_at,
         end_at=data.end_at,
+        expected_booking=data.expected_booking,
     )
     return AssignmentCreateResponse(
         assignment=await _enrich_one(session, assignment),

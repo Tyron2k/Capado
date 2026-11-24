@@ -3730,6 +3730,8 @@ export interface components {
             end_at?: string | null;
             /** End Date */
             end_date?: string | null;
+            /** @description Booking snapshot required by a reviewed proposal. */
+            expected_booking?: components["schemas"]["AssignmentCreate"] | null;
             /** Resource Id */
             resource_id?: string | null;
             resource_type?: components["schemas"]["ResourceType"] | null;
