@@ -35,11 +35,12 @@ class NotFoundError(Exception):
 
 
 class ConflictError(Exception):
-    """Conflict error (HTTP 409). Raised on duplicates or FK-blocked deletions."""
+    """Conflict with the current state (HTTP 409)."""
 
-    def __init__(self, message: str):
+    def __init__(self, message: str, *, code: str | None = None):
         """Initialize with a descriptive conflict message."""
         self.message = message
+        self.code = code
         super().__init__(self.message)
 
 
@@ -115,10 +116,10 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def conflict_error_handler(
         request: Request, exc: ConflictError
     ) -> JSONResponse:
-        return JSONResponse(
-            status_code=409,
-            content={"detail": exc.message},
-        )
+        content = {"detail": exc.message}
+        if exc.code is not None:
+            content["code"] = exc.code
+        return JSONResponse(status_code=409, content=content)
 
     @app.exception_handler(InputValidationError)
     async def input_validation_error_handler(

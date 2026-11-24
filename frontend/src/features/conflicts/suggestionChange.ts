@@ -60,17 +60,13 @@ export function patchForSuggestion(
   throw new Error('Suggestion cannot be applied to this assignment')
 }
 
-/** The preview endpoint requires the complete resulting assignment, not a partial update. */
-export function previewPayloadForPatch(
-  assignment: Assignment,
-  patch: AssignmentUpdate,
-): AssignmentCreate & { assignment_id: string } {
+/** Build the full booking state used by preview and the apply precondition. */
+export function bookingForPatch(assignment: Assignment, patch: AssignmentUpdate): AssignmentCreate {
   const resource_id = patch.resource_id ?? assignment.resource_id
   const work_package_id = patch.work_package_id ?? assignment.work_package_id
   const resource_type = patch.resource_type ?? assignment.resource_type
   if (resource_type === 'personal') {
     return {
-      assignment_id: assignment.id,
       resource_id,
       resource_type,
       work_package_id,
@@ -80,7 +76,6 @@ export function previewPayloadForPatch(
     }
   }
   return {
-    assignment_id: assignment.id,
     resource_id,
     resource_type,
     work_package_id,

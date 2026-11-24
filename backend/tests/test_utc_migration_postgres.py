@@ -10,7 +10,7 @@ import json
 import os
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -19,8 +19,11 @@ import pytest_asyncio
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from app.exceptions import ConflictError
 from app.models.assignment import Assignment
 from app.models.base import column_values
+from app.schemas.assignment import AssignmentCreate
+from app.services.assignment_service import AssignmentService
 from app.services.baseline_service import diff_payloads, snapshot_payload
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +31,59 @@ BOOKING = UUID("11111111-1111-1111-1111-111111111111")
 BASELINE = UUID("22222222-2222-2222-2222-222222222222")
 PROJECT = UUID("33333333-3333-3333-3333-333333333333")
 PACKAGE = UUID("44444444-4444-4444-4444-444444444444")
+
+
+async def test_reviewed_booking_update_checks_the_row_after_a_concurrent_write(
+    legacy_database,
+):
+    url, engine = legacy_database
+    assert (await migrate(url, "head")).returncode == 0
+    async with (
+        AsyncSession(engine) as reviewer,
+        AsyncSession(engine) as writer,
+        AsyncSession(engine) as observer,
+    ):
+        service = AssignmentService(reviewer)
+        original = await service.get_by_id(BOOKING)
+        expected = AssignmentCreate.model_validate(original, from_attributes=True)
+        assert original.start_at is not None
+        changed = original.start_at + timedelta(minutes=15)
+        updated_at = original.updated_at
+        # Versioned assignment CSVs can change a booking while preserving updated_at.
+        await writer.execute(
+            sa.update(Assignment)
+            .where(Assignment.id == BOOKING)
+            .values(start_at=changed)
+        )
+        pending = asyncio.create_task(
+            service.update(
+                BOOKING, start_at=original.start_at, expected_booking=expected
+            )
+        )
+        try:
+            async with asyncio.timeout(10):
+                while not await observer.scalar(
+                    sa.text("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM pg_stat_activity
+                        WHERE datname = current_database() AND wait_event_type = 'Lock'
+                          AND query LIKE '%FOR UPDATE%'
+                    )
+                """)
+                ):
+                    await observer.commit()
+                    await asyncio.sleep(0.025)
+            await writer.commit()
+            with pytest.raises(ConflictError) as exc:
+                await asyncio.wait_for(pending, timeout=5)
+            assert exc.value.code == "assignment_changed"
+            await reviewer.rollback()
+            persisted = await service.get_by_id(BOOKING)
+            assert persisted.start_at == changed
+            assert persisted.updated_at == updated_at
+        finally:
+            pending.cancel()
+            await asyncio.gather(pending, return_exceptions=True)
 
 
 async def test_small_area_import_allows_concurrent_unrelated_history_writes(

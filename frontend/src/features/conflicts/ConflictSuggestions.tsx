@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, Badge, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
+import axios from 'axios'
 import { showErrorNotification } from '../../utils/errorHandling'
 import {
   IconArrowRight,
@@ -34,7 +35,7 @@ import { useTranslation, type Locale } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
 import { AssignmentChangeSummary } from '../planning/AssignmentChangeSummary'
-import { patchForSuggestion, previewPayloadForPatch } from './suggestionChange'
+import { bookingForPatch, patchForSuggestion } from './suggestionChange'
 import { useSettings } from '../../context/SettingsContext'
 import { formatDateTime } from '../../utils/date'
 
@@ -137,6 +138,16 @@ export function ConflictSuggestions({
   )
   const loading = suggestionsQuery.isPending
 
+  const refreshPlan = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.assignments.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.digest.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.gantt.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.planning.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.resources.all }),
+    ])
+
   /**
    * APPLYING A SUGGESTION WRITES AN ASSIGNMENT, so it changes the plan.
    *
@@ -151,8 +162,8 @@ export function ConflictSuggestions({
     mutationFn: async (suggestion: ConflictSuggestion) => {
       const assignment = await getAssignment(suggestion.assignment_id)
       const patch = patchForSuggestion(suggestion, assignment)
-      const after = previewPayloadForPatch(assignment, patch)
-      const result = await previewAssignment(after)
+      const after = bookingForPatch(assignment, patch)
+      const result = await previewAssignment({ ...after, assignment_id: assignment.id })
       return { suggestion, patch, before: assignment, after, result }
     },
     onSuccess: setActive,
@@ -164,12 +175,13 @@ export function ConflictSuggestions({
 
   const applyMutation = useMutation({
     mutationFn: ({
-      suggestion,
       patch,
+      before,
     }: {
       suggestion: ConflictSuggestion
       patch: AssignmentUpdate
-    }) => updateAssignment(suggestion.assignment_id, patch),
+      before: Assignment
+    }) => updateAssignment(before.id, { ...patch, expected_booking: bookingForPatch(before, {}) }),
     onSuccess: async (_result, { suggestion }) => {
       notifications.show({
         title: t('common.saved'),
@@ -177,19 +189,26 @@ export function ConflictSuggestions({
         color: 'green',
       })
       setActive(null)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.assignments.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.conflicts.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.digest.all }),
-        // The Gantt perspectives DRAW the dates and bars this write moves. Adding it here rather than
-        // leaving each screen to remember is the same argument as the rest of this layer.
-        queryClient.invalidateQueries({ queryKey: queryKeys.gantt.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.planning.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.resources.all }),
-      ])
+      await refreshPlan()
       onApplied()
     },
-    onError: (error) => showErrorNotification(error, t('common.error'), t('common.genericError')),
+    onError: async (error) => {
+      if (
+        axios.isAxiosError<{ code?: string }>(error) &&
+        error.response?.status === 409 &&
+        error.response.data?.code === 'assignment_changed'
+      ) {
+        setActive(null)
+        notifications.show({
+          title: t('common.error'),
+          message: t('suggestions.bookingChanged'),
+          color: 'orange',
+        })
+        await refreshPlan()
+        return
+      }
+      showErrorNotification(error, t('common.error'), t('common.genericError'))
+    },
   })
   const busy = previewMutation.isPending || applyMutation.isPending
 
@@ -254,7 +273,11 @@ export function ConflictSuggestions({
               </Button>
               <Button
                 onClick={() =>
-                  applyMutation.mutate({ suggestion: active.suggestion, patch: active.patch })
+                  applyMutation.mutate({
+                    suggestion: active.suggestion,
+                    patch: active.patch,
+                    before: active.before,
+                  })
                 }
                 loading={applyMutation.isPending}
               >

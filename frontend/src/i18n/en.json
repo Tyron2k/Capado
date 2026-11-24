@@ -336,6 +336,7 @@
     "title": "Resolution Suggestions",
     "apply": "Apply",
     "previewAction": "Preview: {action}",
+    "bookingChanged": "This booking changed since the preview. Open a new preview.",
     "previewDisclaimer": "This is an estimate. Only Apply saves the change; the plan may change in the meantime.",
     "skillPreviewNote": "The preview shows capacity conflicts. The replacement's qualifications were checked for the suggestion list but are not recalculated here.",
     "type_shift_forward": "Forward",

@@ -4,6 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@testing-library/jest-dom/vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MantineProvider } from '@mantine/core'
+import { notifications } from '@mantine/notifications'
 import { QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('../../api/assignments', () => ({
@@ -77,6 +78,15 @@ const preview = {
   ],
 }
 
+const expectedBooking = {
+  resource_id: assignment.resource_id,
+  resource_type: assignment.resource_type,
+  work_package_id: assignment.work_package_id,
+  start_date: assignment.start_date,
+  end_date: assignment.end_date,
+  allocation_percent: assignment.allocation_percent,
+}
+
 function renderSuggestions(assignmentIds?: string[]) {
   const onApplied = vi.fn()
   render(
@@ -147,6 +157,7 @@ describe('conflict suggestions in the planning overview', () => {
       expect(updateAssignment).toHaveBeenCalledWith('a1', {
         start_date: '2026-09-03',
         end_date: '2026-09-12',
+        expected_booking: expectedBooking,
       }),
     )
     await waitFor(() => expect(onApplied).toHaveBeenCalledOnce())
@@ -159,6 +170,27 @@ describe('conflict suggestions in the planning overview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }))
     expect(updateAssignment).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Anwenden' })).not.toBeInTheDocument()
+  })
+
+  it('discards an outdated preview and refreshes the suggestions', async () => {
+    vi.mocked(updateAssignment).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 409, data: { code: 'assignment_changed' } },
+    })
+    const onApplied = renderSuggestions()
+    fireEvent.click(await screen.findByRole('button', { name: 'Vorschau' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Anwenden' }))
+
+    await waitFor(() =>
+      expect(notifications.show).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Diese Buchung wurde seit der Vorschau geändert. Öffne eine neue Vorschau.',
+        }),
+      ),
+    )
+    expect(screen.queryByRole('button', { name: 'Anwenden' })).not.toBeInTheDocument()
+    expect(getConflictSuggestions).toHaveBeenCalledTimes(2)
+    expect(onApplied).not.toHaveBeenCalled()
   })
 })
 
@@ -202,7 +234,10 @@ it('shows the exact allocation reduction before saving the same value', async ()
   expect(updateAssignment).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Anwenden' }))
   await waitFor(() =>
-    expect(updateAssignment).toHaveBeenCalledWith('a1', { allocation_percent: 37.5 }),
+    expect(updateAssignment).toHaveBeenCalledWith('a1', {
+      allocation_percent: 37.5,
+      expected_booking: expectedBooking,
+    }),
   )
 })
 

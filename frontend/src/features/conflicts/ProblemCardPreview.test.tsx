@@ -156,7 +156,19 @@ describe('skill-conflict resource swap', () => {
     expect(updateAssignment).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Anwenden' }))
-    await waitFor(() => expect(updateAssignment).toHaveBeenCalledWith('a1', { resource_id: 'r2' }))
+    await waitFor(() =>
+      expect(updateAssignment).toHaveBeenCalledWith('a1', {
+        resource_id: 'r2',
+        expected_booking: {
+          resource_id: 'r1',
+          resource_type: 'personal',
+          work_package_id: 'w1',
+          start_date: '2026-09-01',
+          end_date: '2026-09-10',
+          allocation_percent: 80,
+        },
+      }),
+    )
     await waitFor(() => expect(onChanged).toHaveBeenCalledOnce())
   })
 })

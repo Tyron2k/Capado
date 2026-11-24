@@ -44,6 +44,9 @@ class AssignmentCreate(BaseModel):
 class AssignmentUpdate(BaseModel):
     """Partial update payload."""
 
+    expected_booking: AssignmentCreate | None = Field(
+        default=None, description="Booking snapshot required by a reviewed proposal."
+    )
     resource_id: UUID | None = None
     resource_type: ResourceType | None = None
     work_package_id: UUID | None = None
