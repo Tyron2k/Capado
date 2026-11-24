@@ -183,6 +183,8 @@
     "deleteAssignmentConfirm": "Do you really want to delete this assignment?",
     "assignmentDeleted": "Assignment has been deleted.",
     "assignmentUpdated": "Assignment has been updated.",
+    "assignmentChangedTitle": "Booking changed",
+    "assignmentChanged": "The booking changed while this form was open. Close the form and reopen the booking to continue with the current values.",
     "assignmentCreated": "Assignment has been created.",
     "loadFailed": "Assignments could not be loaded.",
     "noAssignments": "No assignments available. Create a new assignment.",

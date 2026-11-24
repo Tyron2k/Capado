@@ -38,15 +38,18 @@ vi.mock('./AssignmentForm', () => ({
   AssignmentForm: ({
     onSubmit,
     onCancel,
+    saveDisabled,
   }: {
     onSubmit: (v: unknown) => void
     onCancel: () => void
     loading?: boolean
+    saveDisabled?: boolean
     assignment?: unknown
   }) => (
     <div data-testid="assignment-form">
       <button
         data-testid="form-submit"
+        disabled={saveDisabled}
         onClick={() =>
           onSubmit({
             resource_id: 'res-1',
@@ -229,6 +232,70 @@ describe('AssignmentsPanel', () => {
       ),
     )
     expect(createAssignment).not.toHaveBeenCalled()
+  })
+
+  it('submits the original booking and keeps the draft visible when the booking changed', async () => {
+    const original = fakeAssignments[0]
+    const newer = { ...original, allocation_percent: 75 }
+    mockedGetAssignments.mockResolvedValueOnce([original]).mockResolvedValue([newer])
+    vi.mocked(updateAssignment)
+      .mockRejectedValueOnce({
+        isAxiosError: true,
+        response: { status: 409, data: { code: 'assignment_changed' } },
+      })
+      .mockResolvedValueOnce({ assignment: newer, warnings: [] })
+    renderPanel()
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }))
+    fireEvent.click(await screen.findByTestId('form-submit'))
+    expect(await screen.findByText('Booking changed')).toBeVisible()
+    expect(screen.getByTestId('form-submit')).toBeDisabled()
+    expect(updateAssignment).toHaveBeenNthCalledWith(
+      1,
+      original.id,
+      expect.objectContaining({
+        allocation_percent: 80,
+        expected_booking: expect.objectContaining({ allocation_percent: 50 }),
+      }),
+    )
+
+    fireEvent.click(screen.getByTestId('form-cancel'))
+    await screen.findByText('75%')
+    fireEvent.click(screen.getByRole('button', { name: /edit/i }))
+    fireEvent.click(await screen.findByTestId('form-submit'))
+    await waitFor(() =>
+      expect(updateAssignment).toHaveBeenNthCalledWith(
+        2,
+        original.id,
+        expect.objectContaining({
+          expected_booking: expect.objectContaining({ allocation_percent: 75 }),
+        }),
+      ),
+    )
+  })
+
+  it('uses the saved booking as the baseline if an edit returns capacity warnings', async () => {
+    const original = fakeAssignments[0]
+    const updated = { ...original, allocation_percent: 80 }
+    mockedGetAssignments.mockResolvedValue([original])
+    vi.mocked(updateAssignment)
+      .mockResolvedValueOnce({ assignment: updated, warnings: ['Capacity exceeded'] })
+      .mockResolvedValueOnce({ assignment: updated, warnings: [] })
+    renderPanel()
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit/i }))
+    fireEvent.click(await screen.findByTestId('form-submit'))
+    expect(await screen.findByText('Capacity Warning')).toBeVisible()
+    fireEvent.click(screen.getByTestId('form-submit'))
+    await waitFor(() =>
+      expect(updateAssignment).toHaveBeenNthCalledWith(
+        2,
+        original.id,
+        expect.objectContaining({
+          expected_booking: expect.objectContaining({ allocation_percent: 80 }),
+        }),
+      ),
+    )
   })
 
   describe('FilterBar rendering (Requirement 1.5)', () => {

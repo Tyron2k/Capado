@@ -50,9 +50,16 @@ interface AssignmentFormProps {
   onSubmit: (values: AssignmentFormValues) => void
   onCancel: () => void
   loading?: boolean
+  saveDisabled?: boolean
 }
 
-export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: AssignmentFormProps) {
+export function AssignmentForm({
+  assignment,
+  onSubmit,
+  onCancel,
+  loading,
+  saveDisabled,
+}: AssignmentFormProps) {
   const { t } = useTranslation()
   const { settings } = useSettings()
   // Pin the draft's interpretation while open, even if global settings refresh.
@@ -150,6 +157,7 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
 
   useEffect(() => {
     if (assignment) {
+      setPreview(null)
       form.setValues({
         resource_id: assignment.resource_id,
         resource_type: assignment.resource_type,
@@ -345,7 +353,7 @@ export function AssignmentForm({ assignment, onSubmit, onCancel, loading }: Assi
           >
             {t('assignmentForm.preview')}
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} disabled={saveDisabled}>
             {t('common.save')}
           </Button>
         </Group>

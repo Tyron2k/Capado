@@ -183,6 +183,8 @@
     "deleteAssignmentConfirm": "Möchten Sie diese Zuweisung wirklich löschen?",
     "assignmentDeleted": "Zuweisung wurde gelöscht.",
     "assignmentUpdated": "Zuweisung wurde aktualisiert.",
+    "assignmentChangedTitle": "Buchung geändert",
+    "assignmentChanged": "Die Buchung wurde zwischenzeitlich geändert. Schließe das Formular und öffne die Buchung erneut, um mit dem aktuellen Stand weiterzuarbeiten.",
     "assignmentCreated": "Zuweisung wurde erstellt.",
     "loadFailed": "Zuweisungen konnten nicht geladen werden.",
     "noAssignments": "Keine Zuweisungen vorhanden. Erstellen Sie eine neue Zuweisung.",
