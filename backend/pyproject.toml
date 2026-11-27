@@ -20,7 +20,7 @@ dependencies = [
     "PyJWT==2.15.1",  # Imported as 'jwt' in app/services/auth_service.py
     "openpyxl==3.1.5",
     "python-multipart==0.0.34",  # Required by FastAPI for UploadFile/Form parsing
-    "httpx==0.28.1",  # HTTP client for OIDC token exchange and userinfo requests
+    "httpx==0.29.0",  # HTTP client for OIDC token exchange and userinfo requests
     "pydantic-settings==2.16.3",  # BaseSettings for centralized app.config.settings
     "tzdata==2026.6",  # IANA zones, including in slim images without OS tzdata
     # Not imported by the app — pinned only to lift the version the base image ships. The
