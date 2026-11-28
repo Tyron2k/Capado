@@ -194,7 +194,7 @@ export function ConflictSuggestions({
           ? warnings.map((warning) => formatWarning(warning, t, locale)).join(' ')
           : buildDescription(suggestion, t, settings.timeZone, locale),
         color: hasWarnings ? 'orange' : 'green',
-        autoClose: hasWarnings ? false : undefined,
+        autoClose: hasWarnings ? 15_000 : undefined,
       })
       setActive(null)
       await refreshPlan()

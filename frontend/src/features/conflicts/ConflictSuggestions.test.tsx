@@ -181,7 +181,7 @@ describe('conflict suggestions in the planning overview', () => {
       expect.objectContaining({
         title: 'Gespeichert',
         color: 'orange',
-        autoClose: false,
+        autoClose: 15_000,
         message:
           'Kapazität überschritten an 3 Tagen (03.09.2026 bis 05.09.2026, max. Auslastung: 150%).',
       }),
