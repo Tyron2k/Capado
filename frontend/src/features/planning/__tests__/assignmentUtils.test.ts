@@ -17,9 +17,9 @@ describe('formatWarning', () => {
 
   it('parses single-day capacity_exceeded warning', () => {
     const warning = 'capacity_exceeded|days=1|from=2027-01-15|to=2027-01-15|max_util=150'
-    const result = formatWarning(warning, mockT)
-    expect(result).toContain('Capacity exceeded')
-    expect(result).toContain('150')
+    expect(formatWarning(warning, mockT, 'en')).toBe(
+      'Capacity exceeded on 2027-01-15 (utilization: 150%).',
+    )
   })
 
   it('parses multi-day capacity_exceeded warning', () => {

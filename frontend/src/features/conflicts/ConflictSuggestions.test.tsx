@@ -161,6 +161,32 @@ describe('conflict suggestions in the planning overview', () => {
       }),
     )
     await waitFor(() => expect(onApplied).toHaveBeenCalledOnce())
+    expect(notifications.show).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'Gespeichert', color: 'green' }),
+    )
+  })
+
+  it('shows the capacity warning returned on save after a conflict-free preview', async () => {
+    vi.mocked(updateAssignment).mockResolvedValueOnce({
+      assignment: { ...assignment, start_date: '2026-09-03', end_date: '2026-09-12' },
+      warnings: ['capacity_exceeded|days=3|from=2026-09-03|to=2026-09-05|max_util=150'],
+    })
+    const onApplied = renderSuggestions()
+    fireEvent.click(await screen.findByRole('button', { name: 'Vorschau' }))
+    expect(await screen.findByText('Konflikte: 0 → 0')).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Anwenden' }))
+
+    await waitFor(() => expect(onApplied).toHaveBeenCalledOnce())
+    expect(notifications.show).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        title: 'Gespeichert',
+        color: 'orange',
+        autoClose: 15_000,
+        message:
+          'Kapazität überschritten an 3 Tagen (03.09.2026 bis 05.09.2026, max. Auslastung: 150%).',
+      }),
+    )
+    expect(screen.queryByRole('button', { name: 'Anwenden' })).not.toBeInTheDocument()
   })
 
   it('closes the preview without changing the plan', async () => {

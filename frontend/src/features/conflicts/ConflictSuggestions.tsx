@@ -34,7 +34,11 @@ import { useTranslation, type Locale } from '../../i18n'
 import { queryKeys } from '../../api/queryClient'
 import { AssignmentPreviewSummary } from '../planning/AssignmentPreviewSummary'
 import { AssignmentChangeSummary } from '../planning/AssignmentChangeSummary'
-import { assignmentWriteConflict, bookingForPatch } from '../planning/assignmentUtils'
+import {
+  assignmentWriteConflict,
+  bookingForPatch,
+  formatWarning,
+} from '../planning/assignmentUtils'
 import { patchForSuggestion } from './suggestionChange'
 import { useSettings } from '../../context/SettingsContext'
 import { formatDateTime } from '../../utils/date'
@@ -182,11 +186,15 @@ export function ConflictSuggestions({
       patch: AssignmentUpdate
       before: Assignment
     }) => updateAssignment(before.id, { ...patch, expected_booking: bookingForPatch(before) }),
-    onSuccess: async (_result, { suggestion }) => {
+    onSuccess: async ({ warnings }, { suggestion }) => {
+      const hasWarnings = warnings.length > 0
       notifications.show({
         title: t('common.saved'),
-        message: buildDescription(suggestion, t, settings.timeZone, locale),
-        color: 'green',
+        message: hasWarnings
+          ? warnings.map((warning) => formatWarning(warning, t, locale)).join(' ')
+          : buildDescription(suggestion, t, settings.timeZone, locale),
+        color: hasWarnings ? 'orange' : 'green',
+        autoClose: hasWarnings ? 15_000 : undefined,
       })
       setActive(null)
       await refreshPlan()

@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios'
+import type { Locale } from '../../i18n'
 import type { Assignment, AssignmentCreate, AssignmentUpdate } from '../../types/assignment'
 import { formatDate, localDateTimeToUtc, toIsoDate } from '../../utils/date'
 import type { AssignmentFormValues } from './AssignmentForm'
@@ -91,6 +92,7 @@ interface ProjectGroup {
 export function formatWarning(
   warning: string,
   t: (key: string, params?: Record<string, string | number>) => string,
+  locale: Locale = 'de',
 ): string {
   if (warning.startsWith('capacity_exceeded|')) {
     const params: Record<string, string> = {}
@@ -99,8 +101,8 @@ export function formatWarning(
       if (key && value) params[key] = value
     }
     const days = Number(params.days) || 1
-    const from = params.from ? formatDate(params.from) : ''
-    const to = params.to ? formatDate(params.to) : ''
+    const from = params.from ? formatDate(params.from, locale) : ''
+    const to = params.to ? formatDate(params.to, locale) : ''
     const maxUtil = params.max_util ?? '0'
     if (days === 1) {
       return t('planning.capacityExceededSingle', { date: from, maxUtil })

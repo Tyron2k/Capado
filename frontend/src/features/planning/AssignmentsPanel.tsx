@@ -77,7 +77,7 @@ export function AssignmentsPanel({
   focus?: ConflictFocus | null
   onClearFocus?: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const { settings } = useSettings()
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
@@ -454,7 +454,7 @@ export function AssignmentsPanel({
               <Stack gap="xs">
                 {warnings.map((warning, idx) => (
                   <Text key={idx} size="sm">
-                    {formatWarning(warning, t)}
+                    {formatWarning(warning, t, locale)}
                   </Text>
                 ))}
                 <Text size="xs" c="dimmed" mt="xs">
