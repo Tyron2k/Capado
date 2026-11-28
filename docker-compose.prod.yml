@@ -18,7 +18,7 @@
 
 services:
   db:
-    image: postgres:18-alpine
+    image: postgres:19-alpine
     container_name: capado_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-capado_user}
