@@ -196,7 +196,7 @@ beforeAll(() => {
 function renderPanel(focus?: ConflictFocus) {
   return render(
     <QueryClientProvider client={createTestQueryClient()}>
-      <MantineProvider>
+      <MantineProvider env="test">
         <I18nProvider locale="en">
           <AssignmentsPanel focus={focus} onClearFocus={vi.fn()} />
         </I18nProvider>
@@ -285,9 +285,14 @@ describe('AssignmentsPanel', () => {
     renderPanel()
 
     fireEvent.click(await screen.findByRole('button', { name: /edit/i }))
-    fireEvent.click(await screen.findByTestId('form-submit'))
-    expect(await screen.findByText('Capacity Warning')).toBeVisible()
-    fireEvent.click(screen.getByTestId('form-submit'))
+    const submit = await screen.findByTestId('form-submit')
+    await waitFor(() => expect(submit).toBeVisible())
+    fireEvent.click(submit)
+    await waitFor(() => {
+      expect(screen.getByText('Capacity Warning')).toBeVisible()
+      expect(submit).toBeEnabled()
+    })
+    fireEvent.click(submit)
     await waitFor(() =>
       expect(updateAssignment).toHaveBeenNthCalledWith(
         2,
@@ -311,14 +316,22 @@ describe('AssignmentsPanel', () => {
     renderPanel()
 
     fireEvent.click(await screen.findByRole('button', { name: /edit/i }))
-    fireEvent.click(await screen.findByTestId('form-submit'))
-    await waitFor(() => expect(updateAssignment).toHaveBeenCalledOnce())
+    const submit = await screen.findByTestId('form-submit')
+    await waitFor(() => expect(submit).toBeVisible())
+    fireEvent.click(submit)
+    await waitFor(() => {
+      expect(updateAssignment).toHaveBeenCalledOnce()
+      expect(submit).toBeDisabled()
+    })
     fireEvent.click(screen.getByTestId('form-cancel'))
+    expect(screen.getByRole('dialog')).toBeVisible()
     resolveSave({ assignment: original, warnings: ['Capacity exceeded'] })
 
-    expect(await screen.findByText('Capacity Warning')).toBeVisible()
-    expect(screen.getByTestId('assignment-form')).toBeVisible()
-    await waitFor(() => expect(screen.getByTestId('form-submit')).toBeEnabled())
+    await waitFor(() => {
+      expect(screen.getByText('Capacity Warning')).toBeVisible()
+      expect(submit).toBeVisible()
+      expect(submit).toBeEnabled()
+    })
     fireEvent.click(screen.getByTestId('form-cancel'))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
